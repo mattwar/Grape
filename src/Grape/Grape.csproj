@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SDL3-CS" Version="3.2.20" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SDL3.Model.SkiaSharp\SDL3.Model.SkiaSharp.csproj" />
+    <ProjectReference Include="..\SDL3.Model\SDL3.Model.csproj" />
+  </ItemGroup>
+
+</Project>
