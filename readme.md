@@ -1,4 +1,4 @@
-\# Grape - Graphics Programming Extensions
+# Grape - Graphics Programming Extensions
 
 
 
