@@ -18,6 +18,7 @@ public class Application : IDisposable
         if (!SDL.Init(flags))
             throw new InvalidOperationException($"Failed to initialize SDL: {SDL.GetError()}");
         Current = this;
+        this.Thread = Thread.CurrentThread;
     }
 
     /// <summary>
@@ -47,6 +48,11 @@ public class Application : IDisposable
     /// The current running application.
     /// </summary>
     public static Application Current { get; private set; } = null!;
+
+    /// <summary>
+    /// The thread the application was created on.
+    /// </summary>
+    public Thread Thread { get; }
 
     /// <summary>
     /// True if the application has been disposed.
@@ -151,9 +157,11 @@ public class Application : IDisposable
                 switch ((SDL.EventType)e.Type)
                 {
                     case SDL.EventType.Quit:
-                        goto exit;                      
+                        goto exit;
+#if false
                     case SDL.EventType.KeyDown when e.Key.Key == SDL.Keycode.Escape:
                         goto exit;
+#endif
                 }
 
                 DispatchEvent(e);
@@ -166,46 +174,64 @@ public class Application : IDisposable
         _context = null;
     }
 
-
+    /// <summary>
+    /// Executes the callback asynchronously on the application's main thread.
+    /// </summary>
     public void Post(SendOrPostCallback callback, object? state = null)
     {
         if (_context is { } context)
         {
+            // post to the application's synchronization context
             context.Post(callback, state);
         }
         else
         {
+            // application synchronization context is not available, so just invoke the callback
             callback(state);
         }
     }
 
+    /// <summary>
+    /// Executes the callback asynchronously on the application's main thread.
+    /// </summary>
     public Task PostAsync(SendOrPostCallback callback, object? state = null)
     {
         if (_context is { } context)
         {
+            // post to the application's synchronization context
             var tcs = new TaskCompletionSource();
             context.Post(_state => { callback(_state); tcs.SetResult(); }, state);
             return tcs.Task;
         }
         else
         {
+            // application synchronization context is not available, so just invoke the callback
             callback(state);
             return Task.CompletedTask;
         }
     }
 
+    /// <summary>
+    /// Executes the callback synchronously on the application's main thread.
+    /// </summary>
     public void Send(SendOrPostCallback callback, object? state = null)
     {
-        if (_context is { } context)
+        if (this.Thread == Thread.CurrentThread)
         {
+            // this may jump the queue, but we're already on the right thread
+            callback(state);
+        }
+        else if (_context is { } context)
+        {
+            // send to the application's synchronization context
             context.Send(callback, state);
         }
         else
         {
+            // application synchronization context is not available, so just invoke the callback
             callback(state);
         }
     }
-
 
     #region events
 

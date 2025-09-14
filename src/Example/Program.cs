@@ -2,11 +2,11 @@
 using SDL3.Model;
 using Grape;
 
-var window = new Window(800, 600)
+var window = new Window
 {
     Title = "Grape",
     BackgroundColor = new SDL.Color { R = 0, G = 20, B = 0, A = 0 },
-    FullScreen = true
+    FullScreen = true,
 };
 
 var icon = Surface.LoadImage("grape.bmp");
@@ -16,37 +16,10 @@ window.Icon = icon;
 var rocketImage = Surface.LoadImage("rocket.png");
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f);
-//rocket.SpinVelocity = 90; // how many degrees spin per second
+rocket.Speed = 0f;
 
-window.KeyDown += (window, e) =>
-{
-    switch (e.Key)
-    {
-        case SDL.Keycode.Left:
-            rocket.VelocityX += -10f;
-            break;
-        case SDL.Keycode.Right:
-            rocket.VelocityX += 10f;
-            break;
-        case SDL.Keycode.Up:
-            rocket.VelocityY += -10f;
-            break;
-        case SDL.Keycode.Down:
-            rocket.VelocityY += 10f;
-            break;
-    }
-};
-
-window.Rendering += (window, renderer) =>
-{
-    rocket.Render(renderer);
-
-#if DEBUG
-    // render debug text on screen
-    renderer.DrawColor = new SDL.Color { R = 255, G = 255, B = 255, A = 255 };
-    renderer.RenderDebugText(0, 10, $"vx: {rocket.VelocityX} vy: {rocket.VelocityY} vr: {rocket.SpinVelocity} x: {rocket.CenterX:#} y: {rocket.CenterY:#} r: {rocket.Rotation:#}", scale: 4f);
-#endif
-};
+window.KeyDown += Window_KeyDown;
+window.Rendering += Window_Rendering;
 
 // game loop
 var startTime = DateTime.UtcNow;
@@ -63,12 +36,57 @@ while (!window.IsDisposed)
 
     if (rocket.Update(updateContext))
     {
-        if (rocket.CenterX < 0 || rocket.CenterX > window.Size.Width)
-            rocket.VelocityX = -rocket.VelocityX; // bounce off left/right walls
-        if (rocket.CenterY < 0 || rocket.CenterY > window.Size.Height)
-            rocket.VelocityY = -rocket.VelocityY; // bounce off top/bottom walls
-        window.Invalidate(); // request a redraw if something changed
+        // bounce off left/right walls
+        if (rocket.CenterX < 0)
+            rocket.ChangeVelocity((vx, vy) => (Math.Abs(vx), vy));
+        else if (rocket.CenterX > window.Size.Width)
+            rocket.ChangeVelocity((vx, vy) => (-Math.Abs(vx), vy));
+
+        // bounce off top/bottom walls
+        if (rocket.CenterY < 0)
+            rocket.ChangeVelocity((vx, vy) => (vx, Math.Abs(vy)));
+        else if (rocket.CenterY > window.Size.Height)
+            rocket.ChangeVelocity((vx, vy) => (vx, -Math.Abs(vy)));
+
+        // make the rocket point in the direction it's moving
+        rocket.Rotation = rocket.Heading;
+
+        window.Invalidate();
     }
 }
 
 Console.WriteLine("Done");
+
+
+void Window_KeyDown(Window window, SDL.KeyboardEvent context)
+{
+    switch (context.Key)
+    {
+        case SDL.Keycode.Left:
+            rocket.Heading = (rocket.Heading + 350f) % 360f; // rotate left 10%
+            break;
+        case SDL.Keycode.Right:
+            rocket.Heading = (rocket.Heading + 10f) % 360f; // rotate right 10%
+            break;
+        case SDL.Keycode.Up:
+            rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f); // increase speed by 10, maximum 100
+            break;
+        case SDL.Keycode.Down:
+            rocket.Speed = Math.Max(rocket.Speed - 50f, 0f); // decrease speed by 10, minimum 0
+            break;
+        case SDL.Keycode.Escape:
+            Application.Current.Dispose();
+            break;
+    }
+}
+
+void Window_Rendering(Window window, Renderer renderer)
+{
+    rocket.Render(renderer);
+
+#if DEBUG
+    // render debug text on screen
+    renderer.DrawColor = new SDL.Color { R = 255, G = 255, B = 255, A = 255 };
+    renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
+#endif
+}

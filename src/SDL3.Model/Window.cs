@@ -29,6 +29,11 @@ public class Window : IDisposable
         });
     }
 
+    public Window(SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+        : this(100, 100)
+    {
+    }
+
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
 
     internal void AddResource(IDisposable resource)
@@ -399,7 +404,6 @@ public class Window : IDisposable
     #endregion
 
     #region Rendering
-
     /// <summary>
     /// Creates a renderer for this window.
     /// The window already has a default renderer created when the window is created.
@@ -418,7 +422,7 @@ public class Window : IDisposable
     internal Renderer Renderer => _renderer;
 
     /// <summary>
-    /// The background color used to clear the window before drawing.
+    /// The background color used to clear the window before rendering.
     /// </summary>
     public SDL.Color BackgroundColor { get; set; }
 
@@ -432,23 +436,17 @@ public class Window : IDisposable
     private RenderState _renderState;
 
     /// <summary>
-    /// Invalidate's the entire window so it will rerendered.
+    /// Invalidates the window, scheduling a new render operation.
     /// </summary>
     public void Invalidate()
     {
         if (Interlocked.CompareExchange(ref _renderState, RenderState.Scheduled, RenderState.Idle) == RenderState.Idle)
         {
-            Application.Current.Post(_tcs => DoInvalidate(), null);
+            Application.Current.Post(_tcs => DoRender(), null);
         }
     }
 
-    private void DoInvalidate()
-    {
-        Render();
-        _renderState = RenderState.Idle;
-    }
-
-    private void Render()
+    private void DoRender()
     {
         var renderer = _renderer;
         if (renderer != null)
@@ -458,6 +456,9 @@ public class Window : IDisposable
             this.OnRendering(_renderer);
             _renderer.Present();
         }
+
+        // signal that we are done rendering
+        _renderState = RenderState.Idle;
     }
 
     /// <summary>
@@ -471,6 +472,32 @@ public class Window : IDisposable
     public virtual void OnRendering(Renderer renderer)
     {
         this.Rendering?.Invoke(this, renderer);
+    }
+
+    /// <summary>
+    /// Render immediately.
+    /// </summary>
+    public void Render()
+    {
+        Application.Current.Send(_ => DoRender(), null);
+    }
+
+    /// <summary>
+    /// Render immediately using the specified action.
+    /// </summary>
+    public void Render(Action<Renderer> renderAction)
+    {
+        var renderer = _renderer;
+        if (renderer != null)
+        {
+            Application.Current.Send(_ =>
+            {
+                _renderer.DrawColor = this.BackgroundColor;
+                _renderer.Clear();
+                renderAction(_renderer);
+                _renderer.Present();
+            });
+        }
     }
 
     #endregion

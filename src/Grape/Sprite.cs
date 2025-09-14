@@ -24,24 +24,24 @@ public class Sprite : Prop
     public float CenterY { get; set; }
 
     /// <summary>
-    /// The direction and how far the sprite moves along the Y axis in a second.
+    /// The direction of movement.
     /// </summary>
-    public float VelocityX { get; set; }
+    public float Heading { get; set; }
 
     /// <summary>
-    /// The direction and how far the sprite moves along the X axis in a second.
+    /// The speed of the sprite in per second along the heading.
     /// </summary>
-    public float VelocityY { get; set; }
+    public float Speed { get; set; }
 
     /// <summary>
-    /// The current rotation in degrees.
+    /// The current orientation in degrees.
     /// </summary>
     public float Rotation { get; set; }
 
     /// <summary>
-    /// The direction and how far the sprite rotates in a second.
+    /// How many degrees the sprite rotates in a second.
     /// </summary>
-    public float SpinVelocity { get; set; }
+    public float RotationSpeed { get; set; }
 
     /// <summary>
     /// The scale factor to apply to the image.
@@ -70,29 +70,33 @@ public class Sprite : Prop
     public override bool Update(in UpdateContext context)
     {
         double sec = context.Time.TotalSeconds;
-        var timeDelta = context.Time - _lastUpdate;
 
-        if (timeDelta.TotalMilliseconds < 10)
+        var timeDelta = context.Time - _lastUpdate;
+        if (_lastUpdate != TimeSpan.Zero
+            && timeDelta.TotalMilliseconds < 10)
+        {
+            // too soon to update
             return false;
+        }
 
         float newRotation = this.Rotation;
-        if (this.SpinVelocity != 0f)
+        if (this.RotationSpeed != 0f)
         {
-            var rotationDelta = (float)(this.SpinVelocity * timeDelta.TotalSeconds);
+            var rotationDelta = (float)(this.RotationSpeed * timeDelta.TotalSeconds);
             newRotation = (this.Rotation + rotationDelta) % 360f;
         }
 
+        var speed = this.Speed;
         float newCenterX = this.CenterX;
-        if (this.VelocityX != 0f)
-        {
-            var deltaX = (float)(this.VelocityX * timeDelta.TotalSeconds);
-            newCenterX = this.CenterX + deltaX;
-        }
-
         float newCenterY = this.CenterY;
-        if (this.VelocityY != 0f)
+        if (speed != 0f)
         {
-            var deltaY = (float)(this.VelocityY * timeDelta.TotalSeconds);
+            (var velocityX, var velocityY) = GetVelocity(speed, Heading);
+
+            var deltaX = (float)(velocityX * timeDelta.TotalSeconds);
+            newCenterX = this.CenterX + deltaX;
+
+            var deltaY = (float)(velocityY * timeDelta.TotalSeconds);
             newCenterY = this.CenterY + deltaY;
         }
 
@@ -101,7 +105,7 @@ public class Sprite : Prop
             || newCenterY != this.CenterY
             || _lastUpdate == TimeSpan.Zero; // always update the first time
 
-        if (changed)
+        if (changed || _lastUpdate == TimeSpan.Zero)
         {
             this.Rotation = newRotation;
             this.CenterX = newCenterX;
@@ -111,6 +115,42 @@ public class Sprite : Prop
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Get velocity components from speed and heading (degrees).
+    /// </summary>
+    public static (float velocityX, float velocityY) GetVelocity(float speed, float heading)
+    {
+        double headingRads = (heading - 90f) * (Math.PI / 180.0);
+        var velocityX = speed * (float)Math.Cos(headingRads);
+        if (MathF.Abs(velocityX) < 0.0001f)
+            velocityX = 0f;
+        var velocityY = speed * (float)Math.Sin(headingRads);
+        if (MathF.Abs(velocityY) < 0.0001f)
+            velocityY = 0f;
+        return (velocityX, velocityY);
+    }
+
+    /// <summary>
+    /// Gets speed and heading (degrees) from velocity components.
+    /// </summary>
+    public static (float speed, float heading) GetSpeedAndHeading(float velocityX, float velocityY)
+    {
+        var speed = (float)Math.Sqrt(velocityX * velocityX + velocityY * velocityY);
+        var heading = (float)(Math.Atan2(velocityY, velocityX) * (180.0 / Math.PI) + 90f);
+        if (heading < 0)
+            heading += 360f;
+        else if (heading >= 360f)
+            heading -= 360f;
+        return (speed, heading);
+    }
+
+    public void ChangeVelocity(Func<float, float, (float vx, float vy)> fn)
+    {
+        var (vx, vy) = GetVelocity(this.Speed, this.Heading);
+        (vx, vy) = fn(vx, vy);
+        (this.Speed, this.Heading) = GetSpeedAndHeading(vx, vy);
     }
 
     public override void Render(Renderer renderer)
