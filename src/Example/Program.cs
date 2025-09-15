@@ -20,8 +20,6 @@ rocket.Speed = 600f;
 rocket.Heading = 45f;
 
 var sound = AudioData.LoadWAV("szwoopy.wav");
-var speaker = AudioDevice.DefaultPlayback.Open();
-speaker.Volume = 0.2f;
 
 window.KeyDown += Window_KeyDown;
 window.Rendering += Window_Rendering;
@@ -76,9 +74,9 @@ while (!window.IsDisposed)
             rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f; // add a little randomness to the bounce
         }
 
-        if (bounce && speaker.GetPlayCount(sound) < 4)
+        if (bounce)
         {
-            _ = speaker.Play(sound);
+            _ = Audio.Play(sound, volume:.2f);
         }
     }
 }
@@ -115,6 +113,6 @@ void Window_Rendering(Window window, Renderer renderer)
 #if DEBUG
     // render debug text on screen
     renderer.DrawColor = new SDL.Color { R = 255, G = 255, B = 255, A = 255 };
-    renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
+    renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
 #endif
 }

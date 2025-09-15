@@ -3,9 +3,20 @@ using System.Collections.Immutable;
 
 namespace SDL3.Model;
 
+public static class Audio
+{
+    /// <summary>
+    /// Plays the audio data on the default playback device.
+    /// </summary>
+    public static Task Play(AudioData data, float volume = 1f)
+    {
+        return AudioPlaybackDevice.Default.Play(data, volume);
+    }
+}
+
 public class AudioDevice
 {
-    private uint _deviceId;
+    private protected uint _deviceId;
 
     internal AudioDevice(uint deviceId)
     {
@@ -22,7 +33,7 @@ public class AudioDevice
     /// The specifications of the audio device.
     /// </summary>
     public SDL.AudioSpec Spec =>
-        SDL.GetAudioDeviceFormat(_deviceId, out var spec, out _)
+        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out var spec, out _)
             ? spec
             : default;
 
@@ -30,38 +41,27 @@ public class AudioDevice
     /// The number of sample frames in the audio device's buffer.
     /// </summary>
     public int SampleFrames =>
-        SDL.GetAudioDeviceFormat(_deviceId, out _, out var sampleFrames)
+        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out _, out var sampleFrames)
             ? sampleFrames
             : 0;
 
     /// <summary>
-    /// Open the audio device for playback or recording.
+    /// The volume of the audio device, from 0.0 (silent) to 1.0 (full volume).
     /// </summary>
-    public LogicalAudioDevice Open()
+    public virtual float Volume
     {
-        var id = SDL.OpenAudioDevice(_deviceId, this.Spec);
-        if (id == 0)
-            throw new InvalidOperationException($"SDL_OpenAudioDevice Error: {SDL.GetError()}");
-        return new LogicalAudioDevice(id);
+        get => -1f;
+        set { }
     }
 
-    /// <summary>
-    /// Opens the default playback device with the specified audio specifications.
-    /// </summary>
-    public static AudioDevice DefaultPlayback =>
-        PlaybackDevices.Count > 0 ? PlaybackDevices[0] : throw new InvalidOperationException("No playback devices available.");
-
-    /// <summary>
-    /// Opens the default recording device with the specified audio specifications.
-    /// </summary>
-    public static LogicalAudioDevice DefaultRecording =>
-        RecordingDevices.Count > 0 ? RecordingDevices[0].Open() : throw new InvalidOperationException("No recording devices available.");
-
-    private static ImmutableList<AudioDevice>? _playbackDevices;
-    private static ImmutableList<AudioDevice>? _recordingDevices;
+    private static ImmutableList<AudioPlaybackDevice>? _playbackDevices;
+    private static ImmutableList<AudioRecordingDevice>? _recordingDevices;
     private static ImmutableList<string>? _driverNames;
 
-    public static ImmutableList<AudioDevice> PlaybackDevices
+    /// <summary>
+    /// The set of available audio playback devices.
+    /// </summary>
+    public static ImmutableList<AudioPlaybackDevice> PlaybackDevices
     {
         get
         {
@@ -74,11 +74,11 @@ public class AudioDevice
 
                 if (count > 0)
                 {
-                    devices = ids.Select(id => new AudioDevice(id)).ToImmutableList();
+                    devices = ids.Select(id => new AudioPlaybackDevice(id)).ToImmutableList();
                 }
                 else
                 {
-                    devices = ImmutableList<AudioDevice>.Empty;
+                    devices = ImmutableList<AudioPlaybackDevice>.Empty;
                 }
 
                 Interlocked.CompareExchange(ref _playbackDevices, devices, null);
@@ -87,7 +87,10 @@ public class AudioDevice
         }
     }
 
-    public static ImmutableList<AudioDevice> RecordingDevices
+    /// <summary>
+    /// The set of available audio recording devices.
+    /// </summary>
+    public static ImmutableList<AudioRecordingDevice> RecordingDevices
     {
         get
         {
@@ -97,11 +100,11 @@ public class AudioDevice
                 var ids = SDL.GetAudioRecordingDevices(out var count);
                 if (ids != null && count > 0)
                 {
-                    devices = ids.Select(id => new AudioDevice(id)).ToImmutableList();
+                    devices = ids.Select(id => new AudioRecordingDevice(id)).ToImmutableList();
                 }
                 else
                 {
-                    devices = ImmutableList<AudioDevice>.Empty;
+                    devices = ImmutableList<AudioRecordingDevice>.Empty;
                 }
                 Interlocked.CompareExchange(ref _recordingDevices, devices, null);
             }
@@ -144,18 +147,70 @@ public class AudioDevice
     }
 }
 
+public class AudioPlaybackDevice : AudioDevice
+{
+    internal AudioPlaybackDevice(uint deviceId)
+        : base(deviceId)
+    {
+    }
+
+    /// <summary>
+    /// Opens the default playback device with the specified audio specifications.
+    /// </summary>
+    public static AudioPlaybackDevice Default =>
+        PlaybackDevices.Count > 0 
+            ? PlaybackDevices[0] 
+            : throw new InvalidOperationException("No playback devices available.");
+
+    /// <summary>
+    /// Open the audio device for playback or recording.
+    /// </summary>
+    public LogicalPlaybackDevice Open()
+    {
+        var id = SDL.OpenAudioDevice(_deviceId, this.Spec);
+        if (id == 0)
+            throw new InvalidOperationException($"SDL_OpenAudioDevice Error: {SDL.GetError()}");
+        return new LogicalPlaybackDevice(id);
+    }
+
+    /// <summary>
+    /// Plays the audio data on the device.
+    /// </summary>
+    public async Task Play(AudioData data, float volume = 1f)
+    {
+        var device = Open();
+        device.Volume = volume;
+        await device.Play(data);
+        device.Dispose();
+    }
+}
+
+public class AudioRecordingDevice : AudioDevice
+{
+    internal AudioRecordingDevice(uint deviceId)
+        : base(deviceId)
+    {
+    }
+
+    /// <summary>
+    /// Opens the default recording device with the specified audio specifications.
+    /// </summary>
+    public static AudioRecordingDevice Default =>
+        RecordingDevices.Count > 0 
+            ? RecordingDevices[0] 
+            : throw new InvalidOperationException("No recording devices available.");
+}
+
 /// <summary>
 /// An opened audio device that can play audio streams.
 /// </summary>
-public class LogicalAudioDevice : AudioDevice
+public class LogicalPlaybackDevice : AudioPlaybackDevice
 {
-    private uint _deviceId;
     private ImmutableList<AudioStream> _streams = ImmutableList<AudioStream>.Empty;
 
-    internal LogicalAudioDevice(uint deviceId)
+    internal LogicalPlaybackDevice(uint deviceId)
         : base(deviceId)
     {
-        _deviceId = deviceId;
     }
 
     public bool IsDisposed => _deviceId == 0;
@@ -177,41 +232,13 @@ public class LogicalAudioDevice : AudioDevice
         }
     }
 
-
-    private ImmutableDictionary<AudioData, int> _playingData = ImmutableDictionary<AudioData, int>.Empty;
-
     /// <summary>
-    /// True if the device is currently playing audio.
+    /// The volume of the audio device, from 0.0 (silent) to 1.0 (full volume).
     /// </summary>
-    public bool IsPlaying(AudioData audioData)
+    public override float Volume
     {
-        return _playingData.ContainsKey(audioData);
-    }
-
-    /// <summary>
-    /// Gets the number of times the specified audio data is currently being played on the device.
-    /// </summary>
-    public int GetPlayCount(AudioData audioData)
-    {
-        return _playingData.TryGetValue(audioData, out var count) ? count : 0;
-    }
-
-    private void AddPlayingData(AudioData data)
-    {
-        ImmutableInterlocked.AddOrUpdate(ref _playingData, data, 1, (key, oldValue) => oldValue + 1);
-    }
-
-    private void RemovePlayingData(AudioData data)
-    {
-        ImmutableInterlocked.AddOrUpdate(ref _playingData, data, 0, (key, oldValue) => Math.Max(0, oldValue - 1));
-        ImmutableInterlocked.Update(ref _playingData, (dict) =>
-        {
-            if (dict.TryGetValue(data, out var count) && count == 0)
-            {
-                return dict.Remove(data);
-            }
-            return dict;
-        });
+        get => SDL.GetAudioDeviceGain(_deviceId);
+        set => SDL.SetAudioDeviceGain(_deviceId, value);
     }
 
     /// <summary>
@@ -227,7 +254,6 @@ public class LogicalAudioDevice : AudioDevice
                 if (!tcs.Task.IsCompleted)
                 {
                     tcs.SetResult();
-                    RemovePlayingData(data);
                 }
                 return;
             }
@@ -240,24 +266,13 @@ public class LogicalAudioDevice : AudioDevice
                 {
                     stream.Dispose();
                     tcs.SetResult();
-                    RemovePlayingData(data);
                 });
             }
         });
 
         stream.Queue(data);
-        AddPlayingData(data);
         stream.Paused = false;
         return tcs.Task;
-    }
-
-    /// <summary>
-    /// The volume of the audio device, from 0.0 (silent) to 1.0 (full volume).
-    /// </summary>
-    public float Volume
-    {
-        get => SDL.GetAudioDeviceGain(_deviceId);
-        set => SDL.SetAudioDeviceGain(_deviceId, value);
     }
 
     #region Audio Streams
@@ -292,16 +307,15 @@ public class LogicalAudioDevice : AudioDevice
     #endregion
 }
 
-
 public delegate void AudioDataRequested(AudioStream stream, int additionalAmount, int totalAmount);
 
 public class AudioStream : IDisposable
 {
-    private LogicalAudioDevice _device;
+    private LogicalPlaybackDevice _device;
     private nint _streamId;
     private readonly AudioDataRequested? _onDataRequested;
 
-    internal AudioStream(LogicalAudioDevice device, nint streamId, AudioDataRequested? onDataRequested = null)
+    internal AudioStream(LogicalPlaybackDevice device, nint streamId, AudioDataRequested? onDataRequested = null)
     {
         _device = device;
         _streamId = streamId;
