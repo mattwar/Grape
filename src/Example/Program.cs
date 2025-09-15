@@ -2,11 +2,11 @@
 using SDL3.Model;
 using Grape;
 
-var window = new Window
+var window = new Window(800, 600)
 {
     Title = "Grape",
     BackgroundColor = new SDL.Color { R = 0, G = 20, B = 0, A = 0 },
-    FullScreen = true,
+    FullScreen = true
 };
 
 var icon = Surface.LoadImage("grape.bmp");
@@ -16,7 +16,12 @@ window.Icon = icon;
 var rocketImage = Surface.LoadImage("rocket.png");
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f);
-rocket.Speed = 0f;
+rocket.Speed = 600f;
+rocket.Heading = 45f;
+
+var sound = AudioData.LoadWAV("szwoopy.wav");
+var speaker = AudioDevice.DefaultPlayback.Open();
+speaker.Volume = 0.2f;
 
 window.KeyDown += Window_KeyDown;
 window.Rendering += Window_Rendering;
@@ -36,22 +41,45 @@ while (!window.IsDisposed)
 
     if (rocket.Update(updateContext))
     {
+        var bounce = false;
         // bounce off left/right walls
         if (rocket.CenterX < 0)
+        {
             rocket.ChangeVelocity((vx, vy) => (Math.Abs(vx), vy));
+            bounce = true;
+        }
         else if (rocket.CenterX > window.Size.Width)
+        {
             rocket.ChangeVelocity((vx, vy) => (-Math.Abs(vx), vy));
+            bounce = true;
+        }
 
         // bounce off top/bottom walls
         if (rocket.CenterY < 0)
+        {
             rocket.ChangeVelocity((vx, vy) => (vx, Math.Abs(vy)));
+            bounce = true;
+        }
         else if (rocket.CenterY > window.Size.Height)
+        {
             rocket.ChangeVelocity((vx, vy) => (vx, -Math.Abs(vy)));
+            bounce = true;
+        }
 
         // make the rocket point in the direction it's moving
         rocket.Rotation = rocket.Heading;
 
         window.Invalidate();
+
+        if (bounce)
+        {
+            rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f; // add a little randomness to the bounce
+        }
+
+        if (bounce && speaker.GetPlayCount(sound) < 4)
+        {
+            _ = speaker.Play(sound);
+        }
     }
 }
 

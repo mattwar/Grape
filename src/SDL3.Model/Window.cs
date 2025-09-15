@@ -10,6 +10,7 @@ public class Window : IDisposable
     private nint _window;
     private Properties? _properties;
     private Renderer _renderer;
+    private Surface? _icon;
 
     public Window(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
     {
@@ -23,7 +24,7 @@ public class Window : IDisposable
         app.Send(_ =>
         {
             _window = SDL.CreateWindow("", width, height, flags);
-            this.Id = SDL.GetWindowID(_window);
+            this.EventId = SDL.GetWindowID(_window);
             Application.Current.AddWindow(this);
             _renderer = CreateRenderer(null);
         });
@@ -91,9 +92,9 @@ public class Window : IDisposable
     #region properties
 
     /// <summary>
-    /// The id of the window;
+    /// The id of the window in events.
     /// </summary>
-    internal uint Id { get; private set; }
+    internal uint EventId { get; private set; }
 
     /// <summary>
     /// The SDL properties of the window.
@@ -110,7 +111,20 @@ public class Window : IDisposable
         }
     }
 
-    private Surface? _icon;
+    /// <summary>
+    /// The display that the window is currently on.
+    /// </summary>
+    public Display Display
+    {
+        get
+        {
+            ThrowIfDisposed();
+            var displayId = SDL.GetDisplayForWindow(_window);
+            if (Display.TryGetDisplay(displayId, out var display))
+                return display;
+            throw new InvalidOperationException("Display not found");
+        }
+    }
 
     /// <summary>
     /// The current icon used for the window
@@ -264,19 +278,21 @@ public class Window : IDisposable
     /// <summary>
     /// The display mode of the window when in full-screen mode.
     /// </summary>
-    public SDL.DisplayMode FullScreenMode
+    public DisplayMode FullScreenMode
     {
         get
         {
             if (IsDisposed)
                 return default;
-            return SDL.GetWindowFullscreenMode(_window) ?? default;
+            return SDL.GetWindowFullscreenMode(_window) is { } mode
+                ? new DisplayMode(mode)
+                : default;
         }
         set
         {
             if (IsDisposed)
                 return;
-            SDL.SetWindowFullscreenMode(_window, value);
+            SDL.SetWindowFullscreenMode(_window, value._mode);
         }
     }
 
@@ -347,7 +363,7 @@ public class Window : IDisposable
     }
 
     /// <summary>
-    /// The position of the window on the screen.
+    /// The position of the window in the multi-display space.
     /// </summary>
     public (int X, int Y) Position
     {
@@ -386,6 +402,9 @@ public class Window : IDisposable
         }
     }
 
+    /// <summary>
+    /// The title of the window.
+    /// </summary>
     public string Title
     {
         get

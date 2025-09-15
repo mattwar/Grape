@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 
 namespace SDL3.Model;
 
@@ -83,7 +84,8 @@ public class Properties : IDisposable
 
         unsafe
         {
-            T* start = (T*)SDL.GetPointerProperty(_propertiesId, propertyName, 0);
+            var ptr = SDL.GetPointerProperty(_propertiesId, propertyName, 0);
+            T* start = (T*)Marshal.ReadIntPtr(ptr);
 
             // determine length of the array
             T* current = start;

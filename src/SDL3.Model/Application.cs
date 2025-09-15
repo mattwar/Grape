@@ -11,7 +11,9 @@ public class Application : IDisposable
     private bool _disposed;
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
 
-    public Application(SDL.InitFlags flags = SDL.InitFlags.Video)
+    private const SDL.InitFlags DefaultFlags = SDL.InitFlags.Video | SDL.InitFlags.Audio;
+
+    public Application(SDL.InitFlags flags = DefaultFlags)
     {
         if (Current != null)
             throw new InvalidOperationException("An instance of Application already exists.");
@@ -19,29 +21,6 @@ public class Application : IDisposable
             throw new InvalidOperationException($"Failed to initialize SDL: {SDL.GetError()}");
         Current = this;
         this.Thread = Thread.CurrentThread;
-    }
-
-    /// <summary>
-    /// Starts a new application on a separate thread.
-    /// </summary>
-    public static Application Start(SDL.InitFlags flags = SDL.InitFlags.Video)
-    {
-        var application = Current;
-
-        if (application == null)
-        {
-            var tcs = new TaskCompletionSource<Application>();
-            var appThread = new Thread(_ =>
-            {
-                application = new Application(flags);
-                application.Run(() => tcs.SetResult(application));
-                application.Dispose();
-            });
-            appThread.Start();
-            application = tcs.Task.Result;
-        }
-
-        return application;
     }
 
     /// <summary>
@@ -89,10 +68,11 @@ public class Application : IDisposable
         }
     }
 
+    #region Windows and Resources
     private ImmutableList<Window> _windows = ImmutableList<Window>.Empty;
 
     /// <summary>
-    /// The windows associated with the application.
+    /// The windows open in the application.
     /// </summary>
     public IReadOnlyList<Window> Windows => _windows;
 
@@ -119,7 +99,7 @@ public class Application : IDisposable
     /// </summary>
     private Window GetWindow(uint windowId)
     {
-        return _windows.FirstOrDefault(w => w.Id == windowId)
+        return _windows.FirstOrDefault(w => w.EventId == windowId)
                ?? throw new ArgumentException($"Window with ID {windowId} not found.", nameof(windowId));
     }
 
@@ -134,16 +114,55 @@ public class Application : IDisposable
     }
 
     /// <summary>
+    /// The displays available to the application.
+    /// </summary>
+    public ImmutableList<Display> Displays => Display.Displays;
+    #endregion
+
+    #region Event Loop and threading
+    /// <summary>
+    /// Starts the application event loop running on a new thread.
+    /// </summary>
+    public static Application Start(SDL.InitFlags flags = DefaultFlags)
+    {
+        var application = Current;
+
+        if (application == null)
+        {
+            var tcs = new TaskCompletionSource<Application>();
+            var appThread = new Thread(_ =>
+            {
+                application = new Application(flags);
+                application.Run(() => tcs.SetResult(application));
+                application.Dispose();
+            });
+            appThread.Start();
+            application = tcs.Task.Result;
+        }
+
+        return application;
+    }
+
+    /// <summary>
+    /// True if the application event loop is running.
+    /// </summary>
+    private bool _running;
+
+    /// <summary>
     /// Runs the event loop of the application.
     /// </summary>
     public void Run(Action? onStart = null)
-    {
-        AsyncContext.Run(() =>
+    {       
+        if (Interlocked.CompareExchange(ref _running, true, false) == false)
         {
-            _context = SynchronizationContext.Current;
-            onStart?.Invoke();
-            return RunEventLoopAsync();
-        });
+            AsyncContext.Run(() =>
+            {
+                _context = SynchronizationContext.Current;
+                onStart?.Invoke();
+                return RunEventLoopAsync();
+            });
+            _running = false;
+        }
     }
 
     private SynchronizationContext? _context;
@@ -154,16 +173,9 @@ public class Application : IDisposable
         {
             while (SDL.PollEvent(out var e))
             {
-                switch ((SDL.EventType)e.Type)
-                {
-                    case SDL.EventType.Quit:
-                        goto exit;
-#if false
-                    case SDL.EventType.KeyDown when e.Key.Key == SDL.Keycode.Escape:
-                        goto exit;
-#endif
-                }
-
+                if (e.Type == (uint)SDL.EventType.Quit)
+                    goto exit;
+   
                 DispatchEvent(e);
             }
 
@@ -232,6 +244,7 @@ public class Application : IDisposable
             callback(state);
         }
     }
+    #endregion
 
     #region events
 

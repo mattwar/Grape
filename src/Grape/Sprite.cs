@@ -29,7 +29,7 @@ public class Sprite : Prop
     public float Heading { get; set; }
 
     /// <summary>
-    /// The speed of the sprite in per second along the heading.
+    /// The speed of the sprite in pixels/units per second along the heading.
     /// </summary>
     public float Speed { get; set; }
 
@@ -79,6 +79,8 @@ public class Sprite : Prop
             return false;
         }
 
+        _lastUpdate = context.Time;
+
         float newRotation = this.Rotation;
         if (this.RotationSpeed != 0f)
         {
@@ -110,7 +112,6 @@ public class Sprite : Prop
             this.Rotation = newRotation;
             this.CenterX = newCenterX;
             this.CenterY = newCenterY;
-            _lastUpdate = context.Time;
             return true;
         }
 
