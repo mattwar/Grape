@@ -1,6 +1,8 @@
 ﻿using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using static SDL3.SDL;
 
 namespace SDL3.Model;
 
@@ -15,6 +17,25 @@ public sealed class Renderer : IDisposable
         _window = window;
         _name = name ?? "";
         _rendererId = rendererId;
+    }
+
+    /// <summary>
+    /// Creates a renderer for this window.
+    /// The window already has a default renderer created when the window is created.
+    /// </summary>
+    internal static Renderer Create(Window window, string? name = null)
+    {
+        var rendererId = SDL.CreateRenderer(window.WindowId, name);
+        return new Renderer(window, rendererId, name);
+    }
+
+    /// <summary>
+    /// Creates a window gpu renderer with the specified shader format.
+    /// </summary>
+    internal static Renderer Create(Window window, SDL.GPUShaderFormat format)
+    {
+        var rendererId = SDL.CreateGPURenderer(window.WindowId, format, out var gpuDeviceId);
+        return new Renderer(window, rendererId, null);
     }
 
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
@@ -502,5 +523,48 @@ public sealed class Renderer : IDisposable
         return RenderTextureRotated(texture, x, y, angle, centerX, centerY, scale, flip);
     }
 
+    public bool RenderFillRect(in SDL.FRect rect)
+    {
+        return SDL.RenderFillRect(_rendererId, rect);
+    }
+
+    public bool RenderFillRects(SDL.FRect[] rects)
+    {
+        return SDL.RenderFillRects(_rendererId, rects, rects.Length);
+    }
+
+    public bool RenderGeometry(Vertex[] vertices, int[] indices, Texture? texture = null)
+    {
+        return SDL.RenderGeometry(_rendererId, texture != null ? texture.Id : 0, vertices, vertices.Length, indices, indices.Length);
+    }
+
+    public bool RenderGeometry(Vertex[] vertices, int[] indices, Surface? surface = null)
+    {
+        var texture = surface == null ? null
+            : TryGetOrCreateTexture(surface!, out var txt) ? txt
+            : null;
+
+        return RenderGeometry(vertices, indices, texture);
+    }
+
+    public bool RenderLine(float x1, float y1, float x2, float y2)
+    {
+        return SDL.RenderLine(_rendererId, x1, y1, x2, y2);
+    }
+
+    public bool RenderLines(SDL.FPoint[] points)
+    {
+        return SDL.RenderLines(_rendererId, points, points.Length);
+    }
+
+    public bool RenderPoint(float x, float y)
+    {
+        return SDL.RenderPoint(_rendererId, x, y);
+    }
+
+    public bool RenderPoints(SDL.FPoint[] points)
+    {
+        return SDL.RenderPoints(_rendererId, points, points.Length);
+    }
     #endregion
 }

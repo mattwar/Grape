@@ -12,51 +12,20 @@ public static class Audio
     {
         return AudioPlaybackDevice.Default.Play(data, volume);
     }
-}
-
-public class AudioDevice
-{
-    private protected uint _deviceId;
-
-    internal AudioDevice(uint deviceId)
-    {
-        _deviceId = deviceId;
-    }
-
-    /// <summary>
-    /// The name of the audio device.
-    /// </summary>
-    public string Name =>
-        SDL.GetAudioDeviceName(_deviceId) ?? "";
-
-    /// <summary>
-    /// The specifications of the audio device.
-    /// </summary>
-    public SDL.AudioSpec Spec =>
-        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out var spec, out _)
-            ? spec
-            : default;
-
-    /// <summary>
-    /// The number of sample frames in the audio device's buffer.
-    /// </summary>
-    public int SampleFrames =>
-        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out _, out var sampleFrames)
-            ? sampleFrames
-            : 0;
-
-    /// <summary>
-    /// The volume of the audio device, from 0.0 (silent) to 1.0 (full volume).
-    /// </summary>
-    public virtual float Volume
-    {
-        get => -1f;
-        set { }
-    }
 
     private static ImmutableList<AudioPlaybackDevice>? _playbackDevices;
     private static ImmutableList<AudioRecordingDevice>? _recordingDevices;
     private static ImmutableList<string>? _driverNames;
+
+    public static AudioPlaybackDevice DefaultPlaybackDevice =>
+        Audio.PlaybackDevices.Count > 0 
+            ? Audio.PlaybackDevices[0] 
+            : throw new InvalidOperationException("No playback devices available.");
+
+    public static AudioRecordingDevice DefaultRecordingDevice =>
+        Audio.RecordingDevices.Count > 0 
+            ? Audio.RecordingDevices[0] 
+            : throw new InvalidOperationException("No recording devices available.");
 
     /// <summary>
     /// The set of available audio playback devices.
@@ -115,13 +84,13 @@ public class AudioDevice
     /// <summary>
     /// The name of the current audio driver.
     /// </summary>
-    public static string CurrentDriverName =>
+    public static string CurrentDriver =>
         SDL.GetCurrentAudioDriver() ?? "";
 
     /// <summary>
     /// The names of all built-in audio drivers.
     /// </summary>
-    public static ImmutableList<string> DriverNames
+    public static ImmutableList<string> Drivers
     {
         get
         {
@@ -147,6 +116,53 @@ public class AudioDevice
     }
 }
 
+/// <summary>
+/// The base class for audio devices, either playback or recording.
+/// </summary>
+public abstract class AudioDevice
+{
+    private protected uint _deviceId;
+
+    internal AudioDevice(uint deviceId)
+    {
+        _deviceId = deviceId;
+    }
+
+    /// <summary>
+    /// The name of the audio device.
+    /// </summary>
+    public string Name =>
+        SDL.GetAudioDeviceName(_deviceId) ?? "";
+
+    /// <summary>
+    /// The specifications of the audio device.
+    /// </summary>
+    public SDL.AudioSpec Spec =>
+        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out var spec, out _)
+            ? spec
+            : default;
+
+    /// <summary>
+    /// The number of sample frames in the audio device's buffer.
+    /// </summary>
+    public int SampleFrames =>
+        _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out _, out var sampleFrames)
+            ? sampleFrames
+            : 0;
+
+    /// <summary>
+    /// The volume of the audio device, from 0.0 (silent) to 1.0 (full volume).
+    /// </summary>
+    public virtual float Volume
+    {
+        get => -1f;
+        set { }
+    }
+}
+
+/// <summary>
+/// An audio playback device that can play audio streams.
+/// </summary>
 public class AudioPlaybackDevice : AudioDevice
 {
     internal AudioPlaybackDevice(uint deviceId)
@@ -157,10 +173,7 @@ public class AudioPlaybackDevice : AudioDevice
     /// <summary>
     /// Opens the default playback device with the specified audio specifications.
     /// </summary>
-    public static AudioPlaybackDevice Default =>
-        PlaybackDevices.Count > 0 
-            ? PlaybackDevices[0] 
-            : throw new InvalidOperationException("No playback devices available.");
+    public static AudioPlaybackDevice Default => Audio.DefaultPlaybackDevice;
 
     /// <summary>
     /// Open the audio device for playback or recording.
@@ -195,10 +208,7 @@ public class AudioRecordingDevice : AudioDevice
     /// <summary>
     /// Opens the default recording device with the specified audio specifications.
     /// </summary>
-    public static AudioRecordingDevice Default =>
-        RecordingDevices.Count > 0 
-            ? RecordingDevices[0] 
-            : throw new InvalidOperationException("No recording devices available.");
+    public static AudioRecordingDevice Default => Audio.DefaultRecordingDevice;
 }
 
 /// <summary>

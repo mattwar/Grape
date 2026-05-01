@@ -7,6 +7,9 @@ using System.Runtime.InteropServices;
 
 namespace SDL3.Model;
 
+/// <summary>
+/// Represents a physical or virtual display device (aka Monitor) in a multi-display environment.
+/// </summary>
 public sealed class Display
 {
     private uint _displayId;
@@ -16,6 +19,9 @@ public sealed class Display
         _displayId = displayId;
     }
 
+    /// <summary>
+    /// The name of the display.
+    /// </summary>
     public string Name => 
         SDL.GetDisplayName(_displayId) ?? "";
 
@@ -193,6 +199,9 @@ public struct DisplayMode
 
 internal static partial class SdlDisplayEx
 {
+    /// <summary>
+    /// This is remapped because SDL3 has a bug in the equivalent SDL.GetFullscreenDisplayModes function.
+    /// </summary>
     [LibraryImport("SDL3", EntryPoint = "SDL_GetFullscreenDisplayModes"), UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     private static partial IntPtr SDL_GetFullscreenDisplayModes(uint displayID, out int count);
 

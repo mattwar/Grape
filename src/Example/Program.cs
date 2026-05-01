@@ -40,6 +40,7 @@ while (!window.IsDisposed)
     if (rocket.Update(updateContext))
     {
         var bounce = false;
+
         // bounce off left/right walls
         if (rocket.CenterX < 0)
         {
@@ -72,11 +73,7 @@ while (!window.IsDisposed)
         if (bounce)
         {
             rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f; // add a little randomness to the bounce
-        }
-
-        if (bounce)
-        {
-            _ = Audio.Play(sound, volume:.2f);
+            _ = Audio.Play(sound, volume: .2f);
         }
     }
 }

@@ -12,6 +12,8 @@ public class Properties : IDisposable
         _propertiesId = propertiesId;
     }
 
+    internal uint PropertiesId => _propertiesId;
+
     public static readonly Properties Empty = new Properties(0);
 
     public SDL.PropertyType GetPropertyType(string propertyName)

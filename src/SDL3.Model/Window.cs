@@ -26,7 +26,7 @@ public class Window : IDisposable
             _window = SDL.CreateWindow("", width, height, flags);
             this.EventId = SDL.GetWindowID(_window);
             Application.Current.AddWindow(this);
-            _renderer = CreateRenderer(null);
+            _renderer = Renderer.Create(this);
         });
     }
 
@@ -46,6 +46,11 @@ public class Window : IDisposable
     {
         ImmutableInterlocked.Update(ref _resources, list => list.Remove(resource));
     }
+
+    /// <summary>
+    /// The underlying SDL window id.
+    /// </summary>
+    internal nint WindowId => _window;
 
     /// <summary>
     /// True if this window has been disposed.
@@ -423,18 +428,6 @@ public class Window : IDisposable
     #endregion
 
     #region Rendering
-    /// <summary>
-    /// Creates a renderer for this window.
-    /// The window already has a default renderer created when the window is created.
-    /// </summary>
-    private Renderer CreateRenderer(string? name)
-    {
-        ThrowIfDisposed();
-
-        var rendererId = SDL.CreateRenderer(_window, name);
-        return new Renderer(this, rendererId, name);
-    }
-
     /// <summary>
     /// The current <see cref="Renderer"/> used to draw to the window.
     /// </summary>
