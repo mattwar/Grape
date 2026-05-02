@@ -15,4 +15,10 @@
     <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Shaders\SPIRV\*.spv" />
+    <EmbeddedResource Include="Shaders\DXIL\*.dxil" />
+    <EmbeddedResource Include="Shaders\MSL\*.msl" />
+  </ItemGroup>
+
 </Project>

@@ -80,7 +80,7 @@ public class Scene //: IDisposable
     /// <summary>
     /// Renders all the props in the scene.
     /// </summary>
-    public void Render(Renderer renderer)
+    public void Render(Renderer2D renderer)
     {
         foreach (var prop in _props)
         {

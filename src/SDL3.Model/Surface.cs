@@ -217,6 +217,18 @@ public sealed class Surface : IDisposable
     #endregion
 
     /// <summary>
+    /// Returns a view over the raw pixel bytes of the surface (Height * Pitch bytes).
+    /// The returned span aliases the surface's internal buffer; do not retain it
+    /// after the surface is disposed.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetPixels()
+    {
+        ThrowIfDisposed();
+        SDL.Surface* s = (SDL.Surface*)_surfaceId;
+        return new ReadOnlySpan<byte>((void*)s->Pixels, s->Height * s->Pitch);
+    }
+
+    /// <summary>
     /// Gets the color of the pixel at (x, y).
     /// </summary>
     public SDL.Color GetPixel(int x, int y)

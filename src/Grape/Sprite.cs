@@ -154,7 +154,7 @@ public class Sprite : Prop
         (this.Speed, this.Heading) = GetSpeedAndHeading(vx, vy);
     }
 
-    public override void Render(Renderer renderer)
+    public override void Render(Renderer2D renderer)
     {
         if (this.Image is { } image)
         {

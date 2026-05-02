@@ -3,6 +3,9 @@ using static SDL3.SDL;
 
 namespace SDL3.Model;
 
+/// <summary>
+/// Corresponds to the GPU hardware device.
+/// </summary>
 public sealed class GpuDevice : IDisposable
 {
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
@@ -12,14 +15,36 @@ public sealed class GpuDevice : IDisposable
     internal GpuDevice(nint gpuDeviceID)
     {
         _gpuDeviceID = gpuDeviceID;
+        // A GPU device may be created before any window (e.g. via
+        // GpuDevice.Default in a Window3D ctor chain), so make sure the
+        // application is up before registering as a resource.
+        Application.Start();
         Application.Current.AddResource(this);
     }
 
     public static GpuDevice Create(SDL.GPUShaderFormat format, bool debugMode, string? name = null)
     {
+        // Make sure the SDL video subsystem is up before asking for a GPU
+        // device. The Application event loop owns SDL.Init.
+        Application.Start();
+
         var id = SDL.CreateGPUDevice(format, debugMode, name);
+        if (id == 0)
+            throw new InvalidOperationException(
+                $"Failed to create GPU device for shader format(s) {format}: {SDL.GetError()}");
         return new GpuDevice(id);
     }
+
+    private static GpuDevice? _default;
+
+    /// <summary>
+    /// A lazily-created shared GPU device using all supported shader formats.
+    /// Created on first access and disposed with the <see cref="Application"/>.
+    /// </summary>
+    public static GpuDevice Default =>
+        _default ??= Create(
+            SDL.GPUShaderFormat.SPIRV | SDL.GPUShaderFormat.DXIL | SDL.GPUShaderFormat.MSL,
+            debugMode: false);
 
     internal nint GpuDeviceID => _gpuDeviceID;
 
@@ -92,6 +117,12 @@ public sealed class GpuDevice : IDisposable
         GpuCommandBuffer.Create(this);
 
     /// <summary>
+    /// Begins a frame of GPU work.
+    /// </summary>
+    public GpuRenderFrame BeginFrame() =>
+        new GpuRenderFrame(this, CreateCommandBuffer());
+
+    /// <summary>
     /// Creates a new shader for the GPU.
     /// </summary>
     public GpuShader CreateShader(GpuShaderCreateInfo info) =>
@@ -102,6 +133,12 @@ public sealed class GpuDevice : IDisposable
     /// </summary>
     public GpuTexture CreateTexture(GpuTextureCreateInfo info) =>
         GpuTexture.Create(this, info);
+
+    /// <summary>
+    /// Creates a new sampler on the GPU.
+    /// </summary>
+    public GpuSampler CreateSampler(GpuSamplerCreateInfo info) =>
+        GpuSampler.Create(this, info);
 
     /// <summary>
     /// Creates a new vertex buffer on the GPU.
@@ -128,17 +165,43 @@ public sealed class GpuDevice : IDisposable
         GpuPipeline.CreateGraphicsPipeline(this, info);
 }
 
+internal sealed class MeshResources
+{
+    public GpuVertexBuffer? VertexBuffer { get; set; }
+    public GpuUploadBuffer? UploadBuffer { get; set; }
+    public int VertexBufferBytes { get; set; }
+}
+
+/// <summary>
+/// A GPU texture resource that can be used as render target or sampled data.
+/// </summary>
 public sealed class GpuTexture : IDisposable
 {
-    private readonly GpuDevice _gpuDevice;
+    private readonly GpuDevice? _gpuDevice;
     private nint _textureId;
+    private readonly bool _owned;
 
     private GpuTexture(GpuDevice device, nint textureId)
     {
         _gpuDevice = device;
         _textureId = textureId;
+        _owned = true;
         device.AddResource(this);
     }
+
+    private GpuTexture(nint textureId)
+    {
+        _gpuDevice = null;
+        _textureId = textureId;
+        _owned = false;
+    }
+
+    /// <summary>
+    /// Wraps a texture handle whose lifetime is owned by something else (e.g.
+    /// a swapchain). Disposing this wrapper does not release the underlying
+    /// texture.
+    /// </summary>
+    internal static GpuTexture WrapBorrowed(nint textureId) => new GpuTexture(textureId);
 
     internal static GpuTexture Create(GpuDevice device, GpuTextureCreateInfo info)
     {
@@ -166,12 +229,85 @@ public sealed class GpuTexture : IDisposable
     public void Dispose()
     {
         var id = Interlocked.Exchange(ref _textureId, 0);
-        if (id != 0)
+        if (id != 0 && _owned && _gpuDevice is not null)
         {
             _gpuDevice.RemoveResource(this);
             SDL.ReleaseGPUTexture(_gpuDevice.GpuDeviceID, id);
         }
     }
+}
+
+/// <summary>
+/// A GPU sampler resource that controls how textures are sampled by shaders.
+/// </summary>
+public sealed class GpuSampler : IDisposable
+{
+    private readonly GpuDevice _gpuDevice;
+    private nint _samplerId;
+
+    private GpuSampler(GpuDevice device, nint samplerId)
+    {
+        _gpuDevice = device;
+        _samplerId = samplerId;
+        device.AddResource(this);
+    }
+
+    internal static GpuSampler Create(GpuDevice device, GpuSamplerCreateInfo info)
+    {
+        var nativeInfo = new SDL.GPUSamplerCreateInfo
+        {
+            MinFilter = info.MinFilter,
+            MagFilter = info.MagFilter,
+            MipmapMode = info.MipmapMode,
+            AddressModeU = info.AddressModeU,
+            AddressModeV = info.AddressModeV,
+            AddressModeW = info.AddressModeW,
+            MipLodBias = info.MipLodBias,
+            MaxAnisotropy = info.MaxAnisotropy,
+            CompareOp = info.CompareOp,
+            MinLod = info.MinLod,
+            MaxLod = info.MaxLod,
+            EnableAnisotropy = (byte)(info.EnableAnisotropy ? 1 : 0),
+            EnableCompare = (byte)(info.EnableCompare ? 1 : 0),
+        };
+
+        var samplerId = SDL.CreateGPUSampler(device.GpuDeviceID, nativeInfo);
+        return new GpuSampler(device, samplerId);
+    }
+
+    internal nint SamplerId => _samplerId;
+
+    public bool IsDisposed => _samplerId == 0;
+
+    public void Dispose()
+    {
+        var id = Interlocked.Exchange(ref _samplerId, 0);
+        if (id != 0)
+        {
+            _gpuDevice.RemoveResource(this);
+            SDL.ReleaseGPUSampler(_gpuDevice.GpuDeviceID, id);
+        }
+    }
+}
+
+/// <summary>
+/// Describes a GPU sampler to be created.
+/// </summary>
+public record GpuSamplerCreateInfo
+{
+    public SDL.GPUFilter MinFilter { get; init; }
+    public SDL.GPUFilter MagFilter { get; init; }
+    public SDL.GPUSamplerMipmapMode MipmapMode { get; init; }
+    public SDL.GPUSamplerAddressMode AddressModeU { get; init; }
+    public SDL.GPUSamplerAddressMode AddressModeV { get; init; }
+    public SDL.GPUSamplerAddressMode AddressModeW { get; init; }
+    public float MipLodBias { get; init; }
+    public float MaxAnisotropy { get; init; }
+    public SDL.GPUCompareOp CompareOp { get; init; }
+    public float MinLod { get; init; }
+    public float MaxLod { get; init; }
+    public bool EnableAnisotropy { get; init; }
+    public bool EnableCompare { get; init; }
 }
 
 public record GpuTextureCreateInfo
@@ -224,6 +360,9 @@ public record GpuTextureCreateInfo
     public Properties? Properties { get; init; }
 }
 
+/// <summary>
+/// A GPU buffer resource used to store raw data on the device.
+/// </summary>
 public abstract class GpuBuffer : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
@@ -280,6 +419,9 @@ public abstract class GpuBuffer : IDisposable
     private string? _name;
 }
 
+/// <summary>
+/// A staging buffer used to upload CPU data into GPU resources.
+/// </summary>
 public class GpuUploadBuffer : GpuBuffer
 {
     private GpuUploadBuffer(GpuDevice device, nint bufferId, uint size)
@@ -358,6 +500,214 @@ public class GpuUploadBuffer : GpuBuffer
     }
 }
 
+/// <summary>
+/// A single frame of GPU work, including copy and render passes.
+/// </summary>
+public sealed class GpuRenderFrame : IDisposable
+{
+    private readonly GpuDevice _device;
+    private readonly GpuCommandBuffer _commandBuffer;
+    private bool _disposed;
+
+    internal GpuRenderFrame(GpuDevice device, GpuCommandBuffer commandBuffer)
+    {
+        _device = device;
+        _commandBuffer = commandBuffer;
+    }
+
+    internal GpuCommandBuffer CommandBuffer => _commandBuffer;
+
+    public GpuCopyPass BeginCopyPass() =>
+        GpuCopyPass.Begin(_commandBuffer);
+
+    public GpuRenderPass BeginRenderPass(
+        ImmutableArray<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget) =>
+        _device.BeginRenderPass(_commandBuffer, colorTargets, depthTarget);
+
+    public void Submit()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        SDL.SubmitGPUCommandBuffer(_commandBuffer.CommandBufferId);
+        _commandBuffer.ReleaseWithoutCancel();
+    }
+
+    public GpuFence SubmitAndAcquireFence()
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GpuRenderFrame));
+
+        _disposed = true;
+        var fence = SDL.SubmitGPUCommandBufferAndAcquireFence(_commandBuffer.CommandBufferId);
+        _commandBuffer.ReleaseWithoutCancel();
+        return new GpuFence(_device, fence);
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            _commandBuffer.Dispose();
+        }
+    }
+}
+
+/// <summary>
+/// A scoped phase for copying data to or from GPU resources.
+/// </summary>
+public sealed class GpuCopyPass : IDisposable
+{
+    private readonly nint _copyPassId;
+    private bool _disposed;
+
+    private GpuCopyPass(nint copyPassId)
+    {
+        _copyPassId = copyPassId;
+    }
+
+    internal static GpuCopyPass Begin(GpuCommandBuffer commandBuffer)
+    {
+        var copyPassId = SDL.BeginGPUCopyPass(commandBuffer.CommandBufferId);
+        if (copyPassId == 0)
+            throw new InvalidOperationException($"Failed to begin GPU copy pass: {SDL.GetError()}");
+        return new GpuCopyPass(copyPassId);
+    }
+
+    public void Upload(GpuUploadBuffer source, GpuBuffer destination, ReadOnlySpan<byte> bytes)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (source.IsDisposed)
+            throw new ObjectDisposedException(nameof(source));
+        if (destination.IsDisposed)
+            throw new ObjectDisposedException(nameof(destination));
+
+        unsafe
+        {
+            fixed (byte* pBytes = bytes)
+            {
+                void* pMappedBytes = (void*)SDL.MapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId, true);
+                if (pMappedBytes == null)
+                    throw new InvalidOperationException("Failed to map transfer buffer.");
+
+                Buffer.MemoryCopy(pBytes, pMappedBytes, bytes.Length, bytes.Length);
+                SDL.UnmapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId);
+
+                SDL.UploadToGPUBuffer(
+                    _copyPassId,
+                    new GPUTransferBufferLocation { Offset = 0, TransferBuffer = source.BufferId },
+                    new GPUBufferRegion { Buffer = destination.BufferId, Offset = 0, Size = (uint)bytes.Length },
+                    cycle: true
+                );
+            }
+        }
+    }
+
+    /// <summary>
+    /// Uploads a 2D bitmap region into the destination texture's mip 0 layer 0.
+    /// </summary>
+    /// <param name="source">Transfer buffer holding the pixel bytes.</param>
+    /// <param name="destination">Destination GPU texture.</param>
+    /// <param name="width">Region width in pixels.</param>
+    /// <param name="height">Region height in pixels.</param>
+    /// <param name="bytes">Pixel bytes, tightly packed (PixelsPerRow = width).</param>
+    public void UploadToTexture(
+        GpuUploadBuffer source,
+        GpuTexture destination,
+        uint width,
+        uint height,
+        ReadOnlySpan<byte> bytes)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (source.IsDisposed)
+            throw new ObjectDisposedException(nameof(source));
+        if (destination.IsDisposed)
+            throw new ObjectDisposedException(nameof(destination));
+
+        unsafe
+        {
+            fixed (byte* pBytes = bytes)
+            {
+                void* pMappedBytes = (void*)SDL.MapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId, true);
+                if (pMappedBytes == null)
+                    throw new InvalidOperationException("Failed to map transfer buffer.");
+
+                Buffer.MemoryCopy(pBytes, pMappedBytes, bytes.Length, bytes.Length);
+                SDL.UnmapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId);
+
+                SDL.UploadToGPUTexture(
+                    _copyPassId,
+                    new SDL.GPUTextureTransferInfo
+                    {
+                        TransferBuffer = source.BufferId,
+                        Offset = 0,
+                        PixelsPerRow = width,
+                        RowsPerLayer = height,
+                    },
+                    new SDL.GPUTextureRegion
+                    {
+                        Texture = destination.TextureId,
+                        MipLevel = 0,
+                        Layer = 0,
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                        W = width,
+                        H = height,
+                        D = 1,
+                    },
+                    cycle: true
+                );
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _disposed = true;
+            SDL.EndGPUCopyPass(_copyPassId);
+        }
+    }
+}
+
+/// <summary>
+/// A join point for GPU work.
+/// </summary>
+public sealed class GpuFence : IDisposable
+{
+    private readonly GpuDevice _device;
+    private nint _fenceId;
+
+    internal GpuFence(GpuDevice device, nint fenceId)
+    {
+        _device = device;
+        _fenceId = fenceId;
+    }
+
+    public bool IsDisposed => _fenceId == 0;
+
+    public bool IsSignaled => !IsDisposed && SDL.QueryGPUFence(_device.GpuDeviceID, _fenceId);
+
+    public void Dispose()
+    {
+        var id = Interlocked.Exchange(ref _fenceId, 0);
+        if (id != 0)
+        {
+            SDL.ReleaseGPUFence(_device.GpuDeviceID, id);
+        }
+    }
+}
+
+/// <summary>
+/// Describes how vertex data is laid out inside a vertex buffer.
+/// </summary>
 public record GpuVertexBufferLayout
 {
     /// <summary>
@@ -376,6 +726,9 @@ public record GpuVertexBufferLayout
     public GPUVertexInputRate InputRate { get; init; } = GPUVertexInputRate.Vertex;
 }
 
+/// <summary>
+/// Describes one element within a vertex layout.
+/// </summary>
 public record GpuVertexElement
 {
     /// <summary>
@@ -389,6 +742,9 @@ public record GpuVertexElement
     public UInt32 Offset { get; init; }
 }
 
+/// <summary>
+/// A GPU buffer that is intended for vertex input.
+/// </summary>
 public abstract class GpuVertexBuffer : GpuBuffer
 {
     private protected GpuVertexBuffer(GpuDevice device, nint bufferId, uint size, GpuVertexBufferLayout layout)
@@ -401,6 +757,9 @@ public abstract class GpuVertexBuffer : GpuBuffer
 
 }
 
+/// <summary>
+/// A typed vertex buffer for structured vertex data.
+/// </summary>
 public class GpuVertexBuffer<TVertex> : GpuVertexBuffer
     where TVertex : unmanaged
 {
@@ -442,6 +801,9 @@ public class GpuVertexBuffer<TVertex> : GpuVertexBuffer
 }
 
 
+/// <summary>
+/// A block of GPU copy and render instructions.
+/// </summary>
 public sealed class GpuCommandBuffer: IDisposable
 {
     private readonly GpuDevice _gpuDevice;
@@ -464,6 +826,19 @@ public sealed class GpuCommandBuffer: IDisposable
 
     public bool IsDisposed => _commandBufferId == 0;
 
+    /// <summary>
+    /// Releases the wrapper without cancelling the underlying command buffer.
+    /// Call this once the buffer has been handed off to SDL via Submit/SubmitAndAcquireFence.
+    /// </summary>
+    internal void ReleaseWithoutCancel()
+    {
+        var id = Interlocked.Exchange(ref _commandBufferId, 0);
+        if (id != 0)
+        {
+            _gpuDevice.RemoveResource(this);
+        }
+    }
+
     public void Dispose()
     {
         var id = Interlocked.Exchange(ref _commandBufferId, 0);
@@ -475,6 +850,9 @@ public sealed class GpuCommandBuffer: IDisposable
     }
 }
 
+/// <summary>
+/// A scoped render recording phase for drawing into one or more GPU targets.
+/// </summary>
 public sealed class GpuRenderPass : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
@@ -546,7 +924,26 @@ public sealed class GpuRenderPass : IDisposable
         {
             fixed (GPUColorTargetInfo* pColorTargets = nativeColorTargets)
             {
-                var renderPassId = SDL.BeginGPURenderPass(commandBuffer.CommandBufferId, (nint)pColorTargets, (uint)nativeColorTargets.Length, nativeDepthTarget);
+                nint renderPassId;
+                if (depthTarget.Texture is null)
+                {
+                    // SDL_GPU expects a NULL pointer when no depth/stencil
+                    // target is in use. Passing a zero-filled struct by ref
+                    // is NOT equivalent and causes native heap corruption.
+                    renderPassId = SDL.BeginGPURenderPass(
+                        commandBuffer.CommandBufferId,
+                        (nint)pColorTargets,
+                        (uint)nativeColorTargets.Length,
+                        IntPtr.Zero);
+                }
+                else
+                {
+                    renderPassId = SDL.BeginGPURenderPass(
+                        commandBuffer.CommandBufferId,
+                        (nint)pColorTargets,
+                        (uint)nativeColorTargets.Length,
+                        nativeDepthTarget);
+                }
                 return new GpuRenderPass(device, commandBuffer, renderPassId);
             }
         }
@@ -590,13 +987,204 @@ public sealed class GpuRenderPass : IDisposable
         }
     }
 
-    public void Draw()
+    /// <summary>
+    /// Binds an index buffer to the render pass's command buffer.
+    /// </summary>
+    public void BindIndexBuffer(GpuBuffer buffer, SDL.GPUIndexElementSize indexElementSize, uint offset = 0)
     {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+        if (buffer.IsDisposed)
+            throw new ObjectDisposedException(nameof(buffer));
+
+        SDL.GPUBufferBinding binding = new SDL.GPUBufferBinding
+        {
+            Buffer = buffer.BufferId,
+            Offset = offset
+        };
+
+        SDL.BindGPUIndexBuffer(_gpuRenderPassID, binding, indexElementSize);
+    }
+
+    /// <summary>
+    /// Sets the viewport for draw calls in this render pass.
+    /// </summary>
+    public void SetViewport(SDL.GPUViewport viewport)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        SDL.SetGPUViewport(_gpuRenderPassID, viewport);
+    }
+
+    /// <summary>
+    /// Sets the scissor rectangle for draw calls in this render pass.
+    /// </summary>
+    public void SetScissor(SDL.Rect scissor)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        SDL.SetGPUScissor(_gpuRenderPassID, scissor);
+    }
+
+    /// <summary>
+    /// Pushes vertex uniform data for subsequent draw calls in this command buffer.
+    /// </summary>
+    public void PushVertexUniformData<T>(uint slotIndex, in T data)
+        where T : unmanaged
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        unsafe
+        {
+            fixed (T* pData = &data)
+            {
+                SDL.PushGPUVertexUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Draws non-indexed primitives using the currently bound graphics state.
+    /// </summary>
+    public void DrawPrimitives(uint numVertices, uint numInstances = 1, uint firstVertex = 0, uint firstInstance = 0)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        SDL.DrawGPUPrimitives(_gpuRenderPassID, numVertices, numInstances, firstVertex, firstInstance);
+    }
+
+    /// <summary>
+    /// Draws indexed primitives using the currently bound graphics state.
+    /// </summary>
+    public void DrawIndexedPrimitives(uint numIndices, uint numInstances = 1, uint firstIndex = 0, short vertexOffset = 0, uint firstInstance = 0)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        SDL.DrawGPUIndexedPrimitives(_gpuRenderPassID, numIndices, numInstances, firstIndex, vertexOffset, firstInstance);
+    }
+
+    /// <summary>
+    /// Pushes fragment uniform data for subsequent draw calls in this command buffer.
+    /// </summary>
+    public void PushFragmentUniformData<T>(uint slotIndex, in T data)
+        where T : unmanaged
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        unsafe
+        {
+            fixed (T* pData = &data)
+            {
+                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Binds texture+sampler pairs to the fragment stage starting at the given slot.
+    /// </summary>
+    public void BindFragmentSamplers(uint firstSlot, ReadOnlySpan<GpuTextureSamplerBinding> bindings)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        unsafe
+        {
+            Span<SDL.GPUTextureSamplerBinding> native = stackalloc SDL.GPUTextureSamplerBinding[bindings.Length];
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                var b = bindings[i];
+                if (b.Texture.IsDisposed)
+                    throw new ObjectDisposedException(nameof(b.Texture));
+                if (b.Sampler.IsDisposed)
+                    throw new ObjectDisposedException(nameof(b.Sampler));
+                native[i] = new SDL.GPUTextureSamplerBinding
+                {
+                    Texture = b.Texture.TextureId,
+                    Sampler = b.Sampler.SamplerId,
+                };
+            }
+
+            fixed (SDL.GPUTextureSamplerBinding* pNative = native)
+            {
+                SDL.BindGPUFragmentSamplers(_gpuRenderPassID, firstSlot, (nint)pNative, (uint)native.Length);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Binds texture+sampler pairs to the vertex stage starting at the given slot.
+    /// </summary>
+    public void BindVertexSamplers(uint firstSlot, ReadOnlySpan<GpuTextureSamplerBinding> bindings)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        unsafe
+        {
+            Span<SDL.GPUTextureSamplerBinding> native = stackalloc SDL.GPUTextureSamplerBinding[bindings.Length];
+            for (int i = 0; i < bindings.Length; i++)
+            {
+                var b = bindings[i];
+                if (b.Texture.IsDisposed)
+                    throw new ObjectDisposedException(nameof(b.Texture));
+                if (b.Sampler.IsDisposed)
+                    throw new ObjectDisposedException(nameof(b.Sampler));
+                native[i] = new SDL.GPUTextureSamplerBinding
+                {
+                    Texture = b.Texture.TextureId,
+                    Sampler = b.Sampler.SamplerId,
+                };
+            }
+
+            fixed (SDL.GPUTextureSamplerBinding* pNative = native)
+            {
+                SDL.BindGPUVertexSamplers(_gpuRenderPassID, firstSlot, (nint)pNative, (uint)native.Length);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the stencil reference value for subsequent draw calls in this render pass.
+    /// </summary>
+    public void SetStencilReference(byte reference)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        // SDL3-CS exposes SDL_SetGPUStencilReference as an overload of
+        // SetGPUBlendConstants taking a byte (binding quirk).
+        SDL.SetGPUBlendConstants(_gpuRenderPassID, reference);
+    }
+
+    /// <summary>
+    /// Sets the blend constants used by the BlendConstant blend factor.
+    /// </summary>
+    public void SetBlendConstants(SDL.FColor blendConstants)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        SDL.SetGPUBlendConstants(_gpuRenderPassID, blendConstants);
     }
 }
 
+/// <summary>
+/// A pairing of a texture and a sampler for binding to a render pass.
+/// </summary>
+public readonly record struct GpuTextureSamplerBinding(GpuTexture Texture, GpuSampler Sampler);
 
 
+
+/// <summary>
+/// Describes one color target used by a render pass.
+/// </summary>
 public record GpuColorTargetInfo
 {
     // GPUColorTargetInfo
@@ -657,6 +1245,9 @@ public record GpuColorTargetInfo
     public bool CycleResolveTexture { get; init; }
 }
 
+/// <summary>
+/// Describes the depth and stencil target used by a render pass.
+/// </summary>
 public record GpuDepthStencilTargetInfo
 {
     // GPUDepthStencilTargetInfo
@@ -702,6 +1293,9 @@ public record GpuDepthStencilTargetInfo
     public Byte ClearStencil { get; init; }
 }
 
+/// <summary>
+/// A compiled graphics pipeline ready to bind for drawing.
+/// </summary>
 public sealed class GpuPipeline : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
@@ -734,6 +1328,7 @@ public sealed class GpuPipeline : IDisposable
         {
             fixed(SDL.GPUVertexBufferDescription* pBufferDescriptions = info.VertexInputState.BufferDescriptions.AsSpan())
             fixed(SDL.GPUVertexAttribute* pAttributes = info.VertexInputState.Attributes.AsSpan())
+            fixed(SDL.GPUColorTargetDescription* pColorTargets = info.TargetInfo.ColorTargetDescriptions.AsSpan())
             {
                 var inputState = new SDL.GPUVertexInputState
                 {
@@ -741,6 +1336,14 @@ public sealed class GpuPipeline : IDisposable
                     NumVertexBuffers = (uint)info.VertexInputState.BufferDescriptions.Length,
                     VertexAttributes = (nint)pAttributes,
                     NumVertexAttributes = (uint)info.VertexInputState.Attributes.Length
+                };
+
+                var targetInfo = new SDL.GPUGraphicsPipelineTargetInfo
+                {
+                    ColorTargetDescriptions = (nint)pColorTargets,
+                    NumColorTargets = (uint)info.TargetInfo.ColorTargetDescriptions.Length,
+                    DepthStencilFormat = info.TargetInfo.DepthStencilFormat,
+                    HasDepthStencilTarget = info.TargetInfo.HasDepthStencilTarget ? (byte)1 : (byte)0,
                 };
 
                 var createInfo = new GPUGraphicsPipelineCreateInfo
@@ -752,7 +1355,7 @@ public sealed class GpuPipeline : IDisposable
                     RasterizerState = info.RasterizerState,
                     MultisampleState = info.MultisampleState,
                     DepthStencilState = info.DepthStencilState,
-                    TargetInfo = info.TargetInfo,
+                    TargetInfo = targetInfo,
                     Props = info.Properties?.PropertiesId ?? 0
                 };
 
@@ -763,6 +1366,9 @@ public sealed class GpuPipeline : IDisposable
     }
 }
 
+/// <summary>
+/// Describes how to create a graphics pipeline.
+/// </summary>
 public record GpuPipelineCreateInfo
 {
     // GPUGraphicsPipelineCreateInfo
@@ -805,7 +1411,10 @@ public record GpuPipelineCreateInfo
     /// <summary>
     /// Formats and blend modes for the render targets of the graphics pipeline.
     /// </summary>
-    public GPUGraphicsPipelineTargetInfo TargetInfo { get; set; }
+    public GpuPipelineTargetInfo TargetInfo { get; set; } = new GpuPipelineTargetInfo
+    {
+        ColorTargetDescriptions = ImmutableArray<SDL.GPUColorTargetDescription>.Empty,
+    };
 
     /// <summary>
     /// Properties for extensions. Should be null if no extensions are needed.
@@ -813,6 +1422,9 @@ public record GpuPipelineCreateInfo
     public Properties? Properties { get; set; }
 }
 
+/// <summary>
+/// Describes the vertex buffers and attributes used by a pipeline.
+/// </summary>
 public record GpuVertexInputState
 {
     // SDL.GPUVertexInputState
@@ -821,6 +1433,9 @@ public record GpuVertexInputState
     public ImmutableArray<SDL.GPUVertexAttribute> Attributes { get; init; }
 }
 
+/// <summary>
+/// Describes the target formats and blending state for a pipeline.
+/// </summary>
 public record GpuPipelineTargetInfo
 {
     // GPUGraphicsPipelineTargetInfo
@@ -841,6 +1456,9 @@ public record GpuPipelineTargetInfo
     public bool HasDepthStencilTarget { get; init; }
 }
 
+/// <summary>
+/// A GPU shader module used when creating pipelines.
+/// </summary>
 public sealed class GpuShader : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
@@ -895,6 +1513,9 @@ public sealed class GpuShader : IDisposable
     }
 }
 
+/// <summary>
+/// Describes how to create a GPU shader module.
+/// </summary>
 public record GpuShaderCreateInfo
 {
     // GPUShaderCreateInfo

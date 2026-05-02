@@ -2,7 +2,7 @@
 using SDL3.Model;
 using Grape;
 
-var window = new Window(800, 600)
+var window = new Window2D(800, 600)
 {
     Title = "Grape",
     BackgroundColor = new SDL.Color { R = 0, G = 20, B = 0, A = 0 },
@@ -103,7 +103,7 @@ void Window_KeyDown(Window window, SDL.KeyboardEvent context)
     }
 }
 
-void Window_Rendering(Window window, Renderer renderer)
+void Window_Rendering(Window window, Renderer2D renderer)
 {
     rocket.Render(renderer);
 

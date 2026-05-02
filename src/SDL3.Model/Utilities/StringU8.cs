@@ -9,7 +9,7 @@ public class StringU8
 
     private StringU8(byte[] utf8Bytes)
     {
-        System.Diagnostics.Debug.Assert(utf8Bytes[^0] == 0); // null terminated
+        System.Diagnostics.Debug.Assert(utf8Bytes[^1] == 0); // null terminated
         _utf8Bytes = utf8Bytes;
     }
 

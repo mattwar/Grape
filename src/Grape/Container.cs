@@ -29,7 +29,7 @@ public abstract class Container : Prop
         return changed;
     }
 
-    public override void Render(Renderer renderer)
+    public override void Render(Renderer2D renderer)
     {
         var props = _props;
 

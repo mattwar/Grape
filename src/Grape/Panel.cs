@@ -150,7 +150,7 @@ public class StackPanel : Prop
         return changed;
     }
 
-    public override void Render(Renderer renderer)
+    public override void Render(Renderer2D renderer)
     {
         var originalClip = renderer.ClipRect;
 
@@ -201,7 +201,7 @@ public class OverlayPanel : Prop
         return changed;
     }
 
-    public override void Render(Renderer renderer)
+    public override void Render(Renderer2D renderer)
     {
         var originalClip = renderer.ClipRect;
         var panels = _layers;

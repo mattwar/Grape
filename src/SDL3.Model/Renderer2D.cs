@@ -6,13 +6,13 @@ using static SDL3.SDL;
 
 namespace SDL3.Model;
 
-public sealed class Renderer : IDisposable
+public sealed class Renderer2D : IDisposable
 {
-    private readonly Window _window;
+    private readonly Window2D _window;
     private readonly string _name;
     private nint _rendererId;
 
-    internal Renderer(Window window, nint rendererId, string? name)
+    internal Renderer2D(Window2D window, nint rendererId, string? name)
     {
         _window = window;
         _name = name ?? "";
@@ -23,19 +23,19 @@ public sealed class Renderer : IDisposable
     /// Creates a renderer for this window.
     /// The window already has a default renderer created when the window is created.
     /// </summary>
-    internal static Renderer Create(Window window, string? name = null)
+    internal static Renderer2D Create(Window2D window, string? name = null)
     {
         var rendererId = SDL.CreateRenderer(window.WindowId, name);
-        return new Renderer(window, rendererId, name);
+        return new Renderer2D(window, rendererId, name);
     }
 
     /// <summary>
     /// Creates a window gpu renderer with the specified shader format.
     /// </summary>
-    internal static Renderer Create(Window window, SDL.GPUShaderFormat format)
+    internal static Renderer2D Create(Window2D window, SDL.GPUShaderFormat format)
     {
         var rendererId = SDL.CreateGPURenderer(window.WindowId, format, out var gpuDeviceId);
-        return new Renderer(window, rendererId, null);
+        return new Renderer2D(window, rendererId, null);
     }
 
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
@@ -51,7 +51,7 @@ public sealed class Renderer : IDisposable
     }
 
     /// <summary>
-    /// True if this <see cref="Renderer"/> has been disposed.
+    /// True if this <see cref="Renderer2D"/> has been disposed.
     /// </summary>
     public bool IsDisposed => _rendererId == 0;
 
@@ -62,7 +62,7 @@ public sealed class Renderer : IDisposable
     }
 
     /// <summary>
-    /// Disposes this <see cref="Renderer"/>, releasing its resources.
+    /// Disposes this <see cref="Renderer2D"/>, releasing its resources.
     /// </summary>
     public void Dispose()
     {
@@ -85,7 +85,7 @@ public sealed class Renderer : IDisposable
     #region Properties
 
     /// <summary>
-    /// The <see cref="Window"/> this <see cref="Renderer"/> renders to.
+    /// The <see cref="Window"/> this <see cref="Renderer2D"/> renders to.
     /// </summary>
     public Window Window => _window;
 
@@ -309,7 +309,7 @@ public sealed class Renderer : IDisposable
 
     #region Textures
     /// <summary>
-    /// Creates a new <see cref="Texture"/> associated with this <see cref="Renderer"/>.
+    /// Creates a new <see cref="Texture"/> associated with this <see cref="Renderer2D"/>.
     /// </summary>
     public Texture CreateTexture(int width, int height, SDL.PixelFormat pixelFormat, SDL.TextureAccess access)
     {
@@ -533,12 +533,12 @@ public sealed class Renderer : IDisposable
         return SDL.RenderFillRects(_rendererId, rects, rects.Length);
     }
 
-    public bool RenderGeometry(Vertex[] vertices, int[] indices, Texture? texture = null)
+    public bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Texture? texture = null)
     {
         return SDL.RenderGeometry(_rendererId, texture != null ? texture.Id : 0, vertices, vertices.Length, indices, indices.Length);
     }
 
-    public bool RenderGeometry(Vertex[] vertices, int[] indices, Surface? surface = null)
+    public bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Surface? surface = null)
     {
         var texture = surface == null ? null
             : TryGetOrCreateTexture(surface!, out var txt) ? txt

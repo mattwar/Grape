@@ -6,10 +6,10 @@
 /// </summary>
 public sealed class Texture : IDisposable
 {
-    private readonly Renderer _renderer;
+    private readonly Renderer2D _renderer;
     private nint _textureId;
 
-    internal Texture(Renderer renderer, nint surfaceId)
+    internal Texture(Renderer2D renderer, nint surfaceId)
     {
         _renderer = renderer;
         _textureId = surfaceId;
@@ -19,7 +19,7 @@ public sealed class Texture : IDisposable
     /// <summary>
     /// The <see cref="Renderer"/> that created this <see cref="Texture"/>.
     /// </summary>
-    public Renderer Renderer => _renderer;
+    public Renderer2D Renderer => _renderer;
 
     internal nint Id => _textureId;
 

@@ -5,17 +5,15 @@ namespace SDL3.Model;
 /// <summary>
 /// A window class corresponding to an SDL window.
 /// </summary>
-public class Window : IDisposable
+public abstract class Window : IDisposable
 {
     private nint _window;
     private Properties? _properties;
-    private Renderer _renderer;
     private Surface? _icon;
 
-    public Window(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    protected Window(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
     {
         _window = 0;
-        _renderer = null!;
 
         // start application if it is not already started.
         var app = Application.Start();
@@ -26,12 +24,21 @@ public class Window : IDisposable
             _window = SDL.CreateWindow("", width, height, flags);
             this.EventId = SDL.GetWindowID(_window);
             Application.Current.AddWindow(this);
-            _renderer = Renderer.Create(this);
+            OnWindowCreated();
         });
     }
 
-    public Window(SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    protected Window(SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
         : this(100, 100)
+    {
+    }
+
+    /// <summary>
+    /// Called once on the application thread immediately after the underlying
+    /// SDL window has been created. Subclasses can override to attach their
+    /// own renderer or claim the window for a graphics device.
+    /// </summary>
+    protected virtual void OnWindowCreated()
     {
     }
 
@@ -429,11 +436,6 @@ public class Window : IDisposable
 
     #region Rendering
     /// <summary>
-    /// The current <see cref="Renderer"/> used to draw to the window.
-    /// </summary>
-    internal Renderer Renderer => _renderer;
-
-    /// <summary>
     /// The background color used to clear the window before rendering.
     /// </summary>
     public SDL.Color BackgroundColor { get; set; }
@@ -454,62 +456,35 @@ public class Window : IDisposable
     {
         if (Interlocked.CompareExchange(ref _renderState, RenderState.Scheduled, RenderState.Idle) == RenderState.Idle)
         {
-            Application.Current.Post(_tcs => DoRender(), null);
+            Application.Current.Post(_tcs => DoRenderInternal(), null);
         }
     }
 
-    private void DoRender()
+    private void DoRenderInternal()
     {
-        var renderer = _renderer;
-        if (renderer != null)
+        try
         {
-            _renderer.DrawColor = this.BackgroundColor;
-            _renderer.Clear();
-            this.OnRendering(_renderer);
-            _renderer.Present();
+            DoRender();
         }
-
-        // signal that we are done rendering
-        _renderState = RenderState.Idle;
+        finally
+        {
+            // signal that we are done rendering
+            _renderState = RenderState.Idle;
+        }
     }
 
     /// <summary>
-    /// Occurs when the window is rendering a frame, providing access to the current rendering context.
+    /// Performs the per-frame rendering for this window. Implementations are
+    /// invoked on the application thread.
     /// </summary>
-    /// <remarks>This event is raised during the rendering process and allows subscribers to perform custom
-    /// rendering  operations or interact with the rendering context. Handlers can use the provided <see
-    /// cref="RenderContext"/>  to access rendering-specific data and functionality.</remarks>
-    public event WindowEventHandler<Renderer>? Rendering;
-
-    public virtual void OnRendering(Renderer renderer)
-    {
-        this.Rendering?.Invoke(this, renderer);
-    }
+    protected abstract void DoRender();
 
     /// <summary>
     /// Render immediately.
     /// </summary>
     public void Render()
     {
-        Application.Current.Send(_ => DoRender(), null);
-    }
-
-    /// <summary>
-    /// Render immediately using the specified action.
-    /// </summary>
-    public void Render(Action<Renderer> renderAction)
-    {
-        var renderer = _renderer;
-        if (renderer != null)
-        {
-            Application.Current.Send(_ =>
-            {
-                _renderer.DrawColor = this.BackgroundColor;
-                _renderer.Clear();
-                renderAction(_renderer);
-                _renderer.Present();
-            });
-        }
+        Application.Current.Send(_ => DoRenderInternal(), null);
     }
 
     #endregion
