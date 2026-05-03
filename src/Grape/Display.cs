@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -28,18 +29,18 @@ public sealed class Display
     /// <summary>
     /// The bounds of the display in multi-display space.
     /// </summary>
-    public SDL.Rect Bounds => 
+    public Rect Bounds => 
         SDL.GetDisplayBounds(_displayId, out var bounds) 
             ? bounds 
-            : new SDL.Rect { X = 0, Y = 0, W = 0, H = 0 };
+            : default;
 
     /// <summary>
     /// The bounds of the display less the area occupied by system UI elements like the task bar or menu bar.
     /// </summary>
-    public SDL.Rect UsableBounds => 
+    public Rect UsableBounds => 
         SDL.GetDisplayUsableBounds(_displayId, out var bounds) 
             ? bounds 
-            : new SDL.Rect { X = 0, Y = 0, W = 0, H = 0 };
+            : default;
 
     /// <summary>
     /// The scaling for UI elements based of the DPI of the display.
@@ -112,18 +113,20 @@ public sealed class Display
     /// <summary>
     /// Gets the display associated with the given point in the multi-display space.
     /// </summary>
-    public static bool TryGetDisplayFromPoint(SDL.Point point, [NotNullWhen(true)] out Display? display)
+    public static bool TryGetDisplayFromPoint(Vector2 point, [NotNullWhen(true)] out Display? display)
     {
-        var id = SDL.GetDisplayForPoint(point);
+        var sdlPoint = new SDL.Point { X = (int)point.X, Y = (int)point.Y };
+        var id = SDL.GetDisplayForPoint(sdlPoint);
         return TryGetDisplay(id, out display);
     }
 
     /// <summary>
     /// Gets the display associated with the given rectangle in the multi-display space.
     /// </summary>
-    public static bool TryGetDisplayFromRect(SDL.Rect rect, [NotNullWhen(true)] out Display? display)
+    public static bool TryGetDisplayFromRect(Rect rect, [NotNullWhen(true)] out Display? display)
     {
-        var id = SDL.GetDisplayForRect(rect);
+        SDL.Rect sdlRect = rect;
+        var id = SDL.GetDisplayForRect(sdlRect);
         return TryGetDisplay(id, out display);
     }
 

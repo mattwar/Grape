@@ -15,7 +15,7 @@ internal static class DebugTextExample
         var window = new Window3D(800, 600)
         {
             Title = "Debug Text",
-            BackgroundColor = new SDL.Color { R = 16, G = 0, B = 32, A = 255 },
+            BackgroundColor = new Color(16, 0, 32),
         };
 
         var startTime = DateTime.UtcNow;

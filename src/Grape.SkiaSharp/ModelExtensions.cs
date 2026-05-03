@@ -4,12 +4,12 @@ namespace Grape;
 
 public static class ModelExtensions
 {
-    extension(Surface)
+    extension(Image)
     {
         /// <summary>
-        /// Creates a SDL surface from an image file with a pixel format matching the window.
+        /// Creates an <see cref="Image"/> from an image file.
         /// </summary>
-        public static Surface LoadImage(string filename, SDL.PixelFormat format = SDL.PixelFormat.BGRA8888)
+        public static Image LoadImage(string filename, SDL.PixelFormat format = SDL.PixelFormat.BGRA8888)
         {
             var bytes = File.ReadAllBytes(filename);
             return GetImageFromBytes(bytes, format);
@@ -28,9 +28,9 @@ public static class ModelExtensions
     }
 
     /// <summary>
-    /// Loads an image from bytes and creates an SDL surface with a pixel format matching the window.
+    /// Loads an image from bytes and creates an <see cref="Image"/> with the given pixel format.
     /// </summary>
-    private static Surface GetImageFromBytes(Span<byte> bytes, SDL.PixelFormat format)
+    private static Image GetImageFromBytes(Span<byte> bytes, SDL.PixelFormat format)
     {
         using var skBitmap = SKBitmap.Decode(bytes);
         if (skBitmap == null)
@@ -38,7 +38,7 @@ public static class ModelExtensions
 
         var width = skBitmap.Width;
         var height = skBitmap.Height;
-        var surface = Surface.Create(width, height, format);
+        var image = Image.Create(width, height, format);
 
         SDL.Color sdColor = default;
         var bbp = skBitmap.BytesPerPixel;
@@ -51,10 +51,10 @@ public static class ModelExtensions
                 (sdColor.R, sdColor.G, sdColor.B, sdColor.A) = skBitmap.GetPixel(x, y);
                 if (bbp == 3)
                     sdColor.A = 0xFF; // no alpha channel in 3 byte images.. make sure it is opaque
-                surface.SetPixel(x, y, sdColor);
+                image.SetPixel(x, y, sdColor);
             }
         }
 
-        return surface;
+        return image;
     }
 }

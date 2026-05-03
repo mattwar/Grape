@@ -16,14 +16,14 @@ internal static class SpinningTexturedTriangleExample
                 new TextureVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new Vector2(0f,   1f))),
             indices: ImmutableArray<uint>.Empty);
 
-        // Procedurally generate a checkerboard surface so any UV/orientation
+        // Procedurally generate a checkerboard image so any UV/orientation
         // mistake is visually obvious.
-        var checker = CreateCheckerboardSurface(256, 256, cellSize: 32);
+        var checker = CreateCheckerboardImage(256, 256, cellSize: 32);
 
         var window = new Window3D(800, 600)
         {
             Title = "Textured Triangle",
-            BackgroundColor = new SDL.Color { R = 0, G = 0, B = 32, A = 255 },
+            BackgroundColor = new Color(0, 0, 32),
         };
 
         var startTime = DateTime.UtcNow;
@@ -59,21 +59,21 @@ internal static class SpinningTexturedTriangleExample
         }
     }
 
-    private static Surface CreateCheckerboardSurface(int width, int height, int cellSize)
+    private static Grape.Image CreateCheckerboardImage(int width, int height, int cellSize)
     {
-        var surface = Surface.Create(width, height, SDL.PixelFormat.ABGR8888);
-        var dark = new SDL.Color { R = 32, G = 32, B = 32, A = 255 };
-        var light = new SDL.Color { R = 220, G = 220, B = 220, A = 255 };
+        var image = Grape.Image.Create(width, height, SDL.PixelFormat.ABGR8888);
+        var dark = new Color(32, 32, 32);
+        var light = new Color(220, 220, 220);
 
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
             {
                 var isDark = ((x / cellSize) + (y / cellSize)) % 2 == 0;
-                surface.SetPixel(x, y, isDark ? dark : light);
+                image.SetPixel(x, y, isDark ? dark : light);
             }
         }
 
-        return surface;
+        return image;
     }
 }

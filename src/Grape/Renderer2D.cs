@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using static SDL3.SDL;
@@ -92,7 +93,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The current blend mode used for drawing operations.
     /// </summary>
-    public SDL.BlendMode BlendMode
+    internal SDL.BlendMode BlendMode
     {
         get
         {
@@ -115,7 +116,7 @@ public sealed class Renderer2D : IDisposable
     /// <remarks>The clipping rectangle restricts rendering to the specified area. Any drawing operations
     /// outside this rectangle will be ignored. To disable clipping, set the rectangle to <see langword="null"/> or an
     /// empty rectangle.</remarks>
-    public SDL.Rect ClipRect
+    public Rect ClipRect
     {
         get
         {
@@ -128,7 +129,8 @@ public sealed class Renderer2D : IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.SetRenderClipRect(_rendererId, value);
+            SDL.Rect r = value;
+            SDL.SetRenderClipRect(_rendererId, r);
         }
     }
 
@@ -155,7 +157,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The default scale mode used for new textures.
     /// </summary>
-    public SDL.ScaleMode DefaultScaleMode
+    internal SDL.ScaleMode DefaultScaleMode
     {
         get
         {
@@ -175,14 +177,14 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The current draw color.
     /// </summary>
-    public SDL.Color DrawColor
+    public Color DrawColor
     {
         get
         {
             if (IsDisposed)
                 return default;
             SDL.GetRenderDrawColor(_rendererId, out var r, out var g, out var b, out var a);
-            return new SDL.Color { R = r, G = g, B = b, A = a };
+            return new Color(r, g, b, a);
         }
         set
         {
@@ -195,7 +197,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The current draw color as floats from 0.0 to 1.0.
     /// </summary>
-    public SDL.FColor DrawColorFloat
+    internal SDL.FColor DrawColorFloat
     {
         get
         {
@@ -215,7 +217,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The logical representation 
     /// </summary>
-    public (int Width, int Height, SDL.RendererLogicalPresentation Mode) LogicalRepresentation
+    internal (int Width, int Height, SDL.RendererLogicalPresentation Mode) LogicalRepresentation
     {
         get
         {
@@ -235,7 +237,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Gets the logical representation rectangle based on the presentation mode and output size.
     /// </summary>
-    public SDL.FRect LogicalRepresentationRect
+    public Rect LogicalRepresentationRect
     {
         get
         {
@@ -288,7 +290,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The portion of the rendering target where drawing operations are performed.
     /// </summary>
-    public SDL.Rect ViewPort
+    public Rect ViewPort
     {
         get
         {
@@ -301,7 +303,8 @@ public sealed class Renderer2D : IDisposable
         {
             if (IsDisposed)
                 return;
-            SDL.SetRenderViewport(_rendererId, value);
+            SDL.Rect r = value;
+            SDL.SetRenderViewport(_rendererId, r);
         }
     }
 
@@ -321,13 +324,13 @@ public sealed class Renderer2D : IDisposable
     }
 
     /// <summary>
-    /// Creates a <see cref="Texture"/> from a given <see cref="Surface"/>.
+    /// Creates a <see cref="Texture"/> from a given <see cref="Image"/>.
     /// </summary>
-    private Texture CreateTexture(Surface surface)
+    private Texture CreateTexture(Image image)
     {
         ThrowIfDisposed();
-        surface.ThrowIfDisposed();      
-        var id = SDL.CreateTextureFromSurface(_rendererId, surface._surfaceId);
+        image.ThrowIfDisposed();      
+        var id = SDL.CreateTextureFromSurface(_rendererId, image._imageId);
         return new Texture(this, id);
     }
     #endregion
@@ -438,34 +441,34 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
     }
 
-    private readonly ConditionalWeakTable<Surface, SurfaceTextureEntry> _surfaceTextureCache = new();
+    private readonly ConditionalWeakTable<Image, ImageTextureEntry> _imageTextureCache = new();
 
-    private sealed class SurfaceTextureEntry
+    private sealed class ImageTextureEntry
     {
         public Texture Texture { get; set; } = null!;
         public int Version { get; set; }
     }
 
     /// <summary>
-    /// Gets the associated <see cref="Texture"/> for the given <see cref="Surface"/>, creating one if necessary.
-    /// Re-creates the cached texture when the surface's <see cref="Surface.Version"/> has changed.
+    /// Gets the associated <see cref="Texture"/> for the given <see cref="Image"/>, creating one if necessary.
+    /// Re-creates the cached texture when the image's <see cref="Image.Version"/> has changed.
     /// </summary>
-    private bool TryGetOrCreateTexture(Surface surface, [NotNullWhen(true)] out Texture? texture)
+    private bool TryGetOrCreateTexture(Image image, [NotNullWhen(true)] out Texture? texture)
     {
-        if (!_surfaceTextureCache.TryGetValue(surface, out var entry))
+        if (!_imageTextureCache.TryGetValue(image, out var entry))
         {
-            entry = new SurfaceTextureEntry
+            entry = new ImageTextureEntry
             {
-                Texture = this.CreateTexture(surface),
-                Version = surface.Version,
+                Texture = this.CreateTexture(image),
+                Version = image.Version,
             };
-            _surfaceTextureCache.AddOrUpdate(surface, entry);
+            _imageTextureCache.AddOrUpdate(image, entry);
         }
-        else if (entry.Texture.IsDisposed || entry.Version != surface.Version)
+        else if (entry.Texture.IsDisposed || entry.Version != image.Version)
         {
             entry.Texture.Dispose();
-            entry.Texture = this.CreateTexture(surface);
-            entry.Version = surface.Version;
+            entry.Texture = this.CreateTexture(image);
+            entry.Version = image.Version;
         }
 
         texture = entry.Texture;
@@ -473,82 +476,89 @@ public sealed class Renderer2D : IDisposable
     }
 
     /// <summary>
-    /// Renders the portion of the <see cref="Surface"/> to the destination in the window.
+    /// Renders the portion of the <see cref="Image"/> to the destination in the window.
     /// </summary>
-    public bool RenderSurface(Surface surface, SDL.FRect source, SDL.FRect destination)
+    public bool RenderImage(Image image, Rect source, Rect destination)
     {
         if (IsDisposed)
             return false;
 
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
 
         return RenderTexture(texture, source, destination);
     }
 
     /// <summary>
-    /// Renders the entire <see cref="Surface"/> to the destination in the window.
+    /// Renders the entire <see cref="Image"/> to the destination in the window.
     /// </summary>
-    public bool RenderSurface(Surface surface, SDL.FRect destination)
+    public bool RenderImage(Image image, Rect destination)
     {
         if (IsDisposed)
             return false;
 
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
 
         return RenderTexture(texture, destination);
     }
 
     /// <summary>
-    /// Renders the entire <see cref="Surface"/> to the location in the window.
+    /// Renders the entire <see cref="Image"/> to the location in the window.
     /// </summary>
-    public bool RenderSurface(Surface surface, float x, float y, float scale = 1.0f)
+    public bool RenderImage(Image image, float x, float y, float scale = 1.0f)
     {
         if (IsDisposed)
             return false;
 
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
 
         return RenderTexture(texture, x, y, scale);
     }
 
-    public bool RenderSurfaceRotated(Surface surface, SDL.FRect source, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
+    public bool RenderImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
-        return RenderTextureRotated(texture, source, destination, angle, center, flip);
+        var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
+        return RenderTextureRotated(texture, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
     }
 
-    public bool RenderSurfaceRotated(Surface surface, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
+    public bool RenderImageRotated(Image image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
-        return RenderTextureRotated(texture, destination, angle, center, flip);
+        var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
+        return RenderTextureRotated(texture, destination, angle, sdlCenter, (SDL.FlipMode)flip);
     }
 
-    public bool RenderSurfaceRotated(Surface surface, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, SDL.FlipMode flip = SDL.FlipMode.None)
+    public bool RenderImageRotated(Image image, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
-        if (!TryGetOrCreateTexture(surface, out var texture))
+        if (!TryGetOrCreateTexture(image, out var texture))
             return false;
-        return RenderTextureRotated(texture, x, y, angle, centerX, centerY, scale, flip);
+        return RenderTextureRotated(texture, x, y, angle, centerX, centerY, scale, (SDL.FlipMode)flip);
     }
 
-    public bool RenderFillRect(in SDL.FRect rect)
+    public bool RenderFillRect(Rect rect)
     {
-        return SDL.RenderFillRect(_rendererId, rect);
+        SDL.FRect r = rect;
+        return SDL.RenderFillRect(_rendererId, r);
     }
 
-    public bool RenderFillRects(SDL.FRect[] rects)
+    public bool RenderFillRects(Rect[] rects)
     {
-        return SDL.RenderFillRects(_rendererId, rects, rects.Length);
+        unsafe
+        {
+            fixed (Rect* p = rects)
+                return SDL3Native.SDL_RenderFillRects(_rendererId, p, rects.Length);
+        }
     }
 
     private bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Texture? texture = null)
@@ -556,7 +566,7 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderGeometry(_rendererId, texture != null ? texture.Id : 0, vertices, vertices.Length, indices, indices.Length);
     }
 
-    public bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Surface? surface = null)
+    internal bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Image? surface = null)
     {
         var texture = surface == null ? null
             : TryGetOrCreateTexture(surface!, out var txt) ? txt
@@ -570,9 +580,13 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderLine(_rendererId, x1, y1, x2, y2);
     }
 
-    public bool RenderLines(SDL.FPoint[] points)
+    public bool RenderLines(Vector2[] points)
     {
-        return SDL.RenderLines(_rendererId, points, points.Length);
+        unsafe
+        {
+            fixed (Vector2* p = points)
+                return SDL3Native.SDL_RenderLines(_rendererId, p, points.Length);
+        }
     }
 
     public bool RenderPoint(float x, float y)
@@ -580,9 +594,13 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderPoint(_rendererId, x, y);
     }
 
-    public bool RenderPoints(SDL.FPoint[] points)
+    public bool RenderPoints(Vector2[] points)
     {
-        return SDL.RenderPoints(_rendererId, points, points.Length);
+        unsafe
+        {
+            fixed (Vector2* p = points)
+                return SDL3Native.SDL_RenderPoints(_rendererId, p, points.Length);
+        }
     }
     #endregion
 }

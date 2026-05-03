@@ -9,7 +9,7 @@ public abstract class Window : IDisposable
 {
     private nint _window;
     private Properties? _properties;
-    private Surface? _icon;
+    private Image? _icon;
 
     protected Window(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
     {
@@ -141,7 +141,7 @@ public abstract class Window : IDisposable
     /// <summary>
     /// The current icon used for the window
     /// </summary>
-    public Surface? Icon
+    public Image? Icon
     {
         get => _icon;
 
@@ -150,7 +150,7 @@ public abstract class Window : IDisposable
             if (IsDisposed || value == null)
                 return;
             _icon = value;
-            SDL.SetWindowIcon(_window, value._surfaceId);
+            SDL.SetWindowIcon(_window, value._imageId);
         }
     }
 
@@ -438,7 +438,7 @@ public abstract class Window : IDisposable
     /// <summary>
     /// The background color used to clear the window before rendering.
     /// </summary>
-    public SDL.Color BackgroundColor { get; set; }
+    public Color BackgroundColor { get; set; }
 
     private enum RenderState
     {

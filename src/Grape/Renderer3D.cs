@@ -27,7 +27,7 @@ public sealed class Renderer3D : IDisposable
     private BuiltInShaders? _shaders;
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
-    private Surface? _debugFontAtlas;
+    private Image? _debugFontAtlas;
     // One vertex buffer per RenderDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -178,19 +178,19 @@ public sealed class Renderer3D : IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using the given shader and surface as the source texture.
+    /// Draws a textured mesh using the given shader and image as the source texture.
     /// </summary>
     /// <remarks>
     /// The mesh and shader must both use <see cref="TextureVertex3D"/> and
     /// the mesh's vertex layout must match the shader's expected vertex layout.
-    /// The surface's pixels are uploaded once to a GPU texture and cached;
-    /// passing the same <see cref="Surface"/> instance on later frames reuses
+    /// The image's pixels are uploaded once to a GPU texture and cached;
+    /// passing the same <see cref="Image"/> instance on later frames reuses
     /// the upload.
     /// </remarks>
     public void RenderTexturedMesh(
         Mesh<TextureVertex3D> mesh,
         Shader<TextureVertex3D> shader,
-        Surface texture,
+        Image texture,
         Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -206,7 +206,7 @@ public sealed class Renderer3D : IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using the given shader and surface as the source
+    /// Draws a textured mesh using the given shader and image as the source
     /// texture, sourcing vertex data directly from a caller-owned array. See
     /// <see cref="RenderMesh{TVertex}(TVertex[], Shader{TVertex}, Matrix4x4?)"/>
     /// for caching semantics.
@@ -214,7 +214,7 @@ public sealed class Renderer3D : IDisposable
     public void RenderTexturedMesh(
         TextureVertex3D[] vertices,
         Shader<TextureVertex3D> shader,
-        Surface texture,
+        Image texture,
         Matrix4x4? transform = null,
         int? vertexCount = null)
     {
@@ -224,7 +224,7 @@ public sealed class Renderer3D : IDisposable
     internal void RenderTexturedMeshCore(
         TextureVertex3D[] vertices,
         Shader<TextureVertex3D> shader,
-        Surface texture,
+        Image texture,
         GpuSampler? sampler,
         Matrix4x4? transform,
         int? vertexCount)
@@ -248,7 +248,7 @@ public sealed class Renderer3D : IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using the given shader and surface, sourcing
+    /// Draws a textured mesh using the given shader and image, sourcing
     /// vertex data from an <see cref="ImmutableArray{T}"/>. The renderer
     /// borrows the array's backing storage zero-copy. See
     /// <see cref="RenderMesh{TVertex}(ImmutableArray{TVertex}, Shader{TVertex}, Matrix4x4?)"/>
@@ -257,7 +257,7 @@ public sealed class Renderer3D : IDisposable
     public void RenderTexturedMesh(
         ImmutableArray<TextureVertex3D> vertices,
         Shader<TextureVertex3D> shader,
-        Surface texture,
+        Image texture,
         Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(shader);
@@ -281,7 +281,7 @@ public sealed class Renderer3D : IDisposable
     /// <summary>
     /// Renders ASCII debug text using SDL's built-in 8x8 bitmap font, on a
     /// strip of textured quads. The font atlas is built once on first use
-    /// (one quad per character, sampled from a shared 128×64 surface).
+    /// (one quad per character, sampled from a shared 128×64 image).
     /// </summary>
     /// <param name="text">The text to render. Non-ASCII characters render
     /// as the glyph at code 0.</param>
@@ -372,16 +372,16 @@ public sealed class Renderer3D : IDisposable
             vertexCount: needed);
     }
 
-    private Surface GetDebugFontAtlas()
+    private Image GetDebugFontAtlas()
     {
         if (_debugFontAtlas is { IsDisposed: false })
             return _debugFontAtlas;
 
-        var atlas = Surface.Create(DebugAtlasWidth, DebugAtlasHeight, SDL.PixelFormat.ABGR8888);
+        var atlas = Image.Create(DebugAtlasWidth, DebugAtlasHeight, SDL.PixelFormat.ABGR8888);
 
-        // Drive a software renderer over the surface's pixels and use SDL's
+        // Drive a software renderer over the image's pixels and use SDL's
         // built-in debug-text routine to draw each ASCII glyph into its cell.
-        var rendererId = SDL.CreateSoftwareRenderer(atlas._surfaceId);
+        var rendererId = SDL.CreateSoftwareRenderer(atlas._imageId);
         if (rendererId == 0)
         {
             atlas.Dispose();
@@ -414,8 +414,8 @@ public sealed class Renderer3D : IDisposable
             SDL.DestroyRenderer(rendererId);
         }
 
-        // The surface's raw pixels were just written through SDL's renderer,
-        // not through the version-tracked SetPixel path. Mark the surface
+        // The image's raw pixels were just written through SDL's renderer,
+        // not through the version-tracked SetPixel path. Mark the image
         // dirty so any cached GPU upload re-stages on first use.
         atlas.Invalidate();
 
@@ -548,8 +548,8 @@ public sealed class Renderer3D : IDisposable
                         resources.LastUploadedVersion = mesh.Version;
                     }
 
-                    if (command.Command.Texture is { } surface)
-                        EnsureTextureUploaded(copyPass!, surface);
+                    if (command.Command.Texture is { } image)
+                        EnsureTextureUploaded(copyPass!, image);
                 }
             }
 
@@ -593,11 +593,11 @@ public sealed class Renderer3D : IDisposable
                         var transform = command.Command.Transform ?? Matrix4x4.Identity;
                         renderPass.PushVertexUniformData(0, in transform);
                     }
-                    if (command.Command.Texture is { } surface)
+                    if (command.Command.Texture is { } image)
                     {
-                        var gpuTexture = LookupTexture(surface)
+                        var gpuTexture = LookupTexture(image)
                             ?? throw new InvalidOperationException(
-                                "Texture upload was not recorded for this surface.");
+                                "Texture upload was not recorded for this image.");
                         var sampler = command.Command.Sampler ?? DefaultSampler;
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
@@ -639,12 +639,12 @@ public sealed class Renderer3D : IDisposable
         return resources;
     }
 
-    private GpuTexture? LookupTexture(Surface surface)
+    private GpuTexture? LookupTexture(Image image)
     {
         for (int i = 0; i < _textureResources.Count; i++)
         {
             var entry = _textureResources[i];
-            if (entry.Surface.TryGetTarget(out var target) && ReferenceEquals(target, surface))
+            if (entry.Image.TryGetTarget(out var target) && ReferenceEquals(target, image))
             {
                 entry.LastUsedFrame = _frameNumber;
                 return entry.Texture;
@@ -655,7 +655,7 @@ public sealed class Renderer3D : IDisposable
     }
 
     /// <summary>
-    /// Drops cached entries whose source mesh/surface has been garbage
+    /// Drops cached entries whose source mesh/image has been garbage
     /// collected, or that have not been used for <see cref="IdleEvictionFrames"/>
     /// frames. Their GPU buffers/textures are disposed.
     /// </summary>
@@ -678,7 +678,7 @@ public sealed class Renderer3D : IDisposable
         {
             var entry = _textureResources[i];
             var idle = _frameNumber - entry.LastUsedFrame > IdleEvictionFrames;
-            var dead = !entry.Surface.TryGetTarget(out _);
+            var dead = !entry.Image.TryGetTarget(out _);
             if (idle || dead)
             {
                 entry.Texture.Dispose();
@@ -688,26 +688,26 @@ public sealed class Renderer3D : IDisposable
         }
     }
 
-    private void EnsureTextureUploaded(GpuCopyPass copyPass, Surface surface)
+    private void EnsureTextureUploaded(GpuCopyPass copyPass, Image image)
     {
         for (int i = 0; i < _textureResources.Count; i++)
         {
             var entry = _textureResources[i];
-            if (entry.Surface.TryGetTarget(out var target) && ReferenceEquals(target, surface))
+            if (entry.Image.TryGetTarget(out var target) && ReferenceEquals(target, image))
             {
                 entry.LastUsedFrame = _frameNumber;
 
-                // Re-upload only when the surface's contents have changed.
-                if (entry.LastUploadedVersion != surface.Version)
+                // Re-upload only when the image's contents have changed.
+                if (entry.LastUploadedVersion != image.Version)
                 {
-                    var (w, h) = surface.Size;
+                    var (w, h) = image.Size;
                     if (w == entry.Width && h == entry.Height)
                     {
                         // Same dimensions: stream new pixels into the
                         // existing GPU texture. UploadToTexture passes
                         // cycle: true so re-writing while the previous
                         // contents may still be in flight is safe.
-                        var px = surface.GetPixels();
+                        var px = image.GetPixels();
                         if (entry.UploadBuffer is null || entry.UploadBufferBytes < px.Length)
                         {
                             entry.UploadBuffer?.Dispose();
@@ -718,13 +718,13 @@ public sealed class Renderer3D : IDisposable
                     }
                     else
                     {
-                        // Surface was resized (rare): rebuild the texture.
+                        // Image was resized (rare): rebuild the texture.
                         entry.Texture.Dispose();
                         entry.UploadBuffer?.Dispose();
                         entry.UploadBuffer = null;
                         entry.UploadBufferBytes = 0;
 
-                        var resizedFormat = MapPixelFormat(surface.PixelFormat);
+                        var resizedFormat = MapPixelFormat(image.PixelFormat);
                         entry.Texture = _device.CreateTexture(new GpuTextureCreateInfo
                         {
                             Type = SDL.GPUTextureType.Texturetype2D,
@@ -739,19 +739,19 @@ public sealed class Renderer3D : IDisposable
                         entry.Width = w;
                         entry.Height = h;
 
-                        var px = surface.GetPixels();
+                        var px = image.GetPixels();
                         using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)px.Length);
                         copyPass.UploadToTexture(upload, entry.Texture, (uint)w, (uint)h, px);
                     }
 
-                    entry.LastUploadedVersion = surface.Version;
+                    entry.LastUploadedVersion = image.Version;
                 }
                 return;
             }
         }
 
-        var (width, height) = surface.Size;
-        var format = MapPixelFormat(surface.PixelFormat);
+        var (width, height) = image.Size;
+        var format = MapPixelFormat(image.PixelFormat);
 
         var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
         {
@@ -765,16 +765,16 @@ public sealed class Renderer3D : IDisposable
             SampleCount = SDL.GPUSampleCount.SampleCount1,
         });
 
-        var pixels = surface.GetPixels();
+        var pixels = image.GetPixels();
         using var firstUpload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
         copyPass.UploadToTexture(firstUpload, gpuTexture, (uint)width, (uint)height, pixels);
 
         _textureResources.Add(new TextureCacheEntry(
-            new WeakReference<Surface>(surface), gpuTexture, _frameNumber)
+            new WeakReference<Image>(image), gpuTexture, _frameNumber)
         {
             Width = width,
             Height = height,
-            LastUploadedVersion = surface.Version,
+            LastUploadedVersion = image.Version,
         });
     }
 
@@ -785,8 +785,8 @@ public sealed class Renderer3D : IDisposable
         SDL.PixelFormat.ABGR8888 => SDL.GPUTextureFormat.R8G8B8A8Unorm,
         SDL.PixelFormat.ARGB8888 => SDL.GPUTextureFormat.B8G8R8A8Unorm,
         _ => throw new NotSupportedException(
-            $"Surface pixel format '{format}' has no GPU texture format mapping. " +
-            "Convert the surface to ABGR8888 before sampling on the GPU."),
+            $"Image pixel format '{format}' has no GPU texture format mapping. " +
+            "Convert the image to ABGR8888 before sampling on the GPU."),
     };
 
     private GpuPipeline GetOrCreatePipeline(
@@ -885,7 +885,7 @@ public sealed class Renderer3D : IDisposable
         Mesh Mesh,
         Shader Shader,
         Matrix4x4? Transform,
-        Surface? Texture,
+        Image? Texture,
         GpuSampler? Sampler);
 
     private sealed record PreparedDrawCommand(
@@ -917,14 +917,14 @@ public sealed class Renderer3D : IDisposable
 
     private sealed class TextureCacheEntry
     {
-        public TextureCacheEntry(WeakReference<Surface> surface, GpuTexture texture, long lastUsedFrame)
+        public TextureCacheEntry(WeakReference<Image> image, GpuTexture texture, long lastUsedFrame)
         {
-            Surface = surface;
+            Image = image;
             Texture = texture;
             LastUsedFrame = lastUsedFrame;
         }
 
-        public WeakReference<Surface> Surface { get; }
+        public WeakReference<Image> Image { get; }
         public GpuTexture Texture { get; set; }
         public long LastUsedFrame { get; set; }
         public int LastUploadedVersion { get; set; }

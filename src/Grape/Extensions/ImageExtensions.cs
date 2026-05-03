@@ -2,7 +2,7 @@ using static SDL3.SDL;
 
 namespace Grape;
 
-public static class SurfaceExtensions
+public static class ImageExtensions
 {
     //extension(Surface surface)
     //{
@@ -58,7 +58,7 @@ public static class SurfaceExtensions
     /// <summary>
     /// Replace matching colors on the surface with a new color.
     /// </summary>
-    public static void ReplaceMatchingColor(this Surface surface, SDL.Color oldColor, SDL.Color newColor, int tolerance = ColorExtensions.DefaultColorTolerance)
+    public static void ReplaceMatchingColor(this Image surface, Color oldColor, Color newColor, int tolerance = ColorExtensions.DefaultColorTolerance)
     {
         surface.TransformPixels(context =>
         {
@@ -72,7 +72,7 @@ public static class SurfaceExtensions
     /// <summary>
     /// Sets the alpha transparency for pixels matching the specified color.
     /// </summary>
-    public static void SetAlpha(this Surface surface, byte alpha, SDL.Color color, int tolerance = ColorExtensions.DefaultColorTolerance)
+    public static void SetAlpha(this Image surface, byte alpha, Color color, int tolerance = ColorExtensions.DefaultColorTolerance)
     {
         surface.TransformPixels(context =>
         {
@@ -86,7 +86,7 @@ public static class SurfaceExtensions
     /// <summary>
     /// Transforms each pixel on the surface using the specified action.
     /// </summary>
-    public static void TransformPixels(this Surface surface, Action<PixelContext> action)
+    public static void TransformPixels(this Image surface, Action<PixelContext> action)
     {
         var size = surface.Size;
 
@@ -104,21 +104,21 @@ public static class SurfaceExtensions
 
 public struct PixelContext
 {
-    private readonly Surface _surface;
+    private readonly Image _surface;
 
     public int X { get; }
     public int Y { get; }
 
-    internal PixelContext(Surface surface, int x, int y)
+    internal PixelContext(Image surface, int x, int y)
     {
         _surface = surface;
         X = x;
         Y = y;
     }
 
-    private SDL.Color? _color;
+    private Color? _color;
 
-    public SDL.Color Color
+    public Color Color
     {
         get
         {

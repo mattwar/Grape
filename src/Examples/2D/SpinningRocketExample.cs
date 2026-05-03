@@ -9,15 +9,15 @@ internal static class SpinningRocketExample
         var window = new Window2D(800, 600)
         {
             Title = "Spinning Rocket",
-            BackgroundColor = new SDL.Color { R = 0, G = 20, B = 0, A = 0 },
+            BackgroundColor = new Color(0, 20, 0, 0),
             FullScreen = true
         };
 
-        var icon = Surface.LoadImage("grape.bmp");
+        var icon = Grape.Image.LoadImage("grape.bmp");
         icon.SetAlpha(0, icon.GetPixel(0, 0));
         window.Icon = icon;
 
-        var rocketImage = Surface.LoadImage("rocket.png");
+        var rocketImage = Grape.Image.LoadImage("rocket.png");
         rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
         var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f);
         rocket.Speed = 600f;
@@ -38,7 +38,7 @@ internal static class SpinningRocketExample
             var updateContext = new UpdateContext
             {
                 Time = DateTime.UtcNow - startTime,
-                Bounds = new SDL.Rect { X = 0, Y = 0, W = window.Size.Width, H = window.Size.Height }
+                Bounds = new Rect(0, 0, window.Size.Width, window.Size.Height)
             };
 
             if (rocket.Update(updateContext))
@@ -112,7 +112,7 @@ internal static class SpinningRocketExample
 
 #if DEBUG
             // render debug text on screen
-            renderer.DrawColor = new SDL.Color { R = 255, G = 255, B = 255, A = 255 };
+            renderer.DrawColor = new Color(255, 255, 255);
             renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
 #endif
         }

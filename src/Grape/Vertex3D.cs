@@ -29,15 +29,15 @@ public readonly struct Vertex3D
 public readonly struct ColorVertex3D
 {
     public readonly Vector3 Position;
-    public readonly SDL.Color Color;
+    public readonly Color Color;
 
-    public ColorVertex3D(Vector3 position, SDL.Color color)
+    public ColorVertex3D(Vector3 position, Color color)
     {
         Position = position;
         Color = color;
     }
 
-    public ColorVertex3D(Vertex3D vertex, SDL.Color color)
+    public ColorVertex3D(Vertex3D vertex, Color color)
         : this(vertex.Position, color)
     {
     }

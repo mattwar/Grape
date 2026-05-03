@@ -24,7 +24,7 @@ internal static class AnimatedSineRibbonExample
         var window = new Window3D(800, 600)
         {
             Title = "Animated Sine Ribbon",
-            BackgroundColor = new SDL.Color { R = 0, G = 0, B = 32, A = 255 },
+            BackgroundColor = new Color(0, 0, 32),
         };
 
         var startTime = DateTime.UtcNow;
@@ -83,7 +83,7 @@ internal static class AnimatedSineRibbonExample
         }
     }
 
-    private static SDL.Color HsvToColor(float h, float s, float v)
+    private static Color HsvToColor(float h, float s, float v)
     {
         h -= MathF.Floor(h);                  // wrap to [0, 1)
         float c = v * s;
@@ -100,12 +100,9 @@ internal static class AnimatedSineRibbonExample
             default: r = c; g = 0; b = x; break;
         }
         float m = v - c;
-        return new SDL.Color
-        {
-            R = (byte)((r + m) * 255f),
-            G = (byte)((g + m) * 255f),
-            B = (byte)((b + m) * 255f),
-            A = 255,
-        };
+        return new Color(
+            (byte)((r + m) * 255f),
+            (byte)((g + m) * 255f),
+            (byte)((b + m) * 255f));
     }
 }

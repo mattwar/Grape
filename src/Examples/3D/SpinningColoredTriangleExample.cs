@@ -10,15 +10,15 @@ internal static class SpinningColoredTriangleExample
         // A colored triangle in model space (centered at the origin, ~1 unit tall).
         var triangle = new ColoredMesh(
             vertices: ImmutableArray.Create(
-                new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new SDL.Color { R = 255, G = 0,   B = 0,   A = 255 }),
-                new ColorVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), new SDL.Color { R = 0,   G = 255, B = 0,   A = 255 }),
-                new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new SDL.Color { R = 0,   G = 0,   B = 255, A = 255 })),
+                new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
+                new ColorVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), new Color(0,   255, 0)),
+                new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255))),
             indices: ImmutableArray<uint>.Empty);
 
         var window = new Window3D(800, 600)
         {
             Title = "3D Test",
-            BackgroundColor = new SDL.Color { R = 0, G = 0, B = 32, A = 255 },
+            BackgroundColor = new Color(0, 0, 32),
         };
 
         var startTime = DateTime.UtcNow;

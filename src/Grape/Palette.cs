@@ -3,9 +3,9 @@ namespace Grape;
 public sealed class Palette : IDisposable
 {
     private nint _paletteId;
-    private IReadOnlyList<SDL.Color> _colors;
+    private IReadOnlyList<Color> _colors;
 
-    private Palette(nint paletteId, IReadOnlyList<SDL.Color> colors)
+    private Palette(nint paletteId, IReadOnlyList<Color> colors)
     {
         _paletteId = paletteId;
         _colors = colors;
@@ -18,16 +18,20 @@ public sealed class Palette : IDisposable
 
     internal nint Id => _paletteId;
 
-    private static IReadOnlyList<SDL.Color> GetColors(nint paletteId)
+    private static IReadOnlyList<Color> GetColors(nint paletteId)
     {
         if (paletteId == 0)
-            return Array.Empty<SDL.Color>();
+            return Array.Empty<Color>();
         unsafe
         {
 #pragma warning disable CS8500
             SDL.Palette* palette = (SDL.Palette*)paletteId;
 #pragma warning restore CS8500
-            return palette->Colors;
+            var sdlColors = palette->Colors;
+            var result = new Color[sdlColors.Length];
+            for (int i = 0; i < sdlColors.Length; i++)
+                result[i] = sdlColors[i];
+            return result;
         }
     }
 
@@ -48,7 +52,7 @@ public sealed class Palette : IDisposable
     /// <summary>
     /// The colors in the palette.
     /// </summary>
-    public IReadOnlyList<SDL.Color> Colors => _colors;
+    public IReadOnlyList<Color> Colors => _colors;
 
     /// <summary>
     /// An empty palette

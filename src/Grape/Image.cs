@@ -3,45 +3,45 @@ namespace Grape;
 /// <summary>
 /// Represents a CPU-Side bitmap
 /// </summary>
-public sealed class Surface : IDisposable
+public sealed class Image : IDisposable
 {
     private readonly Application _application;
-    internal nint _surfaceId;
+    internal nint _imageId;
     private int _version;
 
-    private Surface(nint surfaceId)
+    private Image(nint imageId)
     {
-        _surfaceId = surfaceId;
+        _imageId = imageId;
         _application = Application.Current;
         _application.AddResource(this);
         _version = 1;
     }
 
-    public static Surface Create(int width, int height, SDL.PixelFormat format)
+    public static Image Create(int width, int height, SDL.PixelFormat format)
     {
         // SDL must be initialised before any SDL.* call. Touching
         // Application.Current starts the app on demand.
         _ = Application.Current;
 
-        var surfaceId = SDL.CreateSurface(width, height, format);
-        if (surfaceId == 0)
-            throw new InvalidOperationException("Cannot create surface");
-        return new Surface(surfaceId);
+        var imageId = SDL.CreateSurface(width, height, format);
+        if (imageId == 0)
+            throw new InvalidOperationException("Cannot create image");
+        return new Image(imageId);
     }
 
-    public bool IsDisposed => _surfaceId == 0;
+    public bool IsDisposed => _imageId == 0;
 
     /// <summary>
-    /// Bumped each time the surface's contents change. Renderers use this to
+    /// Bumped each time the image's contents change. Renderers use this to
     /// detect when their cached GPU texture upload is stale. If you mutate
-    /// the surface through raw pixel access (e.g. <see cref="GetPixels"/> or
+    /// the image through raw pixel access (e.g. <see cref="GetPixels"/> or
     /// an external software renderer), call <see cref="Invalidate"/> to mark
     /// the change.
     /// </summary>
     public int Version => _version;
 
     /// <summary>
-    /// Marks the surface contents as changed so renderers re-upload their
+    /// Marks the image contents as changed so renderers re-upload their
     /// cached GPU texture on the next draw. Mutations through
     /// <see cref="SetPixel"/> or <see cref="TransparentColor"/> bump the
     /// version automatically; this is for callers that touch raw pixels.
@@ -56,14 +56,14 @@ public sealed class Surface : IDisposable
     internal void ThrowIfDisposed()
     {
         if (IsDisposed)
-            throw new ObjectDisposedException("Surface");
+            throw new ObjectDisposedException(nameof(Image));
     }
 
     public void Dispose()
     {
         if (!IsDisposed)
         {
-            var id = Interlocked.Exchange(ref _surfaceId, 0);
+            var id = Interlocked.Exchange(ref _imageId, 0);
             if (id != 0)
             {
                 SDL.DestroySurface(id);
@@ -81,28 +81,28 @@ public sealed class Surface : IDisposable
     /// <summary>
     /// Loads a bitmap from the specified file path.
     /// </summary>
-    public static Surface LoadBitmap(string filePath)
+    public static Image LoadBitmap(string filePath)
     {
         _ = Application.Current;
 
-        var surfaceId = SDL.LoadBMP(filePath);
-        if (surfaceId == 0)
+        var imageId = SDL.LoadBMP(filePath);
+        if (imageId == 0)
             throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
-        return new Surface(surfaceId);
+        return new Image(imageId);
     }
 
     /// <summary>
-    /// Save the contents of the surface to a BMP file.
+    /// Save the contents of the image to a BMP file.
     /// </summary>
     public void Save(string filename)
     {
         if (IsDisposed)
             return;
-        SDL.SaveBMP(_surfaceId, filename);
+        SDL.SaveBMP(_imageId, filename);
     }
 
     /// <summary>
-    /// Any flags used when creating the surface.
+    /// Any flags used when creating the image.
     /// </summary>
     public SDL.SurfaceFlags Flags
     {
@@ -112,7 +112,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return surface->Flags;
             }
         }
@@ -126,13 +126,13 @@ public sealed class Surface : IDisposable
     /// <summary>
     /// The color that is treated as transparent on the surface.
     /// </summary>
-    public SDL.Color? TransparentColor
+    public Color? TransparentColor
     {
         get
         {
             if (IsDisposed || !_hasTransparentColor)
                 return null;
-            SDL.GetSurfaceColorKey(_surfaceId, out var key);
+            SDL.GetSurfaceColorKey(_imageId, out var key);
             return MapToColor(key);
         }
         set
@@ -140,15 +140,15 @@ public sealed class Surface : IDisposable
             if (IsDisposed)
                 return;
 
-            if (value is SDL.Color color)
+            if (value is Color color)
             {
                 var colorKey = MapToPixel(color);
-                SDL.SetSurfaceColorKey(_surfaceId, true, colorKey);
+                SDL.SetSurfaceColorKey(_imageId, true, colorKey);
                 _hasTransparentColor = true;
             }
             else
             {
-                SDL.SetSurfaceColorKey(_surfaceId, false, 0);
+                SDL.SetSurfaceColorKey(_imageId, false, 0);
             }
             unchecked { _version++; }
         }
@@ -165,7 +165,7 @@ public sealed class Surface : IDisposable
         {
             if (_palette == null)
             {
-                var paletteId = SDL.GetSurfacePalette(_surfaceId);
+                var paletteId = SDL.GetSurfacePalette(_imageId);
                 _palette = paletteId == 0 ? Palette.Empty : new Palette(paletteId);
             }
 
@@ -181,7 +181,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return surface->Pitch;
             }
         }
@@ -195,7 +195,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return surface->Format;
             }
         }
@@ -209,7 +209,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return *(SDL.PixelFormatDetails*)SDL.GetPixelFormatDetails(surface->Format);
             }
         }
@@ -223,7 +223,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return (int)SDL.BytesPerPixel(surface->Format);
             }
         }
@@ -240,7 +240,7 @@ public sealed class Surface : IDisposable
                 return default;
             unsafe
             {
-                SDL.Surface* surface = (SDL.Surface*)_surfaceId;
+                SDL.Surface* surface = (SDL.Surface*)_imageId;
                 return (surface->Width, surface->Height);
             }
         }
@@ -255,14 +255,14 @@ public sealed class Surface : IDisposable
     public unsafe ReadOnlySpan<byte> GetPixels()
     {
         ThrowIfDisposed();
-        SDL.Surface* s = (SDL.Surface*)_surfaceId;
+        SDL.Surface* s = (SDL.Surface*)_imageId;
         return new ReadOnlySpan<byte>((void*)s->Pixels, s->Height * s->Pitch);
     }
 
     /// <summary>
     /// Gets the color of the pixel at (x, y).
     /// </summary>
-    public SDL.Color GetPixel(int x, int y)
+    public Color GetPixel(int x, int y)
     {
         if (IsDisposed)
             return default;
@@ -273,7 +273,7 @@ public sealed class Surface : IDisposable
         unsafe
         {
             // Get surface info
-            SDL.Surface* s = (SDL.Surface*)_surfaceId;
+            SDL.Surface* s = (SDL.Surface*)_imageId;
 
             byte* pixels = (byte*)s->Pixels;
             int pitch = s->Pitch;
@@ -304,7 +304,7 @@ public sealed class Surface : IDisposable
     /// <summary>
     /// Sets the color of the pixel at (x, y).
     /// </summary>
-    public void SetPixel(int x, int y, SDL.Color color)
+    public void SetPixel(int x, int y, Color color)
     {
         if (IsDisposed)
             return;
@@ -313,7 +313,7 @@ public sealed class Surface : IDisposable
         unsafe
         {
             // Get surface info
-            SDL.Surface* s = (SDL.Surface*)_surfaceId;
+            SDL.Surface* s = (SDL.Surface*)_imageId;
             byte* pixels = (byte*)s->Pixels;
             int pitch = s->Pitch;
             byte* pixel = pixels + y * pitch + x * bpp;
@@ -341,21 +341,21 @@ public sealed class Surface : IDisposable
     }
 
     /// <summary>
-    /// Convert surface pixel value to SDL.Color
+    /// Convert surface pixel value to Color
     /// </summary>
-    private SDL.Color MapToColor(uint pixel)
+    private Color MapToColor(uint pixel)
     {
         if (IsDisposed)
             return default;
         var formatDetails = this.PixelFormatDetails;
         SDL.GetRGBA(pixel, formatDetails, this.Palette?.Id ?? 0, out byte r, out byte g, out byte b, out byte a);
-        return new SDL.Color { R = r, G = g, B = b, A = a };
+        return new Color(r, g, b, a);
     }
 
     /// <summary>
-    /// Convert SDL.Color to surface pixel value
+    /// Convert Color to surface pixel value
     /// </summary>
-    private uint MapToPixel(SDL.Color color)
+    private uint MapToPixel(Color color)
     {
         if (IsDisposed)
             return default;

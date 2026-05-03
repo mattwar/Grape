@@ -1,5 +1,6 @@
 using SDL3;
 using Grape;
+using System.Numerics;
 
 namespace Grape.Vine;
 
@@ -11,7 +12,7 @@ public class Sprite : Prop
     /// <summary>
     /// The image to render.
     /// </summary>
-    public Surface? Image { get; set; }
+    public Image? Image { get; set; }
 
     /// <summary>
     /// The X position of the center of the sprite.
@@ -51,7 +52,7 @@ public class Sprite : Prop
     /// <summary>
     /// The flip mode to apply when rendering the image.
     /// </summary>
-    public SDL.FlipMode Flipped = SDL.FlipMode.None;
+    public FlipMode Flipped = FlipMode.None;
 
     private TimeSpan _lastUpdate = TimeSpan.Zero;
 
@@ -59,7 +60,7 @@ public class Sprite : Prop
     {
     }
 
-    public Sprite(Surface image, float centerX, float centerY, float scale = 1f)
+    public Sprite(Image image, float centerX, float centerY, float scale = 1f)
     {
         this.Image = image;
         this.CenterX = centerX;
@@ -163,17 +164,17 @@ public class Sprite : Prop
             var scaledHeight = size.Height * this.Scale;
             var x = this.CenterX - scaledWidth / 2;
             var y = this.CenterY - scaledHeight / 2;
-            var source = new SDL.FRect { X = 0, Y = 0, W = size.Width, H = size.Height };
-            var dest = new SDL.FRect { X = x, Y = y, W = scaledWidth, H = scaledHeight };
-            var center = new SDL.FPoint { X = scaledWidth / 2f, Y = scaledHeight / 2f };
+            var source = new Rect(0, 0, size.Width, size.Height);
+            var dest = new Rect(x, y, scaledWidth, scaledHeight);
+            var center = new Vector2(scaledWidth / 2f, scaledHeight / 2f);
 
-            if (this.Rotation != 0f || this.Flipped != SDL.FlipMode.None)
+            if (this.Rotation != 0f || this.Flipped != FlipMode.None)
             {
-                renderer.RenderSurfaceRotated(image, source, dest, this.Rotation, center, this.Flipped);
+                renderer.RenderImageRotated(image, source, dest, this.Rotation, center, this.Flipped);
             }
             else
             {
-                renderer.RenderSurface(image, source, dest);
+                renderer.RenderImage(image, source, dest);
             }
         }
     }
