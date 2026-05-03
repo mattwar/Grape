@@ -1,6 +1,6 @@
 using System.Numerics;
 using SDL3;
-using SDL3.Model;
+using Grape;
 
 /// <summary>
 /// Animated horizontal ribbon whose vertical position follows a travelling

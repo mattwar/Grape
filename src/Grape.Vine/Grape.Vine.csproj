@@ -1,24 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <OutputType>Library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
-    <LangVersion>preview</LangVersion>
+    <AllowUnsafeBlocks>False</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
-    <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Shaders\SPIRV\*.spv" />
-    <EmbeddedResource Include="Shaders\DXIL\*.dxil" />
-    <EmbeddedResource Include="Shaders\MSL\*.msl" />
+    <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" />
+    <ProjectReference Include="..\Grape\Grape.csproj" />
   </ItemGroup>
 
 </Project>

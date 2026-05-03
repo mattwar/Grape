@@ -1,13 +1,13 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36408.4
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape", "Grape\Grape.csproj", "{DDE832AE-2BFD-483D-A5B3-FB512AE35C91}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape.Vine", "Grape.Vine\Grape.Vine.csproj", "{DDE832AE-2BFD-483D-A5B3-FB512AE35C91}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDL3.Model", "SDL3.Model\SDL3.Model.csproj", "{8AA1863C-6450-4E7A-BED5-09BCCF4E8DCF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape", "Grape\Grape.csproj", "{8AA1863C-6450-4E7A-BED5-09BCCF4E8DCF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SDL3.Model.SkiaSharp", "SDL3.Model.SkiaSharp\SDL3.Model.SkiaSharp.csproj", "{D5EEFD5F-A470-488C-AE9D-EFB26987824F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape.SkiaSharp", "Grape.SkiaSharp\Grape.SkiaSharp.csproj", "{D5EEFD5F-A470-488C-AE9D-EFB26987824F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Examples", "Examples\Examples.csproj", "{747D3C6E-BA7C-4018-9253-9CA49E320715}"
 EndProject

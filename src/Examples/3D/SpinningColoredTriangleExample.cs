@@ -1,7 +1,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using SDL3;
-using SDL3.Model;
+using Grape;
 
 internal static class SpinningColoredTriangleExample
 {

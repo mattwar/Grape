@@ -9,9 +9,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Grape.Vine\Grape.Vine.csproj" />
+    <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" />
     <ProjectReference Include="..\Grape\Grape.csproj" />
-    <ProjectReference Include="..\SDL3.Model.SkiaSharp\SDL3.Model.SkiaSharp.csproj" />
-    <ProjectReference Include="..\SDL3.Model\SDL3.Model.csproj" />
   </ItemGroup>
 
   <ItemGroup>

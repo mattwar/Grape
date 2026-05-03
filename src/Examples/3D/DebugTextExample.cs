@@ -1,6 +1,6 @@
 using System.Numerics;
 using SDL3;
-using SDL3.Model;
+using Grape;
 
 /// <summary>
 /// Demonstrates 3D debug text. The string is updated every frame to show
