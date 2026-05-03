@@ -340,8 +340,6 @@ public class AudioStream : IDisposable
         _onDataRequested?.Invoke(this, additionalAmount, totalAmount);
     }
 
-    public event EventHandler? Disposed;
-
     public bool IsDisposed => _streamId == 0;
 
     public void Dispose()

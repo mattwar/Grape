@@ -464,7 +464,7 @@ public abstract class Window : IDisposable
     {
         try
         {
-            DoRender();
+            DoRenderFrame();
         }
         finally
         {
@@ -477,7 +477,7 @@ public abstract class Window : IDisposable
     /// Performs the per-frame rendering for this window. Implementations are
     /// invoked on the application thread.
     /// </summary>
-    protected abstract void DoRender();
+    protected abstract void DoRenderFrame();
 
     /// <summary>
     /// Render immediately.

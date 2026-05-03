@@ -25,6 +25,7 @@ internal static class TriangleSwarmExample
         {
             Title = "Triangle Swarm",
             BackgroundColor = new SDL.Color { R = 8, G = 0, B = 24, A = 255 },
+            FullScreen = true
         };
 
         var startTime = DateTime.UtcNow;
@@ -35,7 +36,7 @@ internal static class TriangleSwarmExample
                 Application.Current.Dispose();
         };
 
-        window.Rendering += (_, renderer) =>
+        window.RenderingFrame += (_, renderer) =>
         {
             var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;
             var (w, h) = window.Size;
@@ -61,6 +62,8 @@ internal static class TriangleSwarmExample
                     Matrix4x4.CreateTranslation(cx, cy, 0f) *
                     aspectScale;
 
+                // Render same triangle with different transforms many times per frame
+                // (no GPU upload cost since the vertex data is shared via ImmutableArray)
                 renderer.RenderMesh(triangle, renderer.Shaders.PositionColorTransform, transform);
             }
         };

@@ -31,14 +31,6 @@ public class Window3D : Window
     {
     }
 
-    /// <summary>
-    /// The <see cref="Renderer3D"/> this window draws through. Available
-    /// once the first frame has rendered.
-    /// </summary>
-    public Renderer3D Renderer =>
-        _renderer ?? throw new InvalidOperationException(
-            "The renderer is not available until the first frame has rendered.");
-
     protected override void OnDispose()
     {
         if (_claimed)
@@ -51,14 +43,23 @@ public class Window3D : Window
     /// <summary>
     /// Occurs when the window is rendering a frame using the GPU pipeline.
     /// </summary>
-    public event WindowEventHandler<Renderer3D>? Rendering;
+    public event WindowEventHandler<Renderer3D>? RenderingFrame;
 
-    public virtual void OnRendering(Renderer3D renderer)
+    public virtual void OnRenderingFrame(Renderer3D renderer)
     {
-        this.Rendering?.Invoke(this, renderer);
+        this.RenderingFrame?.Invoke(this, renderer);
     }
 
-    protected override void DoRender()
+    protected override void DoRenderFrame()
+    {
+        RenderFrame_AppThread(r => OnRenderingFrame(r));
+    }
+
+
+    /// <summary>
+    /// Renders an entire frame using the specified action (assumes the thread is the app thread).
+    /// </summary>
+    private void RenderFrame_AppThread(Action<Renderer3D> renderAction)
     {
         // Lazily create the renderer and claim the window for the GPU on
         // first render. We can't do this in OnWindowCreated because the
@@ -78,8 +79,17 @@ public class Window3D : Window
         if (_claimed)
         {
             _renderer.BeginFrame(this);
-            OnRendering(_renderer);
+            renderAction(_renderer);
             _renderer.Present();
         }
+    }
+
+    /// <summary>
+    /// Renders an entire frame using the specified action (action runs on app thread).
+    /// </summary>
+    public void RenderFrame(Action<Renderer3D> renderAction)
+    {
+        // send render action to application main thread
+        Application.Current.Send(_ => RenderFrame_AppThread(renderAction));
     }
 }

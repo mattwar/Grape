@@ -26,7 +26,7 @@ internal static class SpinningRocketExample
         var sound = AudioData.LoadWAV("szwoopy.wav");
 
         window.KeyDown += Window_KeyDown;
-        window.Rendering += Window_Rendering;
+        window.RenderingFrame += Window_Rendering;
 
         // game loop
         var startTime = DateTime.UtcNow;

@@ -27,7 +27,7 @@ internal static class DebugTextExample
                 Application.Current.Dispose();
         };
 
-        window.Rendering += (_, renderer) =>
+        window.RenderingFrame += (_, renderer) =>
         {
             frame++;
             var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;

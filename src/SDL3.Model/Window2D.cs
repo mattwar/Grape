@@ -17,54 +17,54 @@ public class Window2D : Window
     {
     }
 
+    /// <summary>
+    /// Exposed for extensions to access
+    /// </summary>
+    internal Renderer2D Renderer => _renderer;
+
     protected override void OnWindowCreated()
     {
         _renderer = Renderer2D.Create(this);
     }
 
     /// <summary>
-    /// The current <see cref="Renderer"/> used to draw to the window.
-    /// </summary>
-    internal Renderer2D Renderer => _renderer;
-
-    /// <summary>
     /// Occurs when the window is rendering a frame, providing access to the
     /// current rendering context.
     /// </summary>
-    public event WindowEventHandler<Renderer2D>? Rendering;
+    public event WindowEventHandler<Renderer2D>? RenderingFrame;
 
-    public virtual void OnRendering(Renderer2D renderer)
+    public virtual void OnRenderingFrame(Renderer2D renderer)
     {
-        this.Rendering?.Invoke(this, renderer);
+        this.RenderingFrame?.Invoke(this, renderer);
     }
 
-    protected override void DoRender()
+    protected override void DoRenderFrame()
+    {
+        // DoRender is called on the render thread
+        RenderFrame_AppThread(r => OnRenderingFrame(r));
+    }
+
+    /// <summary>
+    /// Renders an entire frame (assumes the thread is the app thread)
+    /// </summary>
+    private void RenderFrame_AppThread(Action<Renderer2D> renderAction)
     {
         var renderer = _renderer;
         if (renderer != null)
         {
             renderer.DrawColor = this.BackgroundColor;
             renderer.Clear();
-            this.OnRendering(renderer);
+            renderAction(_renderer);
             renderer.Present();
         }
     }
 
     /// <summary>
-    /// Render immediately using the specified action.
+    /// Renders an entire frame using the specified action.
     /// </summary>
-    public void Render(Action<Renderer2D> renderAction)
+    public void RenderFrame(Action<Renderer2D> renderAction)
     {
-        var renderer = _renderer;
-        if (renderer != null)
-        {
-            Application.Current.Send(_ =>
-            {
-                renderer.DrawColor = this.BackgroundColor;
-                renderer.Clear();
-                renderAction(renderer);
-                renderer.Present();
-            });
-        }
+        // send render action to application main thread
+        Application.Current.Send(_ => RenderFrame_AppThread(renderAction));
     }
 }

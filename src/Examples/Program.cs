@@ -1,5 +1,5 @@
-await DebugTextExample.Run();
-//await TriangleSwarmExample.Run();
+//await DebugTextExample.Run();
+await TriangleSwarmExample.Run();
 //await AnimatedSineRibbonExample.Run();
 //await SpinningRocketExample.Run();
 //await SpinningColoredTriangleExample.Run();

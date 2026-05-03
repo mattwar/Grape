@@ -35,7 +35,7 @@ internal static class AnimatedSineRibbonExample
                 Application.Current.Dispose();
         };
 
-        window.Rendering += (_, renderer) =>
+        window.RenderingFrame += (_, renderer) =>
         {
             var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;
 
