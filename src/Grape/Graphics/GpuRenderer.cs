@@ -4,6 +4,8 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 
 namespace Grape;
+
+/// <summary>
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
 internal sealed class GpuRenderer : Renderer3D, IDisposable

@@ -8,6 +8,9 @@ namespace Grape;
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct Color : IEquatable<Color>
 {
+    /// <summary>The default color tolerance used by <see cref="IsClosedTo"/> when none is specified.</summary>
+    public const int DefaultColorTolerance = 8;
+
     public readonly byte R;
     public readonly byte G;
     public readonly byte B;
@@ -25,6 +28,26 @@ public readonly struct Color : IEquatable<Color>
     public static Color FromRgba(byte r, byte g, byte b, byte a) => new(r, g, b, a);
 
     public Color WithAlpha(byte alpha) => new(R, G, B, alpha);
+
+    public void Deconstruct(out byte r, out byte g, out byte b, out byte a)
+    {
+        r = R;
+        g = G;
+        b = B;
+        a = A;
+    }
+
+    /// <summary>
+    /// Returns true if this color is within <paramref name="tolerance"/>
+    /// (in squared RGB distance) of <paramref name="other"/>. Alpha is ignored.
+    /// </summary>
+    public bool IsClosedTo(Color other, int tolerance = DefaultColorTolerance)
+    {
+        int dr = R - other.R;
+        int dg = G - other.G;
+        int db = B - other.B;
+        return dr * dr + dg * dg + db * db <= tolerance * tolerance;
+    }
 
     public static readonly Color Transparent = new(0, 0, 0, 0);
     public static readonly Color Black       = new(0, 0, 0);

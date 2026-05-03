@@ -60,13 +60,13 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
-    /// Renders into this image using a software 2D renderer.
+    /// Render into this image using a 2D renderer abstraction.
     /// </summary>
-    public void RenderImage(Action<Renderer2D> renderAction)
+    public void Render(Action<Renderer2D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         ThrowIfDisposed();
-        using var renderer = ImageRenderer2D.Create(this);
+        using var renderer = Renderer.Create(this);
         renderAction(renderer);
         renderer.Present();
         Invalidate();
@@ -132,7 +132,6 @@ public sealed class Image : IDisposable
     }
 
     #region Properties
-
 
     private bool _hasTransparentColor; // defaults to false
 
@@ -388,4 +387,129 @@ public sealed class Image : IDisposable
             return SDL.MapRGBA((nint)formatDetailsPtr, paletteId, color.R, color.G, color.B, color.A);
         }
     }
+
+    /// <summary>
+    /// Replaces every pixel whose color is within <paramref name="tolerance"/>
+    /// of <paramref name="oldColor"/> with <paramref name="newColor"/>.
+    /// </summary>
+    public void ReplaceMatchingColor(Color oldColor, Color newColor, int tolerance = Color.DefaultColorTolerance)
+    {
+        TransformPixels(context =>
+        {
+            if (context.Color.IsClosedTo(oldColor, tolerance))
+                context.Color = newColor;
+        });
+    }
+
+    /// <summary>
+    /// Sets the alpha channel of every pixel whose color is within
+    /// <paramref name="tolerance"/> of <paramref name="color"/>.
+    /// </summary>
+    public void SetAlpha(byte alpha, Color color, int tolerance = Color.DefaultColorTolerance)
+    {
+        TransformPixels(context =>
+        {
+            if (context.Color.IsClosedTo(color, tolerance))
+                context.Color = context.Color.WithAlpha(alpha);
+        });
+    }
+
+    /// <summary>
+    /// Invokes <paramref name="action"/> for every pixel in the image.
+    /// </summary>
+    public void TransformPixels(Action<PixelContext> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        var (width, height) = Size;
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                action(new PixelContext(this, x, y));
+            }
+        }
+    }
+
+    /// <summary>
+    /// A 2D renderer that draws into an <see cref="Image"/> in CPU memory using
+    /// SDL's software renderer. Pixels written by this renderer land directly
+    /// in the image's surface.
+    /// </summary>
+    private sealed class Renderer : BitmapRenderer2D
+    {
+        private readonly Image _image;
+
+        private Renderer(Image image, nint rendererId)
+            : base(rendererId)
+        {
+            _image = image;
+        }
+
+        /// <summary>
+        /// Creates a software renderer that draws into <paramref name="image"/>.
+        /// </summary>
+        public static Renderer Create(Image image)
+        {
+            ArgumentNullException.ThrowIfNull(image);
+            image.ThrowIfDisposed();
+
+            _ = Application.Current;
+            SDL.InitSubSystem(SDL.InitFlags.Video);
+
+            var rendererId = SDL.CreateSoftwareRenderer(image._imageId);
+            if (rendererId == 0)
+                throw new InvalidOperationException(
+                    $"Failed to create software renderer for image: {SDL.GetError()}");
+
+            return new Renderer(image, rendererId);
+        }
+
+        /// <summary>The <see cref="Grape.Image"/> this renderer draws into.</summary>
+        public Image Image => _image;
+
+        protected override void OnDisposed()
+        {
+            // Pixels were written through SDL's renderer rather than the
+            // version-tracked SetPixel path, so any cached GPU upload of this
+            // image needs to re-stage on next use.
+            if (!_image.IsDisposed)
+                _image.Invalidate();
+        }
+    }
 }
+
+/// <summary>
+/// Mutable cursor over a single pixel of an <see cref="Image"/>, used by
+/// <see cref="Image.TransformPixels"/>.
+/// </summary>
+public struct PixelContext
+{
+    private readonly Image _surface;
+
+    public int X { get; }
+    public int Y { get; }
+
+    internal PixelContext(Image surface, int x, int y)
+    {
+        _surface = surface;
+        X = x;
+        Y = y;
+    }
+
+    private Color? _color;
+
+    public Color Color
+    {
+        get
+        {
+            _color ??= _surface.GetPixel(X, Y);
+            return _color.Value;
+        }
+        set
+        {
+            _color = value;
+            _surface.SetPixel(X, Y, value);
+        }
+    }
+}
+
