@@ -84,23 +84,23 @@ internal static class SpinningRocketExample
 
         Console.WriteLine("Done");
 
-        void Window_KeyDown(Window window, SDL.KeyboardEvent context)
+        void Window_KeyDown(Window window, KeyEventArgs context)
         {
             switch (context.Key)
             {
-                case SDL.Keycode.Left:
+                case Key.Left:
                     rocket.Heading = (rocket.Heading + 350f) % 360f; // rotate left 10%
                     break;
-                case SDL.Keycode.Right:
+                case Key.Right:
                     rocket.Heading = (rocket.Heading + 10f) % 360f; // rotate right 10%
                     break;
-                case SDL.Keycode.Up:
+                case Key.Up:
                     rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f); // increase speed by 10, maximum 100
                     break;
-                case SDL.Keycode.Down:
+                case Key.Down:
                     rocket.Speed = Math.Max(rocket.Speed - 50f, 0f); // decrease speed by 10, minimum 0
                     break;
-                case SDL.Keycode.Escape:
+                case Key.Escape:
                     Application.Current.Dispose();
                     break;
             }

@@ -30,7 +30,7 @@ internal static class SpinningTexturedTriangleExample
 
         window.KeyDown += (_, e) =>
         {
-            if (e.Key == SDL.Keycode.Escape)
+            if (e.Key == Key.Escape)
                 Application.Current.Dispose();
         };
 
