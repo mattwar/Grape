@@ -229,30 +229,49 @@ public sealed class Renderer3D : IDisposable
             {
                 foreach (var command in prepared)
                 {
-                    var vertexBytes = command.Command.Mesh.GetVertexBytes();
+                    var mesh = command.Command.Mesh;
+                    var vertexBytes = mesh.GetVertexBytes();
                     var resources = command.Resources;
 
-                    if (resources.VertexBufferBytes != vertexBytes.Length)
+                    // Skip the upload entirely when the mesh hasn't changed
+                    // since we last sent it to the GPU. Reset(...) on Mesh<T>
+                    // bumps Version so this picks up edits automatically.
+                    var needsUpload =
+                        resources.VertexBuffer is null ||
+                        resources.LastUploadedVersion != mesh.Version ||
+                        resources.VertexBufferBytes != vertexBytes.Length;
+
+                    if (needsUpload)
                     {
-                        resources.VertexBuffer?.Dispose();
-                        resources.UploadBuffer?.Dispose();
+                        // Grow (never shrink) the GPU/transfer buffers so
+                        // small per-frame size jitter doesn't churn allocations.
+                        if (resources.VertexBuffer is null ||
+                            resources.VertexBufferCapacityBytes < vertexBytes.Length)
+                        {
+                            resources.VertexBuffer?.Dispose();
+                            resources.UploadBuffer?.Dispose();
 
-                        resources.VertexBuffer = _device.CreateVertexBuffer<byte>(
-                            (uint)vertexBytes.Length,
-                            new GpuVertexBufferLayout
-                            {
-                                Pitch = vertexBytes.Length / command.Command.Mesh.VertexCount,
-                                Elements = ImmutableArray<GpuVertexElement>.Empty
-                            });
+                            resources.VertexBuffer = _device.CreateVertexBuffer<byte>(
+                                (uint)vertexBytes.Length,
+                                new GpuVertexBufferLayout
+                                {
+                                    Pitch = vertexBytes.Length / mesh.VertexCount,
+                                    Elements = ImmutableArray<GpuVertexElement>.Empty
+                                });
 
-                        resources.UploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)vertexBytes.Length);
+                            resources.UploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)vertexBytes.Length);
+                            resources.VertexBufferCapacityBytes = vertexBytes.Length;
+                        }
+
+                        // Upload uses cycle: true under the hood so re-writing
+                        // a buffer that may still be in flight is safe.
+                        copyPass!.Upload(resources.UploadBuffer!, resources.VertexBuffer!, vertexBytes);
                         resources.VertexBufferBytes = vertexBytes.Length;
+                        resources.LastUploadedVersion = mesh.Version;
                     }
 
-                    copyPass!.Upload(resources.UploadBuffer!, resources.VertexBuffer!, vertexBytes);
-
                     if (command.Command.Texture is { } surface)
-                        EnsureTextureUploaded(copyPass, surface);
+                        EnsureTextureUploaded(copyPass!, surface);
                 }
             }
 
@@ -528,6 +547,15 @@ public sealed class Renderer3D : IDisposable
     private sealed record PreparedDrawCommand(
         DrawCommand Command,
         MeshResources Resources);
+
+    private sealed class MeshResources
+    {
+        public GpuVertexBuffer? VertexBuffer { get; set; }
+        public GpuUploadBuffer? UploadBuffer { get; set; }
+        public int VertexBufferBytes { get; set; }
+        public int VertexBufferCapacityBytes { get; set; }
+        public int LastUploadedVersion { get; set; }
+    }
 
     private sealed class MeshCacheEntry
     {

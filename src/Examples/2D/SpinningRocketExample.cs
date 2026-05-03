@@ -2,11 +2,9 @@ using SDL3;
 using SDL3.Model;
 using Grape;
 
-namespace Examples;
-
-internal static class Examples2D
+internal static class SpinningRocketExample
 {
-    public static async Task SpinningRocket()
+    public static async Task Run()
     {
         var window = new Window2D(800, 600)
         {

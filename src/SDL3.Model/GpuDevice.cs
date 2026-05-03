@@ -173,13 +173,6 @@ public sealed class GpuDevice : IDisposable
         GpuPipeline.CreateGraphicsPipeline(this, info);
 }
 
-internal sealed class MeshResources
-{
-    public GpuVertexBuffer? VertexBuffer { get; set; }
-    public GpuUploadBuffer? UploadBuffer { get; set; }
-    public int VertexBufferBytes { get; set; }
-}
-
 /// <summary>
 /// A GPU texture resource that can be used as render target or sampled data.
 /// </summary>
