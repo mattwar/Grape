@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace Grape;
 
-public class Properties : IDisposable
+internal class Properties : IDisposable
 {
     private uint _propertiesId;
 
@@ -14,16 +14,16 @@ public class Properties : IDisposable
 
     internal uint PropertiesId => _propertiesId;
 
-    public static readonly Properties Empty = new Properties(0);
+    internal static readonly Properties Empty = new Properties(0);
 
-    public SDL.PropertyType GetPropertyType(string propertyName)
+    internal SDL.PropertyType GetPropertyType(string propertyName)
     {
         if (_propertiesId == 0)
             return SDL.PropertyType.Invalid;
         return SDL.GetPropertyType(_propertiesId, propertyName);
     }
 
-    public object? GetPropertyValue(string propertyName)
+    internal object? GetPropertyValue(string propertyName)
     {
         if (_propertiesId == 0)    
             return null;
@@ -43,7 +43,7 @@ public class Properties : IDisposable
         }
     }
 
-    public string GetStringProperty(string propertyName)
+    internal string GetStringProperty(string propertyName)
     {
         if (_propertiesId == 0
             || GetPropertyType(propertyName) != SDL.PropertyType.String)
@@ -51,7 +51,7 @@ public class Properties : IDisposable
         return SDL.GetStringProperty(_propertiesId, propertyName, "");
     }
 
-    public long GetNumberProperty(string propertyName)
+    internal long GetNumberProperty(string propertyName)
     {
         if (_propertiesId == 0
             || GetPropertyType(propertyName) != SDL.PropertyType.Number)
@@ -59,7 +59,7 @@ public class Properties : IDisposable
         return SDL.GetNumberProperty(_propertiesId, propertyName, 0);
     }
 
-    public float GetFloatProperty(string propertyName)
+    internal float GetFloatProperty(string propertyName)
     {
         if (_propertiesId == 0
             || GetPropertyType(propertyName) != SDL.PropertyType.Float)
@@ -67,7 +67,7 @@ public class Properties : IDisposable
         return SDL.GetFloatProperty(_propertiesId, propertyName, 0);
     }
 
-    public float GetBooleanProperty(string propertyName)
+    internal float GetBooleanProperty(string propertyName)
     {
         if (_propertiesId == 0
             || GetPropertyType(propertyName) != SDL.PropertyType.Boolean)
@@ -75,10 +75,10 @@ public class Properties : IDisposable
         return SDL.GetFloatProperty(_propertiesId, propertyName, 0);
     }
 
-    public Span<T> GetSpanProperty<T>(string propertyName, T end) where T : unmanaged =>
+    internal Span<T> GetSpanProperty<T>(string propertyName, T end) where T : unmanaged =>
         GetSpanProperty<T>(propertyName, (T item) => EqualityComparer<T>.Default.Equals(item, end));
 
-    public Span<T> GetSpanProperty<T>(string propertyName, Func<T, bool> fnIsEnd) where T : unmanaged
+    internal Span<T> GetSpanProperty<T>(string propertyName, Func<T, bool> fnIsEnd) where T : unmanaged
     {
         if (_propertiesId == 0
             || GetPropertyType(propertyName) != SDL.PropertyType.Pointer)
