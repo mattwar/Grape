@@ -74,6 +74,7 @@ public class Window2D : Window
             : base(rendererId)
         {
             _window = window;
+            window.AddResource(this);
         }
 
         /// <summary>

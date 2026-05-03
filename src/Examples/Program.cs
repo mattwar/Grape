@@ -1,7 +1,6 @@
 //await DebugTextExample.Run();
 await TriangleSwarmExample.Run();
 //await AnimatedSineRibbonExample.Run();
-//await SpinningRocketExample.Run();
+//await RicochetRocketExample.Run();
 //await SpinningColoredTriangleExample.Run();
 //await SpinningTexturedTriangleExample.Run();
-

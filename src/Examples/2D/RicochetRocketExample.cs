@@ -1,8 +1,7 @@
-using SDL3;
 using Grape;
 using Grape.Vine;
 
-internal static class SpinningRocketExample
+internal static class RicochetRocketExample
 {
     public static async Task Run()
     {
@@ -13,11 +12,11 @@ internal static class SpinningRocketExample
             FullScreen = true
         };
 
-        var icon = Grape.Image.LoadImage("grape.bmp");
+        var icon = Image.LoadImage("grape.bmp");
         icon.SetAlpha(0, icon.GetPixel(0, 0));
         window.Icon = icon;
 
-        var rocketImage = Grape.Image.LoadImage("rocket.png");
+        var rocketImage = Image.LoadImage("rocket.png");
         rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
         var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f);
         rocket.Speed = 600f;
@@ -25,12 +24,42 @@ internal static class SpinningRocketExample
 
         var sound = AudioData.LoadWAV("szwoopy.wav");
 
-        window.KeyDown += Window_KeyDown;
-        window.RenderingFrame += Window_Rendering;
+        window.KeyDown += (window, args) =>
+        {
+            switch (args.Key)
+            {
+                case Key.Left:
+                    rocket.Heading = (rocket.Heading + 350f) % 360f; // rotate left 10%
+                    break;
+                case Key.Right:
+                    rocket.Heading = (rocket.Heading + 10f) % 360f; // rotate right 10%
+                    break;
+                case Key.Up:
+                    rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f); // increase speed by 10, maximum 100
+                    break;
+                case Key.Down:
+                    rocket.Speed = Math.Max(rocket.Speed - 50f, 0f); // decrease speed by 10, minimum 0
+                    break;
+                case Key.Escape:
+                    Application.Current.Dispose();
+                    break;
+            }
+        };
+
+        window.RenderingFrame += (window, renderer) =>
+        {
+            rocket.Render(renderer);
+#if DEBUG
+            // render debug text on screen
+            renderer.DrawColor = new Color(255, 255, 255);
+            renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
+#endif
+        };
 
         // game loop
         var startTime = DateTime.UtcNow;
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(4));
+
         while (!window.IsDisposed)
         {
             await timer.WaitForNextTickAsync();
@@ -83,38 +112,5 @@ internal static class SpinningRocketExample
         }
 
         Console.WriteLine("Done");
-
-        void Window_KeyDown(Window window, KeyEventArgs context)
-        {
-            switch (context.Key)
-            {
-                case Key.Left:
-                    rocket.Heading = (rocket.Heading + 350f) % 360f; // rotate left 10%
-                    break;
-                case Key.Right:
-                    rocket.Heading = (rocket.Heading + 10f) % 360f; // rotate right 10%
-                    break;
-                case Key.Up:
-                    rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f); // increase speed by 10, maximum 100
-                    break;
-                case Key.Down:
-                    rocket.Speed = Math.Max(rocket.Speed - 50f, 0f); // decrease speed by 10, minimum 0
-                    break;
-                case Key.Escape:
-                    Application.Current.Dispose();
-                    break;
-            }
-        }
-
-        void Window_Rendering(Window window, Renderer2D renderer)
-        {
-            rocket.Render(renderer);
-
-#if DEBUG
-            // render debug text on screen
-            renderer.DrawColor = new Color(255, 255, 255);
-            renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
-#endif
-        }
     }
 }

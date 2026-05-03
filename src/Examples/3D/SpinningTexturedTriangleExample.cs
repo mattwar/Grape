@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Numerics;
-using SDL3;
 using Grape;
 
 internal static class SpinningTexturedTriangleExample
