@@ -11,12 +11,16 @@ public sealed class Surface : IDisposable
     private Surface(nint surfaceId)
     {
         _surfaceId = surfaceId;
-        _application = Application.Current ?? throw new InvalidOperationException("No current application");
+        _application = Application.Current;
         _application.AddResource(this);
     }
 
     public static Surface Create(int width, int height, SDL.PixelFormat format)
     {
+        // SDL must be initialised before any SDL.* call. Touching
+        // Application.Current starts the app on demand.
+        _ = Application.Current;
+
         var surfaceId = SDL.CreateSurface(width, height, format);
         if (surfaceId == 0)
             throw new InvalidOperationException("Cannot create surface");
@@ -55,6 +59,8 @@ public sealed class Surface : IDisposable
     /// </summary>
     public static Surface LoadBitmap(string filePath)
     {
+        _ = Application.Current;
+
         var surfaceId = SDL.LoadBMP(filePath);
         if (surfaceId == 0)
             throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");

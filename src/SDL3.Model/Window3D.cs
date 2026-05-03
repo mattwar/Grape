@@ -75,8 +75,11 @@ public class Window3D : Window
                     SDL.GetError());
         }
 
-        _renderer.BeginFrame(this);
-        OnRendering3D(_renderer);
-        _renderer.Present();
+        if (_claimed)
+        {
+            _renderer.BeginFrame(this);
+            OnRendering3D(_renderer);
+            _renderer.Present();
+        }
     }
 }

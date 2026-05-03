@@ -15,18 +15,23 @@ public class Application : IDisposable
 
     public Application(SDL.InitFlags flags = DefaultFlags)
     {
-        if (Current != null)
+        if (_current != null)
             throw new InvalidOperationException("An instance of Application already exists.");
         if (!SDL.Init(flags))
             throw new InvalidOperationException($"Failed to initialize SDL: {SDL.GetError()}");
-        Current = this;
+        _current = this;
         this.Thread = Thread.CurrentThread;
     }
 
     /// <summary>
-    /// The current running application.
+    /// The current running application. Accessing this property will
+    /// start the application (with default init flags) if one is not
+    /// already running. To start with non-default flags, call
+    /// <see cref="Start(SDL.InitFlags)"/> explicitly first.
     /// </summary>
-    public static Application Current { get; private set; } = null!;
+    public static Application Current => _current ??= Start();
+
+    private static Application? _current;
 
     /// <summary>
     /// The thread the application was created on.
@@ -61,8 +66,8 @@ public class Application : IDisposable
             _windows = ImmutableList<Window>.Empty;
             _resources = ImmutableList<IDisposable>.Empty;
 
-            if (Current == this)
-                Current = null!;
+            if (_current == this)
+                _current = null;
 
             SDL.Quit();
         }
@@ -125,7 +130,7 @@ public class Application : IDisposable
     /// </summary>
     public static Application Start(SDL.InitFlags flags = DefaultFlags)
     {
-        var application = Current;
+        var application = _current;
 
         if (application == null)
         {

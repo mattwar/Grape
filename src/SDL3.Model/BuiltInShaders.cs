@@ -42,7 +42,7 @@ public sealed class BuiltInShaders
         _positionColor ??= new Shader<ColorVertex3D>(
             PositionColorVert,
             SolidColorFrag,
-            ColoredMeshData.VertexLayout);
+            ColoredMesh.VertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its baked color, transforming
@@ -53,7 +53,7 @@ public sealed class BuiltInShaders
         _positionColorTransform ??= new Shader<ColorVertex3D>(
             PositionColorTransformVert,
             SolidColorFrag,
-            ColoredMeshData.VertexLayout,
+            ColoredMesh.VertexLayout,
             requiresTransform: true);
 
     /// <summary>
@@ -65,7 +65,7 @@ public sealed class BuiltInShaders
         _texturedQuad ??= new Shader<TextureVertex3D>(
             TexturedQuadVert,
             TexturedQuadFrag,
-            TexturedMeshData.VertexLayout);
+            TexturedMesh.VertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position transformed by a 4x4
@@ -76,7 +76,7 @@ public sealed class BuiltInShaders
         _texturedQuadWithMatrix ??= new Shader<TextureVertex3D>(
             TexturedQuadWithMatrixVert,
             TexturedQuadFrag,
-            TexturedMeshData.VertexLayout,
+            TexturedMesh.VertexLayout,
             requiresTransform: true);
 
     /// <summary>

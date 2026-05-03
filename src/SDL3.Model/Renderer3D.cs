@@ -60,13 +60,20 @@ public sealed class Shader<TVertex> : Shader where TVertex : unmanaged
 /// </summary>
 public sealed class Renderer3D : IDisposable
 {
+    /// <summary>
+    /// Number of frames a cached mesh or texture upload may go unused
+    /// before its GPU resources are evicted.
+    /// </summary>
+    private const int IdleEvictionFrames = 120;
+
     private readonly GpuDevice _device;
-    private readonly Dictionary<MeshData, MeshResources> _meshResources = new();
-    private readonly Dictionary<Surface, GpuTexture> _textureResources = new();
+    private readonly List<MeshCacheEntry> _meshResources = new();
+    private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly List<DrawCommand> _commands = new();
     private BuiltInShaders? _shaders;
     private GpuSampler? _defaultSampler;
+    private long _frameNumber;
 
     // Per-frame state. Non-null between BeginFrame and Present.
     private GpuRenderFrame? _renderFrame;
@@ -108,6 +115,8 @@ public sealed class Renderer3D : IDisposable
         if (_renderFrame is not null)
             throw new InvalidOperationException("A frame is already in progress.");
 
+        _frameNumber++;
+        SweepCaches();
         _commands.Clear();
 
         var bg = window.BackgroundColor;
@@ -145,7 +154,7 @@ public sealed class Renderer3D : IDisposable
     /// The vertex type of the mesh and the shader must match. The mesh's
     /// vertex layout must also match the shader's expected vertex layout.
     /// </remarks>
-    public void RenderMesh<TVertex>(MeshData<TVertex> mesh, Shader<TVertex> shader, Matrix4x4? transform = null)
+    public void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader, Matrix4x4? transform = null)
         where TVertex : unmanaged
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -170,7 +179,7 @@ public sealed class Renderer3D : IDisposable
     /// the upload.
     /// </remarks>
     public void RenderTexturedMesh(
-        MeshData<TextureVertex3D> mesh,
+        Mesh<TextureVertex3D> mesh,
         Shader<TextureVertex3D> shader,
         Surface texture,
         GpuSampler? sampler = null,
@@ -198,9 +207,25 @@ public sealed class Renderer3D : IDisposable
 
         try
         {
+            var canDraw = _colorTarget is not null && _colorFormat != SDL.GPUTextureFormat.Invalid;
+            if (!canDraw)
+            {
+                // No swapchain image (window minimised, being torn down, etc.).
+                // Submit the empty command buffer so SDL releases its resources
+                // cleanly and skip the rest of the frame without throwing.
+                return;
+            }
+
             var prepared = PrepareCommands();
 
-            using (var copyPass = _renderFrame.BeginCopyPass())
+            if (!_renderFrame.TryBeginCopyPass(out var copyPass))
+            {
+                // Device is shutting down or the command buffer is no longer
+                // valid; nothing useful to do this frame.
+                return;
+            }
+
+            using (copyPass)
             {
                 foreach (var command in prepared)
                 {
@@ -224,31 +249,31 @@ public sealed class Renderer3D : IDisposable
                         resources.VertexBufferBytes = vertexBytes.Length;
                     }
 
-                    copyPass.Upload(resources.UploadBuffer!, resources.VertexBuffer!, vertexBytes);
+                    copyPass!.Upload(resources.UploadBuffer!, resources.VertexBuffer!, vertexBytes);
 
                     if (command.Command.Texture is { } surface)
                         EnsureTextureUploaded(copyPass, surface);
                 }
             }
 
-            var colorTargets = _colorTarget is null
-                ? ImmutableArray<GpuColorTargetInfo>.Empty
-                : ImmutableArray.Create(new GpuColorTargetInfo
-                {
-                    Texture = _colorTarget,
-                    ClearColor = _clearColor,
-                    LoadOp = SDL.GPULoadOp.Clear,
-                    StoreOp = SDL.GPUStoreOp.Store,
-                });
-
-            using (var renderPass = _renderFrame.BeginRenderPass(
-                colorTargets,
-                new GpuDepthStencilTargetInfo()))
+            var colorTargets = ImmutableArray.Create(new GpuColorTargetInfo
             {
-                var canDraw = _colorTarget is not null && _colorFormat != SDL.GPUTextureFormat.Invalid;
-                if (!canDraw)
-                    return;
+                Texture = _colorTarget,
+                ClearColor = _clearColor,
+                LoadOp = SDL.GPULoadOp.Clear,
+                StoreOp = SDL.GPUStoreOp.Store,
+            });
 
+            if (!_renderFrame.TryBeginRenderPass(
+                colorTargets,
+                new GpuDepthStencilTargetInfo(),
+                out var renderPass))
+            {
+                return;
+            }
+
+            using (renderPass)
+            {
                 foreach (var command in prepared)
                 {
                     var shader = command.Command.Shader;
@@ -257,7 +282,7 @@ public sealed class Renderer3D : IDisposable
                         shader.FragmentShader,
                         _colorFormat,
                         shader.VertexLayout);
-                    renderPass.BindGraphicsPipeline(pipeline);
+                    renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
                     if (shader.RequiresTransform)
                     {
@@ -273,7 +298,9 @@ public sealed class Renderer3D : IDisposable
                     }
                     if (command.Command.Texture is { } surface)
                     {
-                        var gpuTexture = _textureResources[surface];
+                        var gpuTexture = LookupTexture(surface)
+                            ?? throw new InvalidOperationException(
+                                "Texture upload was not recorded for this surface.");
                         var sampler = command.Command.Sampler ?? DefaultSampler;
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
@@ -286,6 +313,7 @@ public sealed class Renderer3D : IDisposable
         }
         finally
         {
+            _renderFrame?.Dispose();
             _renderFrame = null;
             _colorTarget = null;
             _commands.Clear();
@@ -297,21 +325,82 @@ public sealed class Renderer3D : IDisposable
         Present();
     }
 
-    private MeshResources GetOrCreateMeshResources(MeshData mesh)
+    private MeshResources GetOrCreateMeshResources(Mesh mesh)
     {
-        if (!_meshResources.TryGetValue(mesh, out var resources))
+        for (int i = 0; i < _meshResources.Count; i++)
         {
-            resources = new MeshResources();
-            _meshResources[mesh] = resources;
+            var entry = _meshResources[i];
+            if (entry.Mesh.TryGetTarget(out var target) && ReferenceEquals(target, mesh))
+            {
+                entry.LastUsedFrame = _frameNumber;
+                return entry.Resources;
+            }
         }
 
+        var resources = new MeshResources();
+        _meshResources.Add(new MeshCacheEntry(new WeakReference<Mesh>(mesh), resources, _frameNumber));
         return resources;
+    }
+
+    private GpuTexture? LookupTexture(Surface surface)
+    {
+        for (int i = 0; i < _textureResources.Count; i++)
+        {
+            var entry = _textureResources[i];
+            if (entry.Surface.TryGetTarget(out var target) && ReferenceEquals(target, surface))
+            {
+                entry.LastUsedFrame = _frameNumber;
+                return entry.Texture;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Drops cached entries whose source mesh/surface has been garbage
+    /// collected, or that have not been used for <see cref="IdleEvictionFrames"/>
+    /// frames. Their GPU buffers/textures are disposed.
+    /// </summary>
+    private void SweepCaches()
+    {
+        for (int i = _meshResources.Count - 1; i >= 0; i--)
+        {
+            var entry = _meshResources[i];
+            var idle = _frameNumber - entry.LastUsedFrame > IdleEvictionFrames;
+            var dead = !entry.Mesh.TryGetTarget(out _);
+            if (idle || dead)
+            {
+                entry.Resources.VertexBuffer?.Dispose();
+                entry.Resources.UploadBuffer?.Dispose();
+                _meshResources.RemoveAt(i);
+            }
+        }
+
+        for (int i = _textureResources.Count - 1; i >= 0; i--)
+        {
+            var entry = _textureResources[i];
+            var idle = _frameNumber - entry.LastUsedFrame > IdleEvictionFrames;
+            var dead = !entry.Surface.TryGetTarget(out _);
+            if (idle || dead)
+            {
+                entry.Texture.Dispose();
+                _textureResources.RemoveAt(i);
+            }
+        }
     }
 
     private void EnsureTextureUploaded(GpuCopyPass copyPass, Surface surface)
     {
-        if (_textureResources.ContainsKey(surface))
-            return;
+        for (int i = 0; i < _textureResources.Count; i++)
+        {
+            var entry = _textureResources[i];
+            if (entry.Surface.TryGetTarget(out var target) && ReferenceEquals(target, surface))
+            {
+                entry.LastUsedFrame = _frameNumber;
+                return;
+            }
+        }
 
         var (width, height) = surface.Size;
         var format = MapPixelFormat(surface.PixelFormat);
@@ -332,7 +421,8 @@ public sealed class Renderer3D : IDisposable
         using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
         copyPass.UploadToTexture(upload, gpuTexture, (uint)width, (uint)height, pixels);
 
-        _textureResources[surface] = gpuTexture;
+        _textureResources.Add(new TextureCacheEntry(
+            new WeakReference<Surface>(surface), gpuTexture, _frameNumber));
     }
 
     private static SDL.GPUTextureFormat MapPixelFormat(SDL.PixelFormat format) => format switch
@@ -429,7 +519,7 @@ public sealed class Renderer3D : IDisposable
         GpuVertexLayout Layout);
 
     private sealed record DrawCommand(
-        MeshData Mesh,
+        Mesh Mesh,
         Shader Shader,
         Matrix4x4? Transform,
         Surface? Texture,
@@ -438,6 +528,34 @@ public sealed class Renderer3D : IDisposable
     private sealed record PreparedDrawCommand(
         DrawCommand Command,
         MeshResources Resources);
+
+    private sealed class MeshCacheEntry
+    {
+        public MeshCacheEntry(WeakReference<Mesh> mesh, MeshResources resources, long lastUsedFrame)
+        {
+            Mesh = mesh;
+            Resources = resources;
+            LastUsedFrame = lastUsedFrame;
+        }
+
+        public WeakReference<Mesh> Mesh { get; }
+        public MeshResources Resources { get; }
+        public long LastUsedFrame { get; set; }
+    }
+
+    private sealed class TextureCacheEntry
+    {
+        public TextureCacheEntry(WeakReference<Surface> surface, GpuTexture texture, long lastUsedFrame)
+        {
+            Surface = surface;
+            Texture = texture;
+            LastUsedFrame = lastUsedFrame;
+        }
+
+        public WeakReference<Surface> Surface { get; }
+        public GpuTexture Texture { get; }
+        public long LastUsedFrame { get; set; }
+    }
 
     private List<PreparedDrawCommand> PrepareCommands()
     {
@@ -455,37 +573,186 @@ public sealed class Renderer3D : IDisposable
 }
 
 /// <summary>
-/// CPU-side mesh data used by the high-level renderer.
+/// CPU-side mesh data used by the high-level renderer. Mesh instances are
+/// compared by reference identity; reuse the same instance frame-to-frame to
+/// reuse the cached GPU vertex buffer.
 /// </summary>
-public abstract record MeshData
+public abstract class Mesh
 {
-    private protected MeshData() { }
+    private protected Mesh() { }
 
     public abstract int VertexCount { get; }
+    public abstract int IndexCount { get; }
     public abstract GpuVertexLayout Layout { get; }
     public abstract ReadOnlySpan<byte> GetVertexBytes();
+    public abstract ReadOnlySpan<uint> GetIndices();
+
+    /// <summary>
+    /// Bumped each time the mesh's contents are replaced. The renderer uses
+    /// this to detect when its cached GPU vertex buffer needs to be re-uploaded.
+    /// </summary>
+    public int Version { get; private protected set; }
 }
 
 /// <summary>
-/// CPU-side mesh data used by the high-level renderer.
+/// CPU-Side mesh data used by <see cref="Renderer3D"/>.
+/// Can be updated with fresh vertex/index data.
 /// </summary>
-public record MeshData<TVertex>(ImmutableArray<TVertex> Vertices, ImmutableArray<uint> Indices, GpuVertexLayout VertexLayout)
-    : MeshData
+public class Mesh<TVertex> : Mesh
     where TVertex : unmanaged
 {
-    public override int VertexCount => Vertices.Length;
+    // Either an array we own (writable) or one borrowed from an
+    // ImmutableArray (must not be mutated). _ownsVertices/_ownsIndices
+    // tells which.
+    private TVertex[] _vertices;
+    private int _vertexCount;
+    private bool _ownsVertices;
+
+    private uint[] _indices;
+    private int _indexCount;
+    private bool _ownsIndices;
+
+    public Mesh(
+        ReadOnlySpan<TVertex> vertices,
+        ReadOnlySpan<uint> indices,
+        GpuVertexLayout vertexLayout)
+    {
+        ArgumentNullException.ThrowIfNull(vertexLayout);
+
+        _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
+        vertices.CopyTo(_vertices);
+        _vertexCount = vertices.Length;
+        _ownsVertices = true;
+
+        _indices = indices.Length == 0 ? Array.Empty<uint>() : new uint[indices.Length];
+        indices.CopyTo(_indices);
+        _indexCount = indices.Length;
+        _ownsIndices = true;
+
+        VertexLayout = vertexLayout;
+        Version = 1;
+    }
+
+    public Mesh(
+        ImmutableArray<TVertex> vertices,
+        ImmutableArray<uint> indices,
+        GpuVertexLayout vertexLayout)
+    {
+        ArgumentNullException.ThrowIfNull(vertexLayout);
+        ThrowIfDefault(vertices, nameof(vertices));
+        ThrowIfDefault(indices, nameof(indices));
+
+        // Borrow the immutable arrays' backing storage directly. Immutable
+        // arrays guarantee their contents won't change, so we can safely
+        // read from them without copying.
+        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
+        _vertexCount = vertices.Length;
+        _ownsVertices = false;
+
+        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
+        _indexCount = indices.Length;
+        _ownsIndices = false;
+
+        VertexLayout = vertexLayout;
+        Version = 1;
+    }
+
+    public GpuVertexLayout VertexLayout { get; }
+
+    public override int VertexCount => _vertexCount;
+
+    public override int IndexCount => _indexCount;
 
     public override GpuVertexLayout Layout => VertexLayout;
 
-    public override ReadOnlySpan<byte> GetVertexBytes() => MemoryMarshal.AsBytes(Vertices.AsSpan());
+    public override ReadOnlySpan<byte> GetVertexBytes() =>
+        MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
+
+    public override ReadOnlySpan<uint> GetIndices() =>
+        _indices.AsSpan(0, _indexCount);
+
+    /// <summary>
+    /// Replaces the vertex and index data with new contents copied from the
+    /// supplied spans. The mesh's vertex layout is unchanged. Bumps
+    /// <see cref="Mesh.Version"/> so the renderer re-uploads the GPU
+    /// buffer on the next draw.
+    /// </summary>
+    public void Reset(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    {
+        EnsureOwnedVertexCapacity(vertices.Length);
+        vertices.CopyTo(_vertices);
+        _vertexCount = vertices.Length;
+
+        EnsureOwnedIndexCapacity(indices.Length);
+        indices.CopyTo(_indices);
+        _indexCount = indices.Length;
+
+        unchecked { Version++; }
+    }
+
+    /// <summary>
+    /// Replaces the vertex and index data with the supplied immutable arrays.
+    /// The arrays' underlying storage is borrowed in-place (zero copy).
+    /// Bumps <see cref="Mesh.Version"/>.
+    /// </summary>
+    public void Reset(ImmutableArray<TVertex> vertices, ImmutableArray<uint> indices)
+    {
+        ThrowIfDefault(vertices, nameof(vertices));
+        ThrowIfDefault(indices, nameof(indices));
+
+        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
+        _vertexCount = vertices.Length;
+        _ownsVertices = false;
+
+        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
+        _indexCount = indices.Length;
+        _ownsIndices = false;
+
+        unchecked { Version++; }
+    }
+
+    private void EnsureOwnedVertexCapacity(int count)
+    {
+        if (!_ownsVertices || _vertices.Length < count)
+        {
+            // Either we're holding a borrowed (immutable) array we mustn't
+            // overwrite, or the owned array is too small. Allocate fresh.
+            _vertices = count == 0 ? Array.Empty<TVertex>() : new TVertex[count];
+            _ownsVertices = true;
+        }
+    }
+
+    private void EnsureOwnedIndexCapacity(int count)
+    {
+        if (!_ownsIndices || _indices.Length < count)
+        {
+            _indices = count == 0 ? Array.Empty<uint>() : new uint[count];
+            _ownsIndices = true;
+        }
+    }
+
+    private static void ThrowIfDefault<T>(ImmutableArray<T> array, string paramName)
+    {
+        if (array.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", paramName);
+    }
 }
 
 /// <summary>
-/// CPU-side mesh data using the default vertex shape.
+/// Mesh with position-only vertices.
 /// </summary>
-public sealed record VertexOnlyMeshData(ImmutableArray<Vertex3D> Vertices, ImmutableArray<uint> Indices)
-    : MeshData<Vertex3D>(Vertices, Indices, VertexOnlyMeshData.VertexLayout)
+public sealed class VertexOnlyMesh : Mesh<Vertex3D>
 {
+    public VertexOnlyMesh(ReadOnlySpan<Vertex3D> vertices, ReadOnlySpan<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
+    public VertexOnlyMesh(ImmutableArray<Vertex3D> vertices, ImmutableArray<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
     /// <summary>
     /// The default vertex layout used by the built-in mesh type.
     /// </summary>
@@ -496,7 +763,7 @@ public sealed record VertexOnlyMeshData(ImmutableArray<Vertex3D> Vertices, Immut
 }
 
 /// <summary>
-/// A vertex used by the built-in mesh type.
+/// A vertex with with just a 3D position.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct Vertex3D
@@ -514,17 +781,17 @@ public readonly struct Vertex3D
 }
 
 /// <summary>
-/// A vertex that carries a baked color.
+/// A vertex with position and color
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct ColorVertex3D
 {
-    public readonly Vertex3D Vertex;
+    public readonly Vertex3D Position;
     public readonly SDL.Color Color;
 
     public ColorVertex3D(Vertex3D vertex, SDL.Color color)
     {
-        Vertex = vertex;
+        Position = vertex;
         Color = color;
     }
 }
@@ -536,22 +803,31 @@ public readonly struct ColorVertex3D
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct TextureVertex3D
 {
-    public readonly Vertex3D Vertex;
+    public readonly Vertex3D Position;
     public readonly Vector2 TextureCoordinate;
 
     public TextureVertex3D(Vertex3D vertex, Vector2 textureCoordinate)
     {
-        Vertex = vertex;
+        Position = vertex;
         TextureCoordinate = textureCoordinate;
     }
 }
 
 /// <summary>
-/// CPU-side mesh data that carries baked vertex colors.
+/// Mesh with vertex positions and colors.
 /// </summary>
-public sealed record ColoredMeshData(ImmutableArray<ColorVertex3D> Vertices, ImmutableArray<uint> Indices)
-    : MeshData<ColorVertex3D>(Vertices, Indices, ColoredMeshData.VertexLayout)
+public sealed class ColoredMesh : Mesh<ColorVertex3D>
 {
+    public ColoredMesh(ReadOnlySpan<ColorVertex3D> vertices, ReadOnlySpan<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
+    public ColoredMesh(ImmutableArray<ColorVertex3D> vertices, ImmutableArray<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
     /// <summary>
     /// The default vertex layout used by the colored mesh type.
     /// </summary>
@@ -563,11 +839,20 @@ public sealed record ColoredMeshData(ImmutableArray<ColorVertex3D> Vertices, Imm
 }
 
 /// <summary>
-/// CPU-side mesh data that carries position and texture coordinates.
+/// Mesh with vertex positions and texture coordinates.
 /// </summary>
-public sealed record TexturedMeshData(ImmutableArray<TextureVertex3D> Vertices, ImmutableArray<uint> Indices)
-    : MeshData<TextureVertex3D>(Vertices, Indices, TexturedMeshData.VertexLayout)
+public sealed class TexturedMesh : Mesh<TextureVertex3D>
 {
+    public TexturedMesh(ReadOnlySpan<TextureVertex3D> vertices, ReadOnlySpan<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
+    public TexturedMesh(ImmutableArray<TextureVertex3D> vertices, ImmutableArray<uint> indices)
+        : base(vertices, indices, VertexLayout)
+    {
+    }
+
     /// <summary>
     /// The default vertex layout used by the textured mesh type.
     /// </summary>
@@ -597,8 +882,3 @@ public enum VertexElementKind
     TextureCoordinate2,
     Color4
 }
-
-/// <summary>
-/// CPU-side rectangle data used by the high-level renderer.
-/// </summary>
-public sealed record RectangleData(Vector3 Position, Vector2 Size);

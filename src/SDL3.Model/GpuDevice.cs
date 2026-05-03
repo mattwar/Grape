@@ -15,18 +15,14 @@ public sealed class GpuDevice : IDisposable
     internal GpuDevice(nint gpuDeviceID)
     {
         _gpuDeviceID = gpuDeviceID;
-        // A GPU device may be created before any window (e.g. via
-        // GpuDevice.Default in a Window3D ctor chain), so make sure the
-        // application is up before registering as a resource.
-        Application.Start();
         Application.Current.AddResource(this);
     }
 
     public static GpuDevice Create(SDL.GPUShaderFormat format, bool debugMode, string? name = null)
     {
         // Make sure the SDL video subsystem is up before asking for a GPU
-        // device. The Application event loop owns SDL.Init.
-        Application.Start();
+        // device. Touching Application.Current starts it on demand.
+        _ = Application.Current;
 
         var id = SDL.CreateGPUDevice(format, debugMode, name);
         if (id == 0)
@@ -156,7 +152,19 @@ public sealed class GpuDevice : IDisposable
         ImmutableArray<GpuColorTargetInfo> colorTargets, 
         GpuDepthStencilTargetInfo depthTarget
         ) =>
-        GpuRenderPass.Create(this, commandBuffer, colorTargets, depthTarget);
+        GpuRenderPass.Begin(this, commandBuffer, colorTargets, depthTarget);
+
+    /// <summary>
+    /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
+    /// if the underlying SDL call fails, e.g. because the device is being torn
+    /// down or the swapchain image is no longer valid.
+    /// </summary>
+    public bool TryBeginRenderPass(
+        GpuCommandBuffer commandBuffer,
+        ImmutableArray<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget,
+        out GpuRenderPass? renderPass) =>
+        GpuRenderPass.TryBegin(this, commandBuffer, colorTargets, depthTarget, out renderPass);
 
     /// <summary>
     /// Create a new graphics pipeline for the GPU.
@@ -520,10 +528,28 @@ public sealed class GpuRenderFrame : IDisposable
     public GpuCopyPass BeginCopyPass() =>
         GpuCopyPass.Begin(_commandBuffer);
 
+    /// <summary>
+    /// Attempts to begin a copy pass. Returns <c>false</c> (without throwing)
+    /// if the underlying SDL call fails, for example because the device is
+    /// being torn down or the window has just been closed.
+    /// </summary>
+    public bool TryBeginCopyPass(out GpuCopyPass? copyPass) =>
+        GpuCopyPass.TryBegin(_commandBuffer, out copyPass);
+
     public GpuRenderPass BeginRenderPass(
         ImmutableArray<GpuColorTargetInfo> colorTargets,
         GpuDepthStencilTargetInfo depthTarget) =>
         _device.BeginRenderPass(_commandBuffer, colorTargets, depthTarget);
+
+    /// <summary>
+    /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
+    /// if the underlying SDL call fails.
+    /// </summary>
+    public bool TryBeginRenderPass(
+        ImmutableArray<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget,
+        out GpuRenderPass? renderPass) =>
+        _device.TryBeginRenderPass(_commandBuffer, colorTargets, depthTarget, out renderPass);
 
     public void Submit()
     {
@@ -571,10 +597,28 @@ public sealed class GpuCopyPass : IDisposable
 
     internal static GpuCopyPass Begin(GpuCommandBuffer commandBuffer)
     {
+        if (!TryBegin(commandBuffer, out var copyPass) || copyPass == null)
+            throw new InvalidOperationException($"Failed to begin GPU copy pass: {SDL.GetError()}");
+        return copyPass;
+    }
+
+    /// <summary>
+    /// Attempts to begin a copy pass on the given command buffer. Returns
+    /// <c>false</c> (with <paramref name="copyPass"/> set to <c>null</c>) if
+    /// the underlying SDL call fails, e.g. because the device is being torn
+    /// down. Does not throw.
+    /// </summary>
+    internal static bool TryBegin(GpuCommandBuffer commandBuffer, out GpuCopyPass? copyPass)
+    {
         var copyPassId = SDL.BeginGPUCopyPass(commandBuffer.CommandBufferId);
         if (copyPassId == 0)
-            throw new InvalidOperationException($"Failed to begin GPU copy pass: {SDL.GetError()}");
-        return new GpuCopyPass(copyPassId);
+        {
+            copyPass = null;
+            return false;
+        }
+
+        copyPass = new GpuCopyPass(copyPassId);
+        return true;
     }
 
     public void Upload(GpuUploadBuffer source, GpuBuffer destination, ReadOnlySpan<byte> bytes)
@@ -879,8 +923,42 @@ public sealed class GpuRenderPass : IDisposable
         }
     }
 
-    internal static GpuRenderPass Create(
+    internal static GpuRenderPass Begin(
         GpuDevice device,
+        GpuCommandBuffer commandBuffer,
+        IReadOnlyList<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget)
+    {
+        var renderPassId = BeginNative(commandBuffer, colorTargets, depthTarget);
+        if (renderPassId == 0)
+            throw new InvalidOperationException($"Failed to begin GPU render pass: {SDL.GetError()}");
+        return new GpuRenderPass(device, commandBuffer, renderPassId);
+    }
+
+    /// <summary>
+    /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
+    /// if the underlying SDL call fails, for example because the device is
+    /// being torn down or the swapchain image is no longer valid.
+    /// </summary>
+    internal static bool TryBegin(
+        GpuDevice device,
+        GpuCommandBuffer commandBuffer,
+        IReadOnlyList<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget,
+        out GpuRenderPass? renderPass)
+    {
+        var renderPassId = BeginNative(commandBuffer, colorTargets, depthTarget);
+        if (renderPassId == 0)
+        {
+            renderPass = null;
+            return false;
+        }
+
+        renderPass = new GpuRenderPass(device, commandBuffer, renderPassId);
+        return true;
+    }
+
+    private static nint BeginNative(
         GpuCommandBuffer commandBuffer,
         IReadOnlyList<GpuColorTargetInfo> colorTargets,
         GpuDepthStencilTargetInfo depthTarget)
@@ -919,32 +997,27 @@ public sealed class GpuRenderPass : IDisposable
             ClearStencil = depthTarget.ClearStencil
         };
 
-
         unsafe
         {
             fixed (GPUColorTargetInfo* pColorTargets = nativeColorTargets)
             {
-                nint renderPassId;
                 if (depthTarget.Texture is null)
                 {
                     // SDL_GPU expects a NULL pointer when no depth/stencil
                     // target is in use. Passing a zero-filled struct by ref
                     // is NOT equivalent and causes native heap corruption.
-                    renderPassId = SDL.BeginGPURenderPass(
+                    return SDL.BeginGPURenderPass(
                         commandBuffer.CommandBufferId,
                         (nint)pColorTargets,
                         (uint)nativeColorTargets.Length,
                         IntPtr.Zero);
                 }
-                else
-                {
-                    renderPassId = SDL.BeginGPURenderPass(
-                        commandBuffer.CommandBufferId,
-                        (nint)pColorTargets,
-                        (uint)nativeColorTargets.Length,
-                        nativeDepthTarget);
-                }
-                return new GpuRenderPass(device, commandBuffer, renderPassId);
+
+                return SDL.BeginGPURenderPass(
+                    commandBuffer.CommandBufferId,
+                    (nint)pColorTargets,
+                    (uint)nativeColorTargets.Length,
+                    nativeDepthTarget);
             }
         }
     }
