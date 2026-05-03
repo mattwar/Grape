@@ -79,6 +79,15 @@ public sealed class Renderer3D : IDisposable
     private readonly ConditionalWeakTable<Array, Mesh> _arrayMeshCache = new();
     private BuiltInShaders? _shaders;
     private GpuSampler? _defaultSampler;
+    private GpuSampler? _debugTextSampler;
+    private Surface? _debugFontAtlas;
+    // One vertex buffer per RenderDebugText call within a frame. Each draw
+    // gets its own array so the array-keyed mesh cache resolves to a
+    // distinct Mesh per draw; otherwise multiple text strings in the same
+    // frame would all reference the same backing buffer and render as
+    // whichever string was queued last.
+    private readonly List<TextureVertex3D[]> _debugTextVertexBuffers = new();
+    private int _debugTextVertexIndex;
     private long _frameNumber;
 
     // Per-frame state. Non-null between BeginFrame and Present.
@@ -124,6 +133,7 @@ public sealed class Renderer3D : IDisposable
         _frameNumber++;
         SweepCaches();
         _commands.Clear();
+        _debugTextVertexIndex = 0;
 
         var bg = window.BackgroundColor;
         _clearColor = new SDL.FColor
@@ -187,13 +197,17 @@ public sealed class Renderer3D : IDisposable
     /// resources are released once you stop using it (either when the array
     /// is collected, or after a short idle period).
     /// </remarks>
-    public void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
+    public void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null, int? vertexCount = null)
         where TVertex : unmanaged
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
 
-        var mesh = GetOrCreateArrayMesh(vertices, shader.VertexLayout);
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
         RenderMesh(mesh, shader, transform);
     }
 
@@ -256,13 +270,18 @@ public sealed class Renderer3D : IDisposable
         Shader<TextureVertex3D> shader,
         Surface texture,
         GpuSampler? sampler = null,
-        Matrix4x4? transform = null)
+        Matrix4x4? transform = null,
+        int? vertexCount = null)
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        var mesh = GetOrCreateArrayMesh(vertices, shader.VertexLayout);
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
         RenderTexturedMesh(mesh, shader, texture, sampler, transform);
     }
 
@@ -289,9 +308,165 @@ public sealed class Renderer3D : IDisposable
         RenderTexturedMesh(mesh, shader, texture, sampler, transform);
     }
 
-    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, GpuVertexLayout layout)
+    /// <summary>
+    /// Total number of glyph cells in the debug font atlas.
+    /// </summary>
+    private const int DebugGlyphPixels = 8;
+    private const int DebugAtlasCols = 16;
+    private const int DebugAtlasRows = 8;
+    private const int DebugAtlasWidth = DebugGlyphPixels * DebugAtlasCols;   // 128
+    private const int DebugAtlasHeight = DebugGlyphPixels * DebugAtlasRows;  // 64
+
+    /// <summary>
+    /// Renders ASCII debug text using SDL's built-in 8x8 bitmap font, on a
+    /// strip of textured quads. The font atlas is built once on first use
+    /// (one quad per character, sampled from a shared 128×64 surface).
+    /// </summary>
+    /// <param name="text">The text to render. Non-ASCII characters render
+    /// as the glyph at code 0.</param>
+    /// <param name="transform">World-space transform applied to the text
+    /// mesh. The mesh occupies (0..text.Length) along X and (0..1) along Y
+    /// in local model space; X advances one unit per character, Y goes up.</param>
+    public void RenderDebugText(string text, Matrix4x4 transform)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (text.Length == 0)
+            return;
+
+        var atlas = GetDebugFontAtlas();
+
+        // Each call within a frame needs its own backing array so the
+        // array-keyed mesh cache produces a distinct Mesh per draw. We
+        // pool the arrays across frames so we still get one GPU vertex
+        // buffer per call site (assuming a stable per-frame call order).
+        int needed = text.Length * 6;
+        TextureVertex3D[] verts;
+        if (_debugTextVertexIndex < _debugTextVertexBuffers.Count)
+        {
+            verts = _debugTextVertexBuffers[_debugTextVertexIndex];
+            if (verts.Length < needed)
+            {
+                // Grow this slot in place; the new array becomes a different
+                // cache key, so the previous mesh's GPU buffer will idle-evict.
+                verts = new TextureVertex3D[needed];
+                _debugTextVertexBuffers[_debugTextVertexIndex] = verts;
+            }
+        }
+        else
+        {
+            verts = new TextureVertex3D[needed];
+            _debugTextVertexBuffers.Add(verts);
+        }
+        _debugTextVertexIndex++;
+
+        const float u = 1f / DebugAtlasCols;  // uv width per glyph
+        const float v = 1f / DebugAtlasRows;  // uv height per glyph
+
+        for (int i = 0; i < text.Length; i++)
+        {
+            var c = text[i];
+            if (c >= 128) c = (char)0;
+            int col = c % DebugAtlasCols;
+            int row = c / DebugAtlasCols;
+
+            float u0 = col * u, u1 = u0 + u;
+            float v0 = row * v, v1 = v0 + v;
+
+            float x0 = i;
+            float x1 = i + 1;
+
+            // Y up, baseline at 0, glyph top at 1.
+            var tl = new TextureVertex3D(new Vertex3D(x0, 1f, 0f), new Vector2(u0, v0));
+            var bl = new TextureVertex3D(new Vertex3D(x0, 0f, 0f), new Vector2(u0, v1));
+            var tr = new TextureVertex3D(new Vertex3D(x1, 1f, 0f), new Vector2(u1, v0));
+            var br = new TextureVertex3D(new Vertex3D(x1, 0f, 0f), new Vector2(u1, v1));
+
+            int o = i * 6;
+            verts[o + 0] = tl;
+            verts[o + 1] = bl;
+            verts[o + 2] = br;
+            verts[o + 3] = tl;
+            verts[o + 4] = br;
+            verts[o + 5] = tr;
+        }
+
+        // Pin debug-font sampling to nearest-neighbour clamp so glyph cells
+        // don't bleed across UV boundaries even with linear filtering.
+        var sampler = _debugTextSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
+        {
+            MinFilter = SDL.GPUFilter.Nearest,
+            MagFilter = SDL.GPUFilter.Nearest,
+            MipmapMode = SDL.GPUSamplerMipmapMode.Nearest,
+            AddressModeU = SDL.GPUSamplerAddressMode.ClampToEdge,
+            AddressModeV = SDL.GPUSamplerAddressMode.ClampToEdge,
+            AddressModeW = SDL.GPUSamplerAddressMode.ClampToEdge,
+        });
+
+        RenderTexturedMesh(
+            verts,
+            Shaders.TexturedQuadWithMatrix,
+            atlas,
+            sampler,
+            transform,
+            vertexCount: needed);
+    }
+
+    private Surface GetDebugFontAtlas()
+    {
+        if (_debugFontAtlas is { IsDisposed: false })
+            return _debugFontAtlas;
+
+        var atlas = Surface.Create(DebugAtlasWidth, DebugAtlasHeight, SDL.PixelFormat.ABGR8888);
+
+        // Drive a software renderer over the surface's pixels and use SDL's
+        // built-in debug-text routine to draw each ASCII glyph into its cell.
+        var rendererId = SDL.CreateSoftwareRenderer(atlas._surfaceId);
+        if (rendererId == 0)
+        {
+            atlas.Dispose();
+            throw new InvalidOperationException(
+                $"Failed to create software renderer for debug font atlas: {SDL.GetError()}");
+        }
+
+        try
+        {
+            // Make the background fully transparent and the glyphs white.
+            SDL.SetRenderDrawColor(rendererId, 0, 0, 0, 0);
+            SDL.RenderClear(rendererId);
+            SDL.SetRenderDrawColor(rendererId, 255, 255, 255, 255);
+
+            for (int code = 0; code < 128; code++)
+            {
+                int col = code % DebugAtlasCols;
+                int row = code / DebugAtlasCols;
+                SDL.RenderDebugText(
+                    rendererId,
+                    col * DebugGlyphPixels,
+                    row * DebugGlyphPixels,
+                    ((char)code).ToString());
+            }
+
+            SDL.RenderPresent(rendererId);
+        }
+        finally
+        {
+            SDL.DestroyRenderer(rendererId);
+        }
+
+        // The surface's raw pixels were just written through SDL's renderer,
+        // not through the version-tracked SetPixel path. Mark the surface
+        // dirty so any cached GPU upload re-stages on first use.
+        atlas.Invalidate();
+
+        _debugFontAtlas = atlas;
+        return atlas;
+    }
+
+    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, GpuVertexLayout layout)
         where TVertex : unmanaged
     {
+        var span = vertices.AsSpan(0, count);
+
         if (_arrayMeshCache.TryGetValue(vertices, out var existing))
         {
             if (existing is not Mesh<TVertex> typed)
@@ -303,11 +478,11 @@ public sealed class Renderer3D : IDisposable
 
             // Re-stage the latest contents. Reset bumps the mesh's Version,
             // and the upload loop only re-uploads when Version has changed.
-            typed.Reset(vertices.AsSpan(), ReadOnlySpan<uint>.Empty);
+            typed.Reset(span, ReadOnlySpan<uint>.Empty);
             return typed;
         }
 
-        var mesh = new Mesh<TVertex>(vertices.AsSpan(), ReadOnlySpan<uint>.Empty, layout);
+        var mesh = new Mesh<TVertex>(span, ReadOnlySpan<uint>.Empty, layout);
         _arrayMeshCache.Add(vertices, mesh);
         return mesh;
     }
@@ -702,6 +877,16 @@ public sealed class Renderer3D : IDisposable
         var colorTargets = ImmutableArray.Create(new SDL.GPUColorTargetDescription
         {
             Format = colorFormat,
+            BlendState = new SDL.GPUColorTargetBlendState
+            {
+                EnableBlend = 1,
+                SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
+                DstColorBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+                ColorBlendOp = SDL.GPUBlendOp.Add,
+                SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+                DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+                AlphaBlendOp = SDL.GPUBlendOp.Add,
+            },
         });
 
         return _device.CreateGraphicsPipeline(new GpuPipelineCreateInfo
