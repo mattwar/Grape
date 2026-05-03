@@ -546,6 +546,7 @@ public sealed class Renderer3D : IDisposable
             if (idle || dead)
             {
                 entry.Texture.Dispose();
+                entry.UploadBuffer?.Dispose();
                 _textureResources.RemoveAt(i);
             }
         }
@@ -559,6 +560,56 @@ public sealed class Renderer3D : IDisposable
             if (entry.Surface.TryGetTarget(out var target) && ReferenceEquals(target, surface))
             {
                 entry.LastUsedFrame = _frameNumber;
+
+                // Re-upload only when the surface's contents have changed.
+                if (entry.LastUploadedVersion != surface.Version)
+                {
+                    var (w, h) = surface.Size;
+                    if (w == entry.Width && h == entry.Height)
+                    {
+                        // Same dimensions: stream new pixels into the
+                        // existing GPU texture. UploadToTexture passes
+                        // cycle: true so re-writing while the previous
+                        // contents may still be in flight is safe.
+                        var px = surface.GetPixels();
+                        if (entry.UploadBuffer is null || entry.UploadBufferBytes < px.Length)
+                        {
+                            entry.UploadBuffer?.Dispose();
+                            entry.UploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)px.Length);
+                            entry.UploadBufferBytes = px.Length;
+                        }
+                        copyPass.UploadToTexture(entry.UploadBuffer!, entry.Texture, (uint)w, (uint)h, px);
+                    }
+                    else
+                    {
+                        // Surface was resized (rare): rebuild the texture.
+                        entry.Texture.Dispose();
+                        entry.UploadBuffer?.Dispose();
+                        entry.UploadBuffer = null;
+                        entry.UploadBufferBytes = 0;
+
+                        var resizedFormat = MapPixelFormat(surface.PixelFormat);
+                        entry.Texture = _device.CreateTexture(new GpuTextureCreateInfo
+                        {
+                            Type = SDL.GPUTextureType.Texturetype2D,
+                            Format = resizedFormat,
+                            Usage = SDL.GPUTextureUsageFlags.Sampler,
+                            Width = (uint)w,
+                            Height = (uint)h,
+                            LayerCountOrDepth = 1,
+                            NumLevels = 1,
+                            SampleCount = SDL.GPUSampleCount.SampleCount1,
+                        });
+                        entry.Width = w;
+                        entry.Height = h;
+
+                        var px = surface.GetPixels();
+                        using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)px.Length);
+                        copyPass.UploadToTexture(upload, entry.Texture, (uint)w, (uint)h, px);
+                    }
+
+                    entry.LastUploadedVersion = surface.Version;
+                }
                 return;
             }
         }
@@ -579,11 +630,16 @@ public sealed class Renderer3D : IDisposable
         });
 
         var pixels = surface.GetPixels();
-        using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
-        copyPass.UploadToTexture(upload, gpuTexture, (uint)width, (uint)height, pixels);
+        using var firstUpload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
+        copyPass.UploadToTexture(firstUpload, gpuTexture, (uint)width, (uint)height, pixels);
 
         _textureResources.Add(new TextureCacheEntry(
-            new WeakReference<Surface>(surface), gpuTexture, _frameNumber));
+            new WeakReference<Surface>(surface), gpuTexture, _frameNumber)
+        {
+            Width = width,
+            Height = height,
+            LastUploadedVersion = surface.Version,
+        });
     }
 
     private static SDL.GPUTextureFormat MapPixelFormat(SDL.PixelFormat format) => format switch
@@ -723,8 +779,13 @@ public sealed class Renderer3D : IDisposable
         }
 
         public WeakReference<Surface> Surface { get; }
-        public GpuTexture Texture { get; }
+        public GpuTexture Texture { get; set; }
         public long LastUsedFrame { get; set; }
+        public int LastUploadedVersion { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public GpuUploadBuffer? UploadBuffer { get; set; }
+        public int UploadBufferBytes { get; set; }
     }
 
     private List<PreparedDrawCommand> PrepareCommands()

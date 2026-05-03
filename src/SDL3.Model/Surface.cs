@@ -1,18 +1,20 @@
 ﻿namespace SDL3.Model;
 
 /// <summary>
-/// Represents a bitmap
+/// Represents a CPU-Side bitmap
 /// </summary>
 public sealed class Surface : IDisposable
 {
     private readonly Application _application;
     internal nint _surfaceId;
+    private int _version;
 
     private Surface(nint surfaceId)
     {
         _surfaceId = surfaceId;
         _application = Application.Current;
         _application.AddResource(this);
+        _version = 1;
     }
 
     public static Surface Create(int width, int height, SDL.PixelFormat format)
@@ -28,6 +30,28 @@ public sealed class Surface : IDisposable
     }
 
     public bool IsDisposed => _surfaceId == 0;
+
+    /// <summary>
+    /// Bumped each time the surface's contents change. Renderers use this to
+    /// detect when their cached GPU texture upload is stale. If you mutate
+    /// the surface through raw pixel access (e.g. <see cref="GetPixels"/> or
+    /// an external software renderer), call <see cref="Invalidate"/> to mark
+    /// the change.
+    /// </summary>
+    public int Version => _version;
+
+    /// <summary>
+    /// Marks the surface contents as changed so renderers re-upload their
+    /// cached GPU texture on the next draw. Mutations through
+    /// <see cref="SetPixel"/> or <see cref="TransparentColor"/> bump the
+    /// version automatically; this is for callers that touch raw pixels.
+    /// </summary>
+    public void Invalidate()
+    {
+        if (IsDisposed)
+            return;
+        unchecked { _version++; }
+    }
 
     internal void ThrowIfDisposed()
     {
@@ -126,6 +150,7 @@ public sealed class Surface : IDisposable
             {
                 SDL.SetSurfaceColorKey(_surfaceId, false, 0);
             }
+            unchecked { _version++; }
         }
     }
 
@@ -312,6 +337,7 @@ public sealed class Surface : IDisposable
                     break;
                 }
         }
+        unchecked { _version++; }
     }
 
     /// <summary>

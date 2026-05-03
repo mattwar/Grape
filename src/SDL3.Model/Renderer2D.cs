@@ -438,19 +438,37 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
     }
 
-    private readonly ConditionalWeakTable<Surface, Texture> _surfaceTextureCache = new();
+    private readonly ConditionalWeakTable<Surface, SurfaceTextureEntry> _surfaceTextureCache = new();
+
+    private sealed class SurfaceTextureEntry
+    {
+        public Texture Texture { get; set; } = null!;
+        public int Version { get; set; }
+    }
 
     /// <summary>
     /// Gets the associated <see cref="Texture"/> for the given <see cref="Surface"/>, creating one if necessary.
+    /// Re-creates the cached texture when the surface's <see cref="Surface.Version"/> has changed.
     /// </summary>
     private bool TryGetOrCreateTexture(Surface surface, [NotNullWhen(true)] out Texture? texture)
     {
-        if (!_surfaceTextureCache.TryGetValue(surface, out texture)
-            || texture.IsDisposed)
+        if (!_surfaceTextureCache.TryGetValue(surface, out var entry))
         {
-            texture = this.CreateTexture(surface);
-            _surfaceTextureCache.AddOrUpdate(surface, texture);
+            entry = new SurfaceTextureEntry
+            {
+                Texture = this.CreateTexture(surface),
+                Version = surface.Version,
+            };
+            _surfaceTextureCache.AddOrUpdate(surface, entry);
         }
+        else if (entry.Texture.IsDisposed || entry.Version != surface.Version)
+        {
+            entry.Texture.Dispose();
+            entry.Texture = this.CreateTexture(surface);
+            entry.Version = surface.Version;
+        }
+
+        texture = entry.Texture;
         return texture != null;
     }
 
