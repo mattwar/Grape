@@ -26,4 +26,13 @@ internal static partial class SDL3Native
     [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
     [return: MarshalAs(UnmanagedType.I1)]
     internal static unsafe partial bool SDL_RenderFillRects(IntPtr renderer, void* rects, int count);
+
+    [LibraryImport(SDLLibrary, EntryPoint = "SDL_RenderGeometry")]
+    [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+    [return: MarshalAs(UnmanagedType.I1)]
+    internal static unsafe partial bool SDL_RenderGeometry(
+        IntPtr renderer,
+        IntPtr texture,
+        void* vertices, int num_vertices,
+        int* indices, int num_indices);
 }

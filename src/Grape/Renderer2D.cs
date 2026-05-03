@@ -561,18 +561,29 @@ public sealed class Renderer2D : IDisposable
         }
     }
 
-    private bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Texture? texture = null)
+    /// <summary>
+    /// Renders a triangle list described by <paramref name="vertices"/> and
+    /// <paramref name="indices"/>, optionally sampling from
+    /// <paramref name="image"/>.
+    /// </summary>
+    public bool RenderGeometry(Vertex2D[] vertices, int[] indices, Image? image = null)
     {
-        return SDL.RenderGeometry(_rendererId, texture != null ? texture.Id : 0, vertices, vertices.Length, indices, indices.Length);
-    }
-
-    internal bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Image? surface = null)
-    {
-        var texture = surface == null ? null
-            : TryGetOrCreateTexture(surface!, out var txt) ? txt
+        var texture = image == null ? null
+            : TryGetOrCreateTexture(image!, out var txt) ? txt
             : null;
 
-        return RenderGeometry(vertices, indices, texture);
+        unsafe
+        {
+            fixed (Vertex2D* pVertices = vertices)
+            fixed (int* pIndices = indices)
+            {
+                return SDL3Native.SDL_RenderGeometry(
+                    _rendererId,
+                    texture != null ? texture.Id : 0,
+                    pVertices, vertices.Length,
+                    pIndices, indices.Length);
+            }
+        }
     }
 
     public bool RenderLine(float x1, float y1, float x2, float y2)
