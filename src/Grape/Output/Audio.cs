@@ -160,9 +160,9 @@ public abstract class AudioDevice
     /// <summary>
     /// The specifications of the audio device.
     /// </summary>
-    public SDL.AudioSpec Spec =>
+    public AudioSpec Spec =>
         _deviceId != 0 && SDL.GetAudioDeviceFormat(_deviceId, out var spec, out _)
-            ? spec
+            ? AudioSpec.From(spec)
             : default;
 
     /// <summary>
@@ -203,7 +203,7 @@ public class AudioPlaybackDevice : AudioDevice
     /// </summary>
     public LogicalPlaybackDevice Open()
     {
-        var id = SDL.OpenAudioDevice(_deviceId, this.Spec);
+        var id = SDL.OpenAudioDevice(_deviceId, this.Spec.ToSdl());
         if (id == 0)
             throw new InvalidOperationException($"SDL_OpenAudioDevice Error: {SDL.GetError()}");
         return new LogicalPlaybackDevice(id);
@@ -315,9 +315,9 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     /// </summary>
     public ImmutableList<AudioStream> Streams => _streams;
 
-    public AudioStream CreateStream(SDL.AudioSpec sourceSpec, AudioDataRequested? onDataRequested = null)
+    public AudioStream CreateStream(AudioSpec sourceSpec, AudioDataRequested? onDataRequested = null)
     {
-        var streamId = SDL.CreateAudioStream(sourceSpec, this.Spec);
+        var streamId = SDL.CreateAudioStream(sourceSpec.ToSdl(), this.Spec.ToSdl());
         if (streamId == 0)
             throw new InvalidOperationException($"SDL_OpenAudioDeviceStream Error: {SDL.GetError()}");
 
@@ -472,10 +472,10 @@ public class AudioStream : IDisposable
 /// </summary>
 public sealed class AudioData
 {
-    public SDL.AudioSpec Spec { get; }
+    public AudioSpec Spec { get; }
     public ReadOnlyMemory<byte> Data { get; }
 
-    public AudioData(SDL.AudioSpec spec, ReadOnlyMemory<byte> data)
+    public AudioData(AudioSpec spec, ReadOnlyMemory<byte> data)
     {
         this.Spec = spec;
         this.Data = data;
@@ -497,7 +497,7 @@ public sealed class AudioData
                 Buffer.MemoryCopy(sourceBytesPtr, targetBytePtr, audioLength, audioLength);
             }
             var data = new ReadOnlyMemory<byte>(bytes);
-            return new AudioData(spec, data);
+            return new AudioData(AudioSpec.From(spec), data);
         }
     }
 }

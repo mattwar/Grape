@@ -86,14 +86,14 @@ public sealed class Display
     /// <summary>
     /// The natural orientation of the display.
     /// </summary>
-    public SDL.DisplayOrientation NaturalOrientation =>
-        SDL.GetNaturalDisplayOrientation(_displayId);
+    public DisplayOrientation NaturalOrientation =>
+        (DisplayOrientation)SDL.GetNaturalDisplayOrientation(_displayId);
 
     /// <summary>
     /// The current orientation of the display.
     /// </summary>
-    public SDL.DisplayOrientation Orientation =>
-        SDL.GetCurrentDisplayOrientation(_displayId);
+    public DisplayOrientation Orientation =>
+        (DisplayOrientation)SDL.GetCurrentDisplayOrientation(_displayId);
 
     /// <summary>
     /// Gets the closest matching fullscreen display mode for the given parameters.
