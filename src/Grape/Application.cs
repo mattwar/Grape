@@ -259,25 +259,28 @@ public class Application : IDisposable
         {
             // application events
             case SDL.EventType.Quit:
-                this.OnQuit(e.Quit);
+                this.OnQuitting(default);
                 break;
             case SDL.EventType.Terminating:
-                this.OnTerminating(e.Common);
+                this.OnTerminating(default);
                 break;
             case SDL.EventType.LowMemory:
-                this.OnLocaleChange(e.Common);
+                this.OnLowMemory(default);
                 break;
             case SDL.EventType.WillEnterBackground:
-                this.OnEnteringBackground(e.Common);
+                this.OnEnteringBackground(default);
                 break;
             case SDL.EventType.DidEnterBackground:
-                this.OnEnteredBackground(e.Common);
+                this.OnEnteredBackground(default);
                 break;
             case SDL.EventType.WillEnterForeground:
-                this.OnEnteredForeground(e.Common);
+                this.OnEnteringForeground(default);
                 break;
             case SDL.EventType.DidEnterForeground:
-                this.OnEnteringForeground(e.Common);
+                this.OnEnteredForeground(default);
+                break;
+            case SDL.EventType.LocaleChanged:
+                this.OnLocaleChanged(default);
                 break;
 
             // keyboard events
@@ -329,10 +332,10 @@ public class Application : IDisposable
                 break;
 
             case SDL.EventType.MouseAdded:
-                this.OnMouseDeviceAdded(e.MDevice);
+                this.OnMouseDeviceAdded(new MouseDeviceEventArgs(e.MDevice.Which));
                 break;
             case SDL.EventType.MouseRemoved:
-                this.OnMouseDeviceRemoved(e.MDevice);
+                this.OnMouseDeviceRemoved(new MouseDeviceEventArgs(e.MDevice.Which));
                 break;
             case SDL.EventType.MouseButtonDown:
                 this.DispatchWindowEvent(e.Button.WindowID, e);
@@ -357,249 +360,287 @@ public class Application : IDisposable
         switch ((SDL.EventType)e.Type)
         {
             case SDL.EventType.WindowCloseRequested:
-                this.OnWindowCloseRequested(window, e.Window);
+                this.OnWindowCloseRequested(window, default);
                 break;
             case SDL.EventType.WindowDestroyed:
-                this.OnWindowDestroyed(window, e.Window);
+                this.OnWindowDestroyed(window, default);
                 break;
             case SDL.EventType.WindowDisplayChanged:
-                this.OnWindowDisplayChanged(window, e.Window);
+                Display.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
+                this.OnWindowDisplayChanged(window, new WindowDisplayChangedEventArgs(newDisplay));
                 break;
             case SDL.EventType.WindowDisplayScaleChanged:
-                this.OnWindowDisplayScaleChanged(window, e.Window);
+                this.OnWindowDisplayScaleChanged(window, default);
                 break;
             case SDL.EventType.WindowEnterFullscreen:
-                this.OnWindowEnterFullscreen(window, e.Window);
+                this.OnWindowEnterFullscreen(window, default);
                 break;
             case SDL.EventType.WindowLeaveFullscreen:
-                this.OnWindowLeaveFullscreen(window, e.Window);
+                this.OnWindowLeaveFullscreen(window, default);
                 break;
             case SDL.EventType.WindowFocusGained:
-                this.OnWindowFocusGained(window, e.Window);
+                this.OnWindowFocusGained(window, default);
                 break;
             case SDL.EventType.WindowFocusLost:
-                this.OnWindowFocusLost(window, e.Window);
+                this.OnWindowFocusLost(window, default);
                 break;
             case SDL.EventType.WindowHidden:
-                this.OnWindowHidden(window, e.Window);
+                this.OnWindowHidden(window, default);
                 break;
             case SDL.EventType.WindowShown:
-                this.OnWindowShown(window, e.Window);
+                this.OnWindowShown(window, default);
                 break;
             case SDL.EventType.WindowExposed:
-                this.OnWindowExposed(window, e.Window);
+                this.OnWindowExposed(window, default);
                 break;
             case SDL.EventType.WindowOccluded:
-                this.OnWindowOccluded(window, e.Window);
+                this.OnWindowOccluded(window, default);
                 break;
             case SDL.EventType.WindowMaximized:
-                this.OnWindowMaximized(window, e.Window);
+                this.OnWindowMaximized(window, default);
                 break;
             case SDL.EventType.WindowMinimized:
-                this.OnWindowMinimized(window, e.Window);
+                this.OnWindowMinimized(window, default);
                 break;
             case SDL.EventType.WindowResized:
-                this.OnWindowResized(window, e.Window);
+                this.OnWindowResized(window, new WindowResizedEventArgs(e.Window.Data1, e.Window.Data2));
                 break;
             case SDL.EventType.WindowRestored:
-                this.OnWindowRestored(window, e.Window);
+                this.OnWindowRestored(window, default);
                 break;
             case SDL.EventType.WindowMouseEnter:
-                this.OnWindowMouseEnter(window, e.Window);
+                this.OnWindowMouseEnter(window, default);
                 break;
             case SDL.EventType.WindowMouseLeave:
-                this.OnWindowMouseLeave(window, e.Window);
+                this.OnWindowMouseLeave(window, default);
                 break;
             case SDL.EventType.WindowMoved:
-                this.OnWindowMoved(window, e.Window);
+                this.OnWindowMoved(window, new WindowMovedEventArgs(e.Window.Data1, e.Window.Data2));
                 break;
             case SDL.EventType.WindowPixelSizeChanged:
-                this.OnWindowPixelSizeChanged(window, e.Window);
+                this.OnWindowPixelSizeChanged(window, new WindowPixelSizeChangedEventArgs(e.Window.Data1, e.Window.Data2));
                 break;
             case SDL.EventType.WindowSafeAreaChanged:
-                this.OnWindowSafeAreaChanged(window, e.Window);
+                this.OnWindowSafeAreaChanged(window, default);
                 break;
             case SDL.EventType.WindowHDRStateChanged:
-                this.OnWindowHDRStateChanged(window, e.Window);
+                this.OnWindowHDRStateChanged(window, default);
                 break;
             case SDL.EventType.WindowHitTest:
-                this.OnWindowHitTest(window, e.Window);
+                this.OnWindowHitTest(window, default);
                 break;
             case SDL.EventType.WindowICCProfChanged:
-                this.OnWindowICCProfChanged(window, e.Window);
+                this.OnWindowICCProfChanged(window, default);
                 break;
             case SDL.EventType.WindowMetalViewResized:
-                this.OnWindowMetalViewResized(window, e.Window);
+                this.OnWindowMetalViewResized(window, new WindowMetalViewResizedEventArgs(e.Window.Data1, e.Window.Data2));
                 break;
 
             case SDL.EventType.MouseButtonDown:
-                this.OnMouseButtonDown(window, e.Button);
+                this.OnMouseButtonDown(window, EventArgsFactory.MouseButton(e.Button));
                 break;
             case SDL.EventType.MouseButtonUp:
-                this.OnMouseButtonUp(window, e.Button);
+                this.OnMouseButtonUp(window, EventArgsFactory.MouseButton(e.Button));
                 break;
             case SDL.EventType.MouseMotion:
-                this.OnMouseMotion(window, e.Motion);
+                this.OnMouseMotion(window, EventArgsFactory.MouseMove(e.Motion));
                 break;
             case SDL.EventType.MouseWheel:
-                this.OnMouseWheel(window, e.Wheel);
+                this.OnMouseWheel(window, EventArgsFactory.MouseWheel(e.Wheel));
                 break;
 
             case SDL.EventType.KeyDown:
-                this.OnKeyDown(window, e.Key);
+                this.OnKeyDown(window, EventArgsFactory.Key(e.Key));
                 break;
             case SDL.EventType.KeyUp:
-                this.OnKeyUp(window, e.Key);
+                this.OnKeyUp(window, EventArgsFactory.Key(e.Key));
                 break;
             case SDL.EventType.TextEditing:
-                this.OnTextEditing(window, e.Edit);
+                this.OnTextEditing(window, EventArgsFactory.TextEditing(e.Edit));
                 break;
             case SDL.EventType.TextInput:
-                this.OnTextInput(window, e.Text);
+                this.OnTextInput(window, EventArgsFactory.TextInput(e.Text));
                 break;
         }
     }
 
     #region Application Events
-    public event ApplicationEventHandler<SDL.QuitEvent>? Quitting;
-    protected virtual void OnQuit(SDL.QuitEvent e) { this.Quitting?.Invoke(this, e); }
+    /// <summary>Raised when the user requests the application to quit.</summary>
+    public event ApplicationEventHandler<QuittingEventArgs>? Quitting;
+    protected virtual void OnQuitting(QuittingEventArgs e) { this.Quitting?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? Terminating;
-    protected virtual void OnTerminating(SDL.CommonEvent e) { this.Terminating?.Invoke(this, e); }
+    /// <summary>Raised when the OS is terminating the application (mobile).</summary>
+    public event ApplicationEventHandler<TerminatingEventArgs>? Terminating;
+    protected virtual void OnTerminating(TerminatingEventArgs e) { this.Terminating?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? LowMemory;
-    protected virtual void OnLowMemory(SDL.CommonEvent e) { this.LowMemory?.Invoke(this, e); }
+    /// <summary>Raised when the OS reports low memory (mobile).</summary>
+    public event ApplicationEventHandler<LowMemoryEventArgs>? LowMemory;
+    protected virtual void OnLowMemory(LowMemoryEventArgs e) { this.LowMemory?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? EnteringBackground;
-    protected virtual void OnEnteringBackground(SDL.CommonEvent e) { this.EnteringBackground?.Invoke(this, e); }
+    /// <summary>Raised when the application is about to enter the background.</summary>
+    public event ApplicationEventHandler<EnteringBackgroundEventArgs>? EnteringBackground;
+    protected virtual void OnEnteringBackground(EnteringBackgroundEventArgs e) { this.EnteringBackground?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? EnteredBackground;
-    protected virtual void OnEnteredBackground(SDL.CommonEvent e) { this.EnteredBackground?.Invoke(this, e); }
+    /// <summary>Raised after the application has entered the background.</summary>
+    public event ApplicationEventHandler<EnteredBackgroundEventArgs>? EnteredBackground;
+    protected virtual void OnEnteredBackground(EnteredBackgroundEventArgs e) { this.EnteredBackground?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? EnteringForeground;
-    protected virtual void OnEnteringForeground(SDL.CommonEvent e) { this.EnteringForeground?.Invoke(this, e); }
+    /// <summary>Raised when the application is about to enter the foreground.</summary>
+    public event ApplicationEventHandler<EnteringForegroundEventArgs>? EnteringForeground;
+    protected virtual void OnEnteringForeground(EnteringForegroundEventArgs e) { this.EnteringForeground?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? EnteredForeground;
-    protected virtual void OnEnteredForeground(SDL.CommonEvent e) { this.EnteredForeground?.Invoke(this, e); }
+    /// <summary>Raised after the application has entered the foreground.</summary>
+    public event ApplicationEventHandler<EnteredForegroundEventArgs>? EnteredForeground;
+    protected virtual void OnEnteredForeground(EnteredForegroundEventArgs e) { this.EnteredForeground?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.CommonEvent>? LocaleChanged;
-    protected virtual void OnLocaleChange(SDL.CommonEvent e) { this.LocaleChanged?.Invoke(this, e); }
+    /// <summary>Raised when the system locale has changed.</summary>
+    public event ApplicationEventHandler<LocaleChangedEventArgs>? LocaleChanged;
+    protected virtual void OnLocaleChanged(LocaleChangedEventArgs e) { this.LocaleChanged?.Invoke(this, e); }
     #endregion
 
     #region Keyboard/Text Events
-    public event WindowEventHandler<SDL.KeyboardEvent>? KeyDown;
-    protected virtual void OnKeyDown(Window window, SDL.KeyboardEvent e) { this.KeyDown?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<KeyEventArgs>? KeyDown;
+    protected virtual void OnKeyDown(Window window, KeyEventArgs e) { this.KeyDown?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.KeyboardEvent>? KeyUp;
-    protected virtual void OnKeyUp(Window window, SDL.KeyboardEvent e) { this.KeyUp?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<KeyEventArgs>? KeyUp;
+    protected virtual void OnKeyUp(Window window, KeyEventArgs e) { this.KeyUp?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.TextEditingEvent>? TextEditing;
-    protected virtual void OnTextEditing(Window window, SDL.TextEditingEvent e) { this.TextEditing?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<TextEditingEventArgs>? TextEditing;
+    protected virtual void OnTextEditing(Window window, TextEditingEventArgs e) { this.TextEditing?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.TextInputEvent>? TextInput;
-    protected virtual void OnTextInput(Window window, SDL.TextInputEvent e) { this.TextInput?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<TextInputEventArgs>? TextInput;
+    protected virtual void OnTextInput(Window window, TextInputEventArgs e) { this.TextInput?.Invoke(this, window, e); }
     #endregion
 
     #region Window Events
-    public event WindowEventHandler<SDL.WindowEvent>? WindowCloseRequested;
-    protected virtual void OnWindowCloseRequested(Window window, SDL.WindowEvent e) { this.WindowCloseRequested?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowCloseRequestedEventArgs>? WindowCloseRequested;
+    protected virtual void OnWindowCloseRequested(Window window, WindowCloseRequestedEventArgs e) { this.WindowCloseRequested?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowDestroyed;
-    protected virtual void OnWindowDestroyed(Window window, SDL.WindowEvent e) { this.WindowDestroyed?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowDestroyedEventArgs>? WindowDestroyed;
+    protected virtual void OnWindowDestroyed(Window window, WindowDestroyedEventArgs e) { this.WindowDestroyed?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowDisplayChanged;
-    protected virtual void OnWindowDisplayChanged(Window window, SDL.WindowEvent e) { this.WindowDisplayChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowDisplayChangedEventArgs>? WindowDisplayChanged;
+    protected virtual void OnWindowDisplayChanged(Window window, WindowDisplayChangedEventArgs e) { this.WindowDisplayChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowDisplayScaleChanged;
-    protected virtual void OnWindowDisplayScaleChanged(Window window, SDL.WindowEvent e) { this.WindowDisplayScaleChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowDisplayScaleChangedEventArgs>? WindowDisplayScaleChanged;
+    protected virtual void OnWindowDisplayScaleChanged(Window window, WindowDisplayScaleChangedEventArgs e) { this.WindowDisplayScaleChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowEnterFullscreen;
-    protected virtual void OnWindowEnterFullscreen(Window window, SDL.WindowEvent e) { this.WindowEnterFullscreen?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowEnterFullscreenEventArgs>? WindowEnterFullscreen;
+    protected virtual void OnWindowEnterFullscreen(Window window, WindowEnterFullscreenEventArgs e) { this.WindowEnterFullscreen?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowLeaveFullscreen;
-    protected virtual void OnWindowLeaveFullscreen(Window window, SDL.WindowEvent e) { this.WindowLeaveFullscreen?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowLeaveFullscreenEventArgs>? WindowLeaveFullscreen;
+    protected virtual void OnWindowLeaveFullscreen(Window window, WindowLeaveFullscreenEventArgs e) { this.WindowLeaveFullscreen?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowFocusGained;
-    protected virtual void OnWindowFocusGained(Window window, SDL.WindowEvent e) { this.WindowFocusGained?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowFocusGainedEventArgs>? WindowFocusGained;
+    protected virtual void OnWindowFocusGained(Window window, WindowFocusGainedEventArgs e) { this.WindowFocusGained?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowFocusLost;
-    protected virtual void OnWindowFocusLost(Window window, SDL.WindowEvent e) { this.WindowFocusLost?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowFocusLostEventArgs>? WindowFocusLost;
+    protected virtual void OnWindowFocusLost(Window window, WindowFocusLostEventArgs e) { this.WindowFocusLost?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowHidden;
-    protected virtual void OnWindowHidden(Window window, SDL.WindowEvent e) { this.WindowHidden?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowHiddenEventArgs>? WindowHidden;
+    protected virtual void OnWindowHidden(Window window, WindowHiddenEventArgs e) { this.WindowHidden?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowShown;
-    protected virtual void OnWindowShown(Window window, SDL.WindowEvent e) { this.WindowShown?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowShownEventArgs>? WindowShown;
+    protected virtual void OnWindowShown(Window window, WindowShownEventArgs e) { this.WindowShown?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowExposed;
-    protected virtual void OnWindowExposed(Window window, SDL.WindowEvent e) { this.WindowExposed?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowExposedEventArgs>? WindowExposed;
+    protected virtual void OnWindowExposed(Window window, WindowExposedEventArgs e) { this.WindowExposed?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowOccluded;
-    protected virtual void OnWindowOccluded(Window window, SDL.WindowEvent e) { this.WindowOccluded?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowOccludedEventArgs>? WindowOccluded;
+    protected virtual void OnWindowOccluded(Window window, WindowOccludedEventArgs e) { this.WindowOccluded?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMaximized;
-    protected virtual void OnWindowMaximized(Window window, SDL.WindowEvent e) { this.WindowMaximized?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMaximizedEventArgs>? WindowMaximized;
+    protected virtual void OnWindowMaximized(Window window, WindowMaximizedEventArgs e) { this.WindowMaximized?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMinimized;
-    protected virtual void OnWindowMinimized(Window window, SDL.WindowEvent e) { this.WindowMinimized?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMinimizedEventArgs>? WindowMinimized;
+    protected virtual void OnWindowMinimized(Window window, WindowMinimizedEventArgs e) { this.WindowMinimized?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowResized;
-    protected virtual void OnWindowResized(Window window, SDL.WindowEvent e) { this.WindowResized?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowResizedEventArgs>? WindowResized;
+    protected virtual void OnWindowResized(Window window, WindowResizedEventArgs e) { this.WindowResized?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowRestored;
-    protected virtual void OnWindowRestored(Window window, SDL.WindowEvent e) { this.WindowRestored?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowRestoredEventArgs>? WindowRestored;
+    protected virtual void OnWindowRestored(Window window, WindowRestoredEventArgs e) { this.WindowRestored?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMouseEnter;
-    protected virtual void OnWindowMouseEnter(Window window, SDL.WindowEvent e) { this.WindowMouseEnter?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMouseEnterEventArgs>? WindowMouseEnter;
+    protected virtual void OnWindowMouseEnter(Window window, WindowMouseEnterEventArgs e) { this.WindowMouseEnter?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMouseLeave;
-    protected virtual void OnWindowMouseLeave(Window window, SDL.WindowEvent e) { this.WindowMouseLeave?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMouseLeaveEventArgs>? WindowMouseLeave;
+    protected virtual void OnWindowMouseLeave(Window window, WindowMouseLeaveEventArgs e) { this.WindowMouseLeave?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMoved;
-    protected virtual void OnWindowMoved(Window window, SDL.WindowEvent e) { this.WindowMoved?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMovedEventArgs>? WindowMoved;
+    protected virtual void OnWindowMoved(Window window, WindowMovedEventArgs e) { this.WindowMoved?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowPixelSizeChanged;
-    protected virtual void OnWindowPixelSizeChanged(Window window, SDL.WindowEvent e) { this.WindowPixelSizeChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowPixelSizeChangedEventArgs>? WindowPixelSizeChanged;
+    protected virtual void OnWindowPixelSizeChanged(Window window, WindowPixelSizeChangedEventArgs e) { this.WindowPixelSizeChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowSafeAreaChanged;
-    protected virtual void OnWindowSafeAreaChanged(Window window, SDL.WindowEvent e) { this.WindowSafeAreaChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowSafeAreaChangedEventArgs>? WindowSafeAreaChanged;
+    protected virtual void OnWindowSafeAreaChanged(Window window, WindowSafeAreaChangedEventArgs e) { this.WindowSafeAreaChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowHDRStateChanged;
-    protected virtual void OnWindowHDRStateChanged(Window window, SDL.WindowEvent e) { this.WindowHDRStateChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowHDRStateChangedEventArgs>? WindowHDRStateChanged;
+    protected virtual void OnWindowHDRStateChanged(Window window, WindowHDRStateChangedEventArgs e) { this.WindowHDRStateChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowHitTest;
-    protected virtual void OnWindowHitTest(Window window, SDL.WindowEvent e) { this.WindowHitTest?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowHitTestEventArgs>? WindowHitTest;
+    protected virtual void OnWindowHitTest(Window window, WindowHitTestEventArgs e) { this.WindowHitTest?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowICCProfChanged;
-    protected virtual void OnWindowICCProfChanged(Window window, SDL.WindowEvent e) { this.WindowICCProfChanged?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowICCProfChangedEventArgs>? WindowICCProfChanged;
+    protected virtual void OnWindowICCProfChanged(Window window, WindowICCProfChangedEventArgs e) { this.WindowICCProfChanged?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.WindowEvent>? WindowMetalViewResized;
-    protected virtual void OnWindowMetalViewResized(Window window, SDL.WindowEvent e) { this.WindowMetalViewResized?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<WindowMetalViewResizedEventArgs>? WindowMetalViewResized;
+    protected virtual void OnWindowMetalViewResized(Window window, WindowMetalViewResizedEventArgs e) { this.WindowMetalViewResized?.Invoke(this, window, e); }
     #endregion
 
     #region Mouse Events
 
-    public event ApplicationEventHandler<SDL.MouseDeviceEvent>? MouseDeviceAdded;
-    protected virtual void OnMouseDeviceAdded(SDL.MouseDeviceEvent e) { this.MouseDeviceAdded?.Invoke(this, e); }
+    public event ApplicationEventHandler<MouseDeviceEventArgs>? MouseDeviceAdded;
+    protected virtual void OnMouseDeviceAdded(MouseDeviceEventArgs e) { this.MouseDeviceAdded?.Invoke(this, e); }
 
-    public event ApplicationEventHandler<SDL.MouseDeviceEvent>? MouseDeviceRemoved;
-    protected virtual void OnMouseDeviceRemoved(SDL.MouseDeviceEvent e) { this.MouseDeviceRemoved?.Invoke(this, e); }
+    public event ApplicationEventHandler<MouseDeviceEventArgs>? MouseDeviceRemoved;
+    protected virtual void OnMouseDeviceRemoved(MouseDeviceEventArgs e) { this.MouseDeviceRemoved?.Invoke(this, e); }
 
-    public event WindowEventHandler<SDL.MouseMotionEvent>? MouseMotion;
-    protected virtual void OnMouseMotion(Window window, SDL.MouseMotionEvent e) { this.MouseMotion?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<MouseMoveEventArgs>? MouseMotion;
+    protected virtual void OnMouseMotion(Window window, MouseMoveEventArgs e) { this.MouseMotion?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.MouseButtonEvent>? MouseButtonDown;
-    protected virtual void OnMouseButtonDown(Window window, SDL.MouseButtonEvent e) { this.MouseButtonDown?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<MouseButtonEventArgs>? MouseButtonDown;
+    protected virtual void OnMouseButtonDown(Window window, MouseButtonEventArgs e) { this.MouseButtonDown?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.MouseButtonEvent>? MouseButtonUp;
-    protected virtual void OnMouseButtonUp(Window window, SDL.MouseButtonEvent e) { this.MouseButtonUp?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<MouseButtonEventArgs>? MouseButtonUp;
+    protected virtual void OnMouseButtonUp(Window window, MouseButtonEventArgs e) { this.MouseButtonUp?.Invoke(this, window, e); }
 
-    public event WindowEventHandler<SDL.MouseWheelEvent>? MouseWheel;
-    protected virtual void OnMouseWheel(Window window, SDL.MouseWheelEvent e) { this.MouseWheel?.Invoke(window, e); }
+    public event ApplicationWindowEventHandler<MouseWheelEventArgs>? MouseWheel;
+    protected virtual void OnMouseWheel(Window window, MouseWheelEventArgs e) { this.MouseWheel?.Invoke(this, window, e); }
     #endregion
 
     #endregion
 }
 
-public delegate void ApplicationEventHandler<T>(Application sender, T context);
-public delegate void WindowEventHandler<T>(Window sender, T context);
+/// <summary>
+/// Handler for application-wide events that have no associated window.
+/// </summary>
+public delegate void ApplicationEventHandler<T>(Application sender, T args);
+
+/// <summary>
+/// Handler for window-targeted events raised at the application level.
+/// </summary>
+public delegate void ApplicationWindowEventHandler<T>(Application sender, Window window, T args);
+
+/// <summary>
+/// Handler for window-targeted events raised by a single window.
+/// </summary>
+public delegate void WindowEventHandler<T>(Window sender, T args);
+
+// Application-only event arg records. Currently empty markers; signatures are
+// stable so payload can be added later without breaking handlers.
+public readonly record struct QuittingEventArgs;
+public readonly record struct TerminatingEventArgs;
+public readonly record struct LowMemoryEventArgs;
+public readonly record struct EnteringBackgroundEventArgs;
+public readonly record struct EnteredBackgroundEventArgs;
+public readonly record struct EnteringForegroundEventArgs;
+public readonly record struct EnteredForegroundEventArgs;
+public readonly record struct LocaleChangedEventArgs;
+
+/// <summary>
+/// A mouse device was added or removed at the application level.
+/// </summary>
+/// <param name="MouseId">The instance id of the mouse that was added or removed.</param>
+public readonly record struct MouseDeviceEventArgs(uint MouseId);
