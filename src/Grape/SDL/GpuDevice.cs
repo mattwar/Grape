@@ -23,6 +23,9 @@ internal sealed class GpuDevice : IDisposable
         // Make sure the SDL video subsystem is up before asking for a GPU
         // device. Touching Application.Current starts it on demand.
         _ = Application.Current;
+        if (!SDL.InitSubSystem(SDL.InitFlags.Video))
+            throw new InvalidOperationException(
+                $"Failed to initialize SDL video subsystem: {SDL.GetError()}");
 
         var id = SDL.CreateGPUDevice(format, debugMode, name);
         if (id == 0)

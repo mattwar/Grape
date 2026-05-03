@@ -13,7 +13,7 @@ public abstract class Window : IDisposable
     private Properties? _properties;
     private Image? _icon;
 
-    protected Window(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    protected Window(int width, int height, WindowFlags flags = WindowFlags.None)
     {
         _window = 0;
 
@@ -23,15 +23,24 @@ public abstract class Window : IDisposable
         // make sure that window is created on the application thread.
         app.Send(_ =>
         {
-            _window = SDL.CreateWindow("", width, height, flags);
+            // Bring up the video subsystem the first time a window is created.
+            // SDL refcounts subsystem init so calling this repeatedly is fine.
+            if (!SDL.InitSubSystem(SDL.InitFlags.Video))
+                throw new InvalidOperationException(
+                    $"Failed to initialize SDL video subsystem: {SDL.GetError()}");
+
+            // Windows are resizable by default. Anything else can be toggled
+            // via properties after creation.
+            var sdlFlags = (SDL.WindowFlags)flags | SDL.WindowFlags.Resizable;
+            _window = SDL.CreateWindow("", width, height, sdlFlags);
             this.EventId = SDL.GetWindowID(_window);
             Application.Current.AddWindow(this);
             OnWindowCreated();
         });
     }
 
-    protected Window(SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
-        : this(100, 100)
+    protected Window(WindowFlags flags = WindowFlags.None)
+        : this(100, 100, flags)
     {
     }
 
@@ -172,28 +181,41 @@ public abstract class Window : IDisposable
     public int CreateHeight => (int)this.Properties.GetNumberProperty(SDL.Props.WindowCreateHeightNumber);
 
     /// <summary>
-    /// The current <see cref="WindowFlags"/> of the window.
+    /// The creation-time <see cref="WindowFlags"/> of this window. Reflects
+    /// only flags that cannot change after creation; runtime state is
+    /// available through individual properties.
     /// </summary>
-    public SDL.WindowFlags Flags
+    public WindowFlags Flags
     {
         get
         {
             if (IsDisposed)
-                return 0;
-            return SDL.GetWindowFlags(_window);
+                return WindowFlags.None;
+            const ulong creationMask =
+                (ulong)WindowFlags.OpenGL
+                | (ulong)WindowFlags.External
+                | (ulong)WindowFlags.HighPixelDensity
+                | (ulong)WindowFlags.Utility
+                | (ulong)WindowFlags.Tooltip
+                | (ulong)WindowFlags.PopupMenu
+                | (ulong)WindowFlags.FillDocument
+                | (ulong)WindowFlags.Vulkan
+                | (ulong)WindowFlags.Metal
+                | (ulong)WindowFlags.Transparent;
+            return (WindowFlags)((ulong)SDL.GetWindowFlags(_window) & creationMask);
         }
     }
 
     /// <summary>
-    /// True if the window is currently focusable.
+    /// True if the window can currently receive keyboard focus.
     /// </summary>
     public bool Focusable
     {
-        get 
+        get
         {
             if (IsDisposed)
                 return false;
-            return (Flags & SDL.WindowFlags.NotFocusable) == 0;
+            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.NotFocusable) == 0;
         }
         set
         {
@@ -224,7 +246,7 @@ public abstract class Window : IDisposable
     }
 
     /// <summary>
-    /// True if the window has a border
+    /// True if the window has a border.
     /// </summary>
     public bool Bordered
     {
@@ -232,7 +254,7 @@ public abstract class Window : IDisposable
         {
             if (IsDisposed)
                 return false;
-            return (Flags & SDL.WindowFlags.Borderless) == 0;
+            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Borderless) == 0;
         }
         set
         {
@@ -241,6 +263,132 @@ public abstract class Window : IDisposable
             SDL.SetWindowBordered(_window, value);
         }
     }
+
+    /// <summary>True if the window can be resized by the user.</summary>
+    public bool Resizable
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Resizable) != 0;
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowResizable(_window, value);
+        }
+    }
+
+    /// <summary>True if the window stays above all other windows.</summary>
+    public bool AlwaysOnTop
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.AlwaysOnTop) != 0;
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowAlwaysOnTop(_window, value);
+        }
+    }
+
+    /// <summary>True if the window has captured the mouse cursor.</summary>
+    public bool MouseGrabbed
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return SDL.GetWindowMouseGrab(_window);
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowMouseGrab(_window, value);
+        }
+    }
+
+    /// <summary>True if the window has grabbed keyboard input.</summary>
+    public bool KeyboardGrabbed
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return SDL.GetWindowKeyboardGrab(_window);
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowKeyboardGrab(_window, value);
+        }
+    }
+
+    /// <summary>True if the window is in relative mouse mode.</summary>
+    public bool RelativeMouseMode
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return SDL.GetWindowRelativeMouseMode(_window);
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowRelativeMouseMode(_window, value);
+        }
+    }
+
+    /// <summary>True if the window is currently modal to its parent.</summary>
+    public bool Modal
+    {
+        get
+        {
+            if (IsDisposed)
+                return false;
+            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Modal) != 0;
+        }
+        set
+        {
+            if (IsDisposed)
+                return;
+            SDL.SetWindowModal(_window, value);
+        }
+    }
+
+    /// <summary>True if the window is currently hidden.</summary>
+    public bool IsHidden =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Hidden) != 0;
+
+    /// <summary>True if the window is currently minimized.</summary>
+    public bool IsMinimized =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Minimized) != 0;
+
+    /// <summary>True if the window is currently maximized.</summary>
+    public bool IsMaximized =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Maximized) != 0;
+
+    /// <summary>True if the window is currently occluded.</summary>
+    public bool IsOccluded =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Occluded) != 0;
+
+    /// <summary>True if the window currently has keyboard input focus.</summary>
+    public bool HasInputFocus =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.InputFocus) != 0;
+
+    /// <summary>True if the window currently has mouse focus.</summary>
+    public bool HasMouseFocus =>
+        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.MouseFocus) != 0;
 
     /// <summary>
     /// The size of the window borders in pixels.
@@ -434,6 +582,55 @@ public abstract class Window : IDisposable
             SDL.SetWindowTitle(_window, value);
         }
     }
+    #endregion
+
+    #region Window state methods
+
+    /// <summary>Shows the window if it was hidden.</summary>
+    public void Show()
+    {
+        if (IsDisposed) return;
+        SDL.ShowWindow(_window);
+    }
+
+    /// <summary>Hides the window without destroying it.</summary>
+    public void Hide()
+    {
+        if (IsDisposed) return;
+        SDL.HideWindow(_window);
+    }
+
+    /// <summary>Minimizes the window to the taskbar/dock.</summary>
+    public void Minimize()
+    {
+        if (IsDisposed) return;
+        SDL.MinimizeWindow(_window);
+    }
+
+    /// <summary>Maximizes the window to fill its display.</summary>
+    public void Maximize()
+    {
+        if (IsDisposed) return;
+        SDL.MaximizeWindow(_window);
+    }
+
+    /// <summary>
+    /// Restores the window from a minimized or maximized state to its
+    /// previous size and position.
+    /// </summary>
+    public void Restore()
+    {
+        if (IsDisposed) return;
+        SDL.RestoreWindow(_window);
+    }
+
+    /// <summary>Brings the window above other windows and gives it focus.</summary>
+    public void Raise()
+    {
+        if (IsDisposed) return;
+        SDL.RaiseWindow(_window);
+    }
+
     #endregion
 
     #region Rendering

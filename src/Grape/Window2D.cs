@@ -7,12 +7,12 @@ public class Window2D : Window
 {
     private Renderer2D _renderer = null!;
 
-    public Window2D(int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    public Window2D(int width, int height, WindowFlags flags = WindowFlags.None)
         : base(width, height, flags)
     {
     }
 
-    public Window2D(SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    public Window2D(WindowFlags flags = WindowFlags.None)
         : base(flags)
     {
     }

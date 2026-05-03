@@ -11,23 +11,26 @@ public class Application : IDisposable
     private bool _disposed;
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
 
-    private const SDL.InitFlags DefaultFlags = SDL.InitFlags.Video | SDL.InitFlags.Audio;
-
-    public Application(SDL.InitFlags flags = DefaultFlags)
+    public Application()
     {
         if (_current != null)
             throw new InvalidOperationException("An instance of Application already exists.");
-        if (!SDL.Init(flags))
+        // Initialize only the Events subsystem here. Other subsystems are
+        // brought up lazily by the types that need them (Window -> Video,
+        // Audio -> Audio, Gamepad -> Gamepad, etc). SDL's subsystem init is
+        // ref-counted, so calling InitSubSystem from many places is safe.
+        if (!SDL.Init(SDL.InitFlags.Events))
             throw new InvalidOperationException($"Failed to initialize SDL: {SDL.GetError()}");
         _current = this;
         this.Thread = Thread.CurrentThread;
     }
 
     /// <summary>
-    /// The current running application. Accessing this property will
-    /// start the application (with default init flags) if one is not
-    /// already running. To start with non-default flags, call
-    /// <see cref="Start(SDL.InitFlags)"/> explicitly first.
+    /// The current running application. Accessing this property will start
+    /// the application if one is not already running. Subsystems beyond
+    /// the basic event loop are initialized lazily on first use of the
+    /// types that need them (creating a <see cref="Window"/> brings up
+    /// video, touching <see cref="Audio"/> brings up audio, and so on).
     /// </summary>
     public static Application Current => _current ??= Start();
 
@@ -128,7 +131,7 @@ public class Application : IDisposable
     /// <summary>
     /// Starts the application event loop running on a new thread.
     /// </summary>
-    public static Application Start(SDL.InitFlags flags = DefaultFlags)
+    public static Application Start()
     {
         var application = _current;
 
@@ -137,7 +140,7 @@ public class Application : IDisposable
             var tcs = new TaskCompletionSource<Application>();
             var appThread = new Thread(_ =>
             {
-                application = new Application(flags);
+                application = new Application();
                 application.Run(() => tcs.SetResult(application));
                 application.Dispose();
             });

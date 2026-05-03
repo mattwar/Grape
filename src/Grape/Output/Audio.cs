@@ -6,10 +6,24 @@ namespace Grape;
 public static class Audio
 {
     /// <summary>
+    /// Ensures the application is running and the SDL audio subsystem is
+    /// initialized. Safe to call from any audio entry point; SDL ref-counts
+    /// subsystem init so repeated calls are cheap.
+    /// </summary>
+    private static void EnsureInit()
+    {
+        _ = Application.Current;
+        if (!SDL.InitSubSystem(SDL.InitFlags.Audio))
+            throw new InvalidOperationException(
+                $"Failed to initialize SDL audio subsystem: {SDL.GetError()}");
+    }
+
+    /// <summary>
     /// Plays the audio data on the default playback device.
     /// </summary>
     public static Task Play(AudioData data, float volume = 1f)
     {
+        EnsureInit();
         return AudioPlaybackDevice.Default.Play(data, volume);
     }
 
@@ -34,6 +48,7 @@ public static class Audio
     {
         get
         {
+            EnsureInit();
             var devices = _playbackDevices;
             if (devices == null)
             {
@@ -63,6 +78,7 @@ public static class Audio
     {
         get
         {
+            EnsureInit();
             var devices = _recordingDevices;
             if (devices == null)
             {
@@ -84,8 +100,14 @@ public static class Audio
     /// <summary>
     /// The name of the current audio driver.
     /// </summary>
-    public static string CurrentDriver =>
-        SDL.GetCurrentAudioDriver() ?? "";
+    public static string CurrentDriver
+    {
+        get
+        {
+            EnsureInit();
+            return SDL.GetCurrentAudioDriver() ?? "";
+        }
+    }
 
     /// <summary>
     /// The names of all built-in audio drivers.
@@ -94,6 +116,7 @@ public static class Audio
     {
         get
         {
+            EnsureInit();
             var driverNames = _driverNames;
             if (driverNames == null)
             {
