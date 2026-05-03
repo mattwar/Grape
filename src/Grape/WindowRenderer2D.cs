@@ -7,13 +7,13 @@ using static SDL3.SDL;
 
 namespace Grape;
 
-public sealed class Renderer2D : IDisposable
+public sealed class WindowRenderer2D : Renderer2D, IDisposable
 {
     private readonly Window2D _window;
     private readonly string _name;
     private nint _rendererId;
 
-    internal Renderer2D(Window2D window, nint rendererId, string? name)
+    internal WindowRenderer2D(Window2D window, nint rendererId, string? name)
     {
         _window = window;
         _name = name ?? "";
@@ -24,19 +24,19 @@ public sealed class Renderer2D : IDisposable
     /// Creates a renderer for this window.
     /// The window already has a default renderer created when the window is created.
     /// </summary>
-    internal static Renderer2D Create(Window2D window, string? name = null)
+    internal static WindowRenderer2D Create(Window2D window, string? name = null)
     {
         var rendererId = SDL.CreateRenderer(window.WindowId, name);
-        return new Renderer2D(window, rendererId, name);
+        return new WindowRenderer2D(window, rendererId, name);
     }
 
     /// <summary>
     /// Creates a window gpu renderer with the specified shader format.
     /// </summary>
-    internal static Renderer2D Create(Window2D window, SDL.GPUShaderFormat format)
+    internal static WindowRenderer2D Create(Window2D window, SDL.GPUShaderFormat format)
     {
         var rendererId = SDL.CreateGPURenderer(window.WindowId, format, out var gpuDeviceId);
-        return new Renderer2D(window, rendererId, null);
+        return new WindowRenderer2D(window, rendererId, null);
     }
 
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
@@ -52,7 +52,7 @@ public sealed class Renderer2D : IDisposable
     }
 
     /// <summary>
-    /// True if this <see cref="Renderer2D"/> has been disposed.
+    /// True if this <see cref="WindowRenderer2D"/> has been disposed.
     /// </summary>
     public bool IsDisposed => _rendererId == 0;
 
@@ -63,7 +63,7 @@ public sealed class Renderer2D : IDisposable
     }
 
     /// <summary>
-    /// Disposes this <see cref="Renderer2D"/>, releasing its resources.
+    /// Disposes this <see cref="WindowRenderer2D"/>, releasing its resources.
     /// </summary>
     public void Dispose()
     {
@@ -86,7 +86,7 @@ public sealed class Renderer2D : IDisposable
     #region Properties
 
     /// <summary>
-    /// The <see cref="Window"/> this <see cref="Renderer2D"/> renders to.
+    /// The <see cref="Window"/> this <see cref="WindowRenderer2D"/> renders to.
     /// </summary>
     public Window Window => _window;
 
@@ -116,7 +116,7 @@ public sealed class Renderer2D : IDisposable
     /// <remarks>The clipping rectangle restricts rendering to the specified area. Any drawing operations
     /// outside this rectangle will be ignored. To disable clipping, set the rectangle to <see langword="null"/> or an
     /// empty rectangle.</remarks>
-    public Rect ClipRect
+    public override Rect ClipRect
     {
         get
         {
@@ -137,7 +137,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The current scaling factor used for drawing operations.
     /// </summary>
-    public float ColorScale
+    public override float ColorScale
     {
         get
         {
@@ -177,7 +177,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The current draw color.
     /// </summary>
-    public Color DrawColor
+    public override Color DrawColor
     {
         get
         {
@@ -237,7 +237,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Gets the logical representation rectangle based on the presentation mode and output size.
     /// </summary>
-    public Rect LogicalRepresentationRect
+    public override Rect LogicalRepresentationRect
     {
         get
         {
@@ -256,7 +256,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The output size in pixels.
     /// </summary>
-    public (int Width, int Height) OutputSize
+    public override (int Width, int Height) OutputSize
     {
         get
         {
@@ -270,7 +270,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The rendering scale
     /// </summary>
-    public (float ScaleX, float ScaleY) Scale
+    public override (float ScaleX, float ScaleY) Scale
     {
         get
         {
@@ -290,7 +290,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// The portion of the rendering target where drawing operations are performed.
     /// </summary>
-    public Rect ViewPort
+    public override Rect ViewPort
     {
         get
         {
@@ -340,7 +340,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Fills the current rendering target with the <see cref="DrawColor"/>.
     /// </summary>
-    public void Clear()
+    public override void Clear()
     {
         if (IsDisposed)
             return;
@@ -363,7 +363,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Draws debug text at the specified coordinates.
     /// </summary>
-    public bool RenderDebugText(int x, int y, string text, float scale = 0f)
+    public override bool RenderDebugText(int x, int y, string text, float scale = 0f)
     {
         if (IsDisposed)
             return false;
@@ -393,51 +393,12 @@ public sealed class Renderer2D : IDisposable
     }
 
     /// <summary>
-    /// Renders the entire <see cref="Texture"/> the the destination in the window.
-    /// </summary>
-    private bool RenderTexture(Texture texture, SDL.FRect destination)
-    {
-        var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height};
-        return RenderTexture(texture, source, destination);
-    }
-
-    /// <summary>
-    /// Renders the entire <see cref="Texture"/> to the location.
-    /// </summary>
-    private bool RenderTexture(Texture texture, float x, float y, float scale = 1.0f)
-    {
-        var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
-        var dest = new SDL.FRect { X = x, Y = y, W = texture.Size.Width * scale, H = texture.Size.Height * scale };
-        return RenderTexture(texture, source, dest);
-    }
-
-    /// <summary>
     /// Renders a portion of the <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
     /// </summary>
     private bool RenderTextureRotated(Texture texture, SDL.FRect source, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
     {
         if (IsDisposed)
             return false;
-        return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
-    }
-
-    /// <summary>
-    /// Renders the entire <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
-    /// </summary>
-    private bool RenderTextureRotated(Texture texture, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
-    {
-        var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
-        return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
-    }
-
-    /// <summary>
-    /// Renders the entire <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
-    /// </summary>
-    private bool RenderTextureRotated(Texture texture, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, SDL.FlipMode flip = SDL.FlipMode.None)
-    {
-        var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
-        var destination = new SDL.FRect { X = x, Y = y, W = texture.Size.Width * scale, H = texture.Size.Height * scale };
-        var center = new SDL.FPoint { X = centerX * scale, Y = centerY * scale };
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
     }
 
@@ -478,7 +439,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the portion of the <see cref="Image"/> to the destination in the window.
     /// </summary>
-    public bool RenderImage(Image image, Rect source, Rect destination)
+    public override bool RenderImage(Image image, Rect source, Rect destination)
     {
         if (IsDisposed)
             return false;
@@ -489,35 +450,7 @@ public sealed class Renderer2D : IDisposable
         return RenderTexture(texture, source, destination);
     }
 
-    /// <summary>
-    /// Renders the entire <see cref="Image"/> to the destination in the window.
-    /// </summary>
-    public bool RenderImage(Image image, Rect destination)
-    {
-        if (IsDisposed)
-            return false;
-
-        if (!TryGetOrCreateTexture(image, out var texture))
-            return false;
-
-        return RenderTexture(texture, destination);
-    }
-
-    /// <summary>
-    /// Renders the entire <see cref="Image"/> to the location in the window.
-    /// </summary>
-    public bool RenderImage(Image image, float x, float y, float scale = 1.0f)
-    {
-        if (IsDisposed)
-            return false;
-
-        if (!TryGetOrCreateTexture(image, out var texture))
-            return false;
-
-        return RenderTexture(texture, x, y, scale);
-    }
-
-    public bool RenderImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
+    public override bool RenderImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
@@ -527,32 +460,13 @@ public sealed class Renderer2D : IDisposable
         return RenderTextureRotated(texture, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
     }
 
-    public bool RenderImageRotated(Image image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
-    {
-        if (IsDisposed)
-            return false;
-        if (!TryGetOrCreateTexture(image, out var texture))
-            return false;
-        var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
-        return RenderTextureRotated(texture, destination, angle, sdlCenter, (SDL.FlipMode)flip);
-    }
-
-    public bool RenderImageRotated(Image image, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, FlipMode flip = FlipMode.None)
-    {
-        if (IsDisposed)
-            return false;
-        if (!TryGetOrCreateTexture(image, out var texture))
-            return false;
-        return RenderTextureRotated(texture, x, y, angle, centerX, centerY, scale, (SDL.FlipMode)flip);
-    }
-
-    public bool RenderFillRect(Rect rect)
+    public override bool RenderFillRect(Rect rect)
     {
         SDL.FRect r = rect;
         return SDL.RenderFillRect(_rendererId, r);
     }
 
-    public bool RenderFillRects(Rect[] rects)
+    public override bool RenderFillRects(ReadOnlySpan<Rect> rects)
     {
         unsafe
         {
@@ -566,7 +480,7 @@ public sealed class Renderer2D : IDisposable
     /// <paramref name="indices"/>, optionally sampling from
     /// <paramref name="image"/>.
     /// </summary>
-    public bool RenderGeometry(Vertex2D[] vertices, int[] indices, Image? image = null)
+    public override bool RenderGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Image? image = null)
     {
         var texture = image == null ? null
             : TryGetOrCreateTexture(image!, out var txt) ? txt
@@ -586,12 +500,12 @@ public sealed class Renderer2D : IDisposable
         }
     }
 
-    public bool RenderLine(float x1, float y1, float x2, float y2)
+    public override bool RenderLine(float x1, float y1, float x2, float y2)
     {
         return SDL.RenderLine(_rendererId, x1, y1, x2, y2);
     }
 
-    public bool RenderLines(Vector2[] points)
+    public override bool RenderLines(ReadOnlySpan<Vector2> points)
     {
         unsafe
         {
@@ -600,12 +514,12 @@ public sealed class Renderer2D : IDisposable
         }
     }
 
-    public bool RenderPoint(float x, float y)
+    public override bool RenderPoint(float x, float y)
     {
         return SDL.RenderPoint(_rendererId, x, y);
     }
 
-    public bool RenderPoints(Vector2[] points)
+    public override bool RenderPoints(ReadOnlySpan<Vector2> points)
     {
         unsafe
         {

@@ -6,7 +6,7 @@ using System.Numerics;
 namespace Grape;
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
-public sealed class Renderer3D : IDisposable
+public sealed class WindowRenderer3D : Renderer3D, IDisposable
 {
     /// <summary>
     /// Number of frames a cached mesh or texture upload may go unused
@@ -43,7 +43,7 @@ public sealed class Renderer3D : IDisposable
     private SDL.GPUTextureFormat _colorFormat;
     private SDL.FColor _clearColor;
 
-    internal Renderer3D(GpuDevice device)
+    internal WindowRenderer3D(GpuDevice device)
     {
         _device = device;
     }
@@ -56,7 +56,7 @@ public sealed class Renderer3D : IDisposable
     /// <summary>
     /// Lazy access to the precompiled shaders bundled with Grape.
     /// </summary>
-    public BuiltInShaders Shaders => _shaders ??= new BuiltInShaders(_device);
+    public override BuiltInShaders Shaders => _shaders ??= new BuiltInShaders(_device);
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
@@ -117,8 +117,7 @@ public sealed class Renderer3D : IDisposable
     /// The vertex type of the mesh and the shader must match. The mesh's
     /// vertex layout must also match the shader's expected vertex layout.
     /// </remarks>
-    public void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader, Matrix4x4? transform = null)
-        where TVertex : unmanaged
+    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader, Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -144,8 +143,7 @@ public sealed class Renderer3D : IDisposable
     /// resources are released once you stop using it (either when the array
     /// is collected, or after a short idle period).
     /// </remarks>
-    public void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null, int? vertexCount = null)
-        where TVertex : unmanaged
+    public override void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null, int? vertexCount = null)
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
@@ -166,8 +164,7 @@ public sealed class Renderer3D : IDisposable
     /// over the same underlying array) on later frames reuses the cached
     /// GPU buffer with no re-upload, since immutable arrays cannot change.
     /// </summary>
-    public void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
-        where TVertex : unmanaged
+    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(shader);
         if (vertices.IsDefault)
@@ -187,7 +184,7 @@ public sealed class Renderer3D : IDisposable
     /// passing the same <see cref="Image"/> instance on later frames reuses
     /// the upload.
     /// </remarks>
-    public void RenderTexturedMesh(
+    public override void RenderTexturedMesh(
         Mesh<TextureVertex3D> mesh,
         Shader<TextureVertex3D> shader,
         Image texture,
@@ -211,7 +208,7 @@ public sealed class Renderer3D : IDisposable
     /// <see cref="RenderMesh{TVertex}(TVertex[], Shader{TVertex}, Matrix4x4?)"/>
     /// for caching semantics.
     /// </summary>
-    public void RenderTexturedMesh(
+    public override void RenderTexturedMesh(
         TextureVertex3D[] vertices,
         Shader<TextureVertex3D> shader,
         Image texture,
@@ -254,7 +251,7 @@ public sealed class Renderer3D : IDisposable
     /// <see cref="RenderMesh{TVertex}(ImmutableArray{TVertex}, Shader{TVertex}, Matrix4x4?)"/>
     /// for caching semantics.
     /// </summary>
-    public void RenderTexturedMesh(
+    public override void RenderTexturedMesh(
         ImmutableArray<TextureVertex3D> vertices,
         Shader<TextureVertex3D> shader,
         Image texture,
@@ -288,7 +285,7 @@ public sealed class Renderer3D : IDisposable
     /// <param name="transform">World-space transform applied to the text
     /// mesh. The mesh occupies (0..text.Length) along X and (0..1) along Y
     /// in local model space; X advances one unit per character, Y goes up.</param>
-    public void RenderDebugText(string text, Matrix4x4 transform)
+    public override void RenderDebugText(string text, Matrix4x4 transform)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length == 0)

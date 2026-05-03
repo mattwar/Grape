@@ -6,7 +6,7 @@ namespace Grape;
 public class Window3D : Window
 {
     private readonly GpuDevice _device;
-    private Renderer3D? _renderer;
+    private WindowRenderer3D? _renderer;
     private bool _claimed;
 
     internal Window3D(GpuDevice device, int width, int height, WindowFlags flags = WindowFlags.None)
@@ -67,7 +67,7 @@ public class Window3D : Window
         // so _device hasn't been assigned yet at that point.
         if (_renderer is null)
         {
-            _renderer = new Renderer3D(_device);
+            _renderer = new WindowRenderer3D(_device);
             _claimed = SDL.ClaimWindowForGPUDevice(_device.GpuDeviceID, this.WindowId);
             if (!_claimed)
                 throw new InvalidOperationException(

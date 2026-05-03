@@ -5,7 +5,7 @@ namespace Grape;
 /// </summary>
 public class Window2D : Window
 {
-    private Renderer2D _renderer = null!;
+    private WindowRenderer2D _renderer = null!;
 
     public Window2D(int width, int height, WindowFlags flags = WindowFlags.None)
         : base(width, height, flags)
@@ -17,14 +17,9 @@ public class Window2D : Window
     {
     }
 
-    /// <summary>
-    /// Exposed for extensions to access
-    /// </summary>
-    internal Renderer2D Renderer => _renderer;
-
     protected override void OnWindowCreated()
     {
-        _renderer = Renderer2D.Create(this);
+        _renderer = WindowRenderer2D.Create(this);
     }
 
     /// <summary>
