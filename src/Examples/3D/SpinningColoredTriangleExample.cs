@@ -29,7 +29,7 @@ internal static class SpinningColoredTriangleExample
                 Application.Current.Dispose();
         };
 
-        window.Rendering3D += (_, renderer) =>
+        window.Rendering += (_, renderer) =>
         {
             var seconds = (float)(DateTime.UtcNow - startTime).TotalSeconds;
             var (w, h) = window.Size;

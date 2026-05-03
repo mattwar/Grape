@@ -21,11 +21,6 @@ internal static class AnimatedSineRibbonExample
         // Two triangles per segment, six vertices each.
         var vertices = new ColorVertex3D[Segments * 6];
 
-        // Start with empty data; the first frame will Reset() with real values.
-        var ribbon = new ColoredMesh(
-            vertices: ReadOnlySpan<ColorVertex3D>.Empty,
-            indices: ReadOnlySpan<uint>.Empty);
-
         var window = new Window3D(800, 600)
         {
             Title = "Animated Sine Ribbon",
@@ -40,7 +35,7 @@ internal static class AnimatedSineRibbonExample
                 Application.Current.Dispose();
         };
 
-        window.Rendering3D += (_, renderer) =>
+        window.Rendering += (_, renderer) =>
         {
             var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;
 
@@ -72,13 +67,12 @@ internal static class AnimatedSineRibbonExample
                 vertices[v + 5] = topRight;
             }
 
-            ribbon.Reset(vertices, ReadOnlySpan<uint>.Empty);
-
             var (w, h) = window.Size;
             var aspect = (float)h / w;
             var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-            renderer.RenderMesh(ribbon, renderer.Shaders.PositionColorTransform, transform);
+            // reuse same array with different vertex data each frame
+            renderer.RenderMesh(vertices, renderer.Shaders.PositionColorTransform, transform);
         };
 
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));

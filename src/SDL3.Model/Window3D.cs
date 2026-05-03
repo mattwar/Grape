@@ -51,11 +51,11 @@ public class Window3D : Window
     /// <summary>
     /// Occurs when the window is rendering a frame using the GPU pipeline.
     /// </summary>
-    public event WindowEventHandler<Renderer3D>? Rendering3D;
+    public event WindowEventHandler<Renderer3D>? Rendering;
 
-    public virtual void OnRendering3D(Renderer3D renderer)
+    public virtual void OnRendering(Renderer3D renderer)
     {
-        this.Rendering3D?.Invoke(this, renderer);
+        this.Rendering?.Invoke(this, renderer);
     }
 
     protected override void DoRender()
@@ -78,7 +78,7 @@ public class Window3D : Window
         if (_claimed)
         {
             _renderer.BeginFrame(this);
-            OnRendering3D(_renderer);
+            OnRendering(_renderer);
             _renderer.Present();
         }
     }

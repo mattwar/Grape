@@ -45,9 +45,8 @@ public sealed class BuiltInShaders
             ColoredMesh.VertexLayout);
 
     /// <summary>
-    /// Draws each vertex at its position with its baked color, transforming
-    /// the position by a 4x4 model-view-projection matrix supplied as a
-    /// vertex uniform.
+    /// Draws each vertex at its position with its color, transforming
+    /// the position by a 4x4 model-view-projection matrix.
     /// </summary>
     public Shader<ColorVertex3D> PositionColorTransform =>
         _positionColorTransform ??= new Shader<ColorVertex3D>(
@@ -69,8 +68,8 @@ public sealed class BuiltInShaders
 
     /// <summary>
     /// Draws each vertex at its position transformed by a 4x4
-    /// model-view-projection matrix supplied as a vertex uniform, sampling
-    /// the bound texture using the vertex texture coordinate.
+    /// model-view-projection matrix, sampling the bound texture using the
+    /// vertex texture coordinate.
     /// </summary>
     public Shader<TextureVertex3D> TexturedQuadWithMatrix =>
         _texturedQuadWithMatrix ??= new Shader<TextureVertex3D>(

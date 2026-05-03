@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Numerics;
 
@@ -71,6 +72,11 @@ public sealed class Renderer3D : IDisposable
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly List<DrawCommand> _commands = new();
+    // Maps caller-owned vertex arrays to the renderer-owned Mesh that wraps
+    // them. Lifetime is tied to the array reference: when the user drops
+    // their array, the mesh becomes collectible, the renderer's weak ref
+    // goes empty, and SweepCaches() disposes the GPU buffer.
+    private readonly ConditionalWeakTable<Array, Mesh> _arrayMeshCache = new();
     private BuiltInShaders? _shaders;
     private GpuSampler? _defaultSampler;
     private long _frameNumber;
@@ -169,6 +175,48 @@ public sealed class Renderer3D : IDisposable
     }
 
     /// <summary>
+    /// Draws a mesh using the given shader, sourcing vertex data directly
+    /// from a caller-owned array. The renderer keeps a weak association
+    /// between the array reference and an internal <see cref="Mesh{TVertex}"/>;
+    /// passing the same array on later frames reuses the cached GPU buffer
+    /// and only re-uploads when the array's contents have changed.
+    /// </summary>
+    /// <remarks>
+    /// To "resize" the mesh, allocate a new array — that's a different
+    /// reference and gets a fresh GPU buffer. The previous array's GPU
+    /// resources are released once you stop using it (either when the array
+    /// is collected, or after a short idle period).
+    /// </remarks>
+    public void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
+        where TVertex : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+
+        var mesh = GetOrCreateArrayMesh(vertices, shader.VertexLayout);
+        RenderMesh(mesh, shader, transform);
+    }
+
+    /// <summary>
+    /// Draws a mesh using the given shader, sourcing vertex data from an
+    /// <see cref="ImmutableArray{T}"/>. The renderer borrows the array's
+    /// backing storage zero-copy and keeps a weak association keyed on it;
+    /// passing the same <see cref="ImmutableArray{T}"/> (or any other built
+    /// over the same underlying array) on later frames reuses the cached
+    /// GPU buffer with no re-upload, since immutable arrays cannot change.
+    /// </summary>
+    public void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
+        where TVertex : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(shader);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        RenderMesh(mesh, shader, transform);
+    }
+
+    /// <summary>
     /// Draws a textured mesh using the given shader and surface as the source texture.
     /// </summary>
     /// <remarks>
@@ -195,6 +243,100 @@ public sealed class Renderer3D : IDisposable
                 nameof(mesh));
 
         _commands.Add(new DrawCommand(mesh, shader, transform, texture, sampler));
+    }
+
+    /// <summary>
+    /// Draws a textured mesh using the given shader and surface as the source
+    /// texture, sourcing vertex data directly from a caller-owned array. See
+    /// <see cref="RenderMesh{TVertex}(TVertex[], Shader{TVertex}, Matrix4x4?)"/>
+    /// for caching semantics.
+    /// </summary>
+    public void RenderTexturedMesh(
+        TextureVertex3D[] vertices,
+        Shader<TextureVertex3D> shader,
+        Surface texture,
+        GpuSampler? sampler = null,
+        Matrix4x4? transform = null)
+    {
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+
+        var mesh = GetOrCreateArrayMesh(vertices, shader.VertexLayout);
+        RenderTexturedMesh(mesh, shader, texture, sampler, transform);
+    }
+
+    /// <summary>
+    /// Draws a textured mesh using the given shader and surface, sourcing
+    /// vertex data from an <see cref="ImmutableArray{T}"/>. The renderer
+    /// borrows the array's backing storage zero-copy. See
+    /// <see cref="RenderMesh{TVertex}(ImmutableArray{TVertex}, Shader{TVertex}, Matrix4x4?)"/>
+    /// for caching semantics.
+    /// </summary>
+    public void RenderTexturedMesh(
+        ImmutableArray<TextureVertex3D> vertices,
+        Shader<TextureVertex3D> shader,
+        Surface texture,
+        GpuSampler? sampler = null,
+        Matrix4x4? transform = null)
+    {
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        RenderTexturedMesh(mesh, shader, texture, sampler, transform);
+    }
+
+    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, GpuVertexLayout layout)
+        where TVertex : unmanaged
+    {
+        if (_arrayMeshCache.TryGetValue(vertices, out var existing))
+        {
+            if (existing is not Mesh<TVertex> typed)
+                throw new ArgumentException(
+                    $"Vertex array was previously used with vertex type " +
+                    $"'{existing!.GetType().GetGenericArguments().FirstOrDefault()?.Name ?? existing.GetType().Name}' " +
+                    $"and cannot be reused with '{typeof(TVertex).Name}'.",
+                    nameof(vertices));
+
+            // Re-stage the latest contents. Reset bumps the mesh's Version,
+            // and the upload loop only re-uploads when Version has changed.
+            typed.Reset(vertices.AsSpan(), ReadOnlySpan<uint>.Empty);
+            return typed;
+        }
+
+        var mesh = new Mesh<TVertex>(vertices.AsSpan(), ReadOnlySpan<uint>.Empty, layout);
+        _arrayMeshCache.Add(vertices, mesh);
+        return mesh;
+    }
+
+    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, GpuVertexLayout layout)
+        where TVertex : unmanaged
+    {
+        // Key on the immutable array's underlying T[]. Two ImmutableArrays
+        // built over the same backing array hit the same cache entry, which
+        // is fine since neither can mutate.
+        var backing = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
+
+        if (_arrayMeshCache.TryGetValue(backing, out var existing))
+        {
+            if (existing is not Mesh<TVertex> typed)
+                throw new ArgumentException(
+                    $"Vertex array was previously used with vertex type " +
+                    $"'{existing!.GetType().GetGenericArguments().FirstOrDefault()?.Name ?? existing.GetType().Name}' " +
+                    $"and cannot be reused with '{typeof(TVertex).Name}'.",
+                    nameof(vertices));
+
+            // Immutable: contents can't have changed, so no Reset needed.
+            return typed;
+        }
+
+        // Borrow the backing array zero-copy via the ImmutableArray ctor.
+        var mesh = new Mesh<TVertex>(vertices, ImmutableArray<uint>.Empty, layout);
+        _arrayMeshCache.Add(backing, mesh);
+        return mesh;
     }
 
     /// <summary>
