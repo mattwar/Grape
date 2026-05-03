@@ -6,10 +6,10 @@ namespace Grape;
 /// </summary>
 internal sealed class Texture : IDisposable
 {
-    private readonly WindowRenderer2D _renderer;
+    private readonly BitmapRenderer2D _renderer;
     private nint _textureId;
 
-    internal Texture(WindowRenderer2D renderer, nint surfaceId)
+    internal Texture(BitmapRenderer2D renderer, nint surfaceId)
     {
         _renderer = renderer;
         _textureId = surfaceId;
@@ -19,7 +19,7 @@ internal sealed class Texture : IDisposable
     /// <summary>
     /// The <see cref="Renderer"/> that created this <see cref="Texture"/>.
     /// </summary>
-    public WindowRenderer2D Renderer => _renderer;
+    public BitmapRenderer2D Renderer => _renderer;
 
     internal nint Id => _textureId;
 

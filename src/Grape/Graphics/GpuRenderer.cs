@@ -6,7 +6,7 @@ using System.Numerics;
 namespace Grape;
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
-public sealed class WindowRenderer3D : Renderer3D, IDisposable
+internal sealed class GpuRenderer : Renderer3D, IDisposable
 {
     /// <summary>
     /// Number of frames a cached mesh or texture upload may go unused
@@ -43,7 +43,7 @@ public sealed class WindowRenderer3D : Renderer3D, IDisposable
     private SDL.GPUTextureFormat _colorFormat;
     private SDL.FColor _clearColor;
 
-    internal WindowRenderer3D(GpuDevice device)
+    internal GpuRenderer(GpuDevice device)
     {
         _device = device;
     }

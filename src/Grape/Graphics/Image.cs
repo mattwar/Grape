@@ -59,6 +59,19 @@ public sealed class Image : IDisposable
             throw new ObjectDisposedException(nameof(Image));
     }
 
+    /// <summary>
+    /// Renders into this image using a software 2D renderer.
+    /// </summary>
+    public void RenderImage(Action<Renderer2D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        ThrowIfDisposed();
+        using var renderer = ImageRenderer2D.Create(this);
+        renderAction(renderer);
+        renderer.Present();
+        Invalidate();
+    }
+
     public void Dispose()
     {
         if (!IsDisposed)

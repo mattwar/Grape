@@ -5,7 +5,7 @@ namespace Grape;
 /// </summary>
 public class Window2D : Window
 {
-    private WindowRenderer2D _renderer = null!;
+    private Renderer _renderer = null!;
 
     public Window2D(int width, int height, WindowFlags flags = WindowFlags.None)
         : base(width, height, flags)
@@ -19,7 +19,7 @@ public class Window2D : Window
 
     protected override void OnWindowCreated()
     {
-        _renderer = WindowRenderer2D.Create(this);
+        _renderer = Renderer.Create(this);
     }
 
     /// <summary>
@@ -61,5 +61,46 @@ public class Window2D : Window
     {
         // send render action to application main thread
         Application.Current.Send(_ => RenderFrame_AppThread(renderAction));
+    }
+
+    /// <summary>
+    /// A 2D renderer that draws into a <see cref="Window2D"/>'s swapchain.
+    /// </summary>
+    private sealed class Renderer : BitmapRenderer2D
+    {
+        private readonly Window2D _window;
+
+        private Renderer(Window2D window, nint rendererId)
+            : base(rendererId)
+        {
+            _window = window;
+        }
+
+        /// <summary>
+        /// Creates a renderer for this window.
+        /// The window already has a default renderer created when the window is created.
+        /// </summary>
+        internal static Renderer Create(Window2D window, string? name = null)
+        {
+            var rendererId = SDL.CreateRenderer(window.WindowId, name);
+            return new Renderer(window, rendererId);
+        }
+
+        /// <summary>
+        /// Creates a window gpu renderer with the specified shader format.
+        /// </summary>
+        internal static Renderer Create(Window2D window, SDL.GPUShaderFormat format)
+        {
+            var rendererId = SDL.CreateGPURenderer(window.WindowId, format, out var gpuDeviceId);
+            return new Renderer(window, rendererId);
+        }
+
+        /// <summary>The <see cref="Grape.Window"/> this renderer draws into.</summary>
+        public Window Window => _window;
+
+        protected override void OnDisposed()
+        {
+            _window.RemoveResource(this);
+        }
     }
 }
