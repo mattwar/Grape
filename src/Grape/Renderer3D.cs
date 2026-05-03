@@ -377,7 +377,7 @@ public sealed class Renderer3D : IDisposable
         if (_debugFontAtlas is { IsDisposed: false })
             return _debugFontAtlas;
 
-        var atlas = Image.Create(DebugAtlasWidth, DebugAtlasHeight, SDL.PixelFormat.ABGR8888);
+        var atlas = Image.Create(DebugAtlasWidth, DebugAtlasHeight, PixelFormat.ABGR8888);
 
         // Drive a software renderer over the image's pixels and use SDL's
         // built-in debug-text routine to draw each ASCII glyph into its cell.
@@ -778,12 +778,12 @@ public sealed class Renderer3D : IDisposable
         });
     }
 
-    private static SDL.GPUTextureFormat MapPixelFormat(SDL.PixelFormat format) => format switch
+    private static SDL.GPUTextureFormat MapPixelFormat(PixelFormat format) => format switch
     {
         // SDL_PIXELFORMAT_ABGR8888 stores bytes in memory as R, G, B, A on
         // little-endian platforms, matching SDL_GPU R8G8B8A8_UNORM.
-        SDL.PixelFormat.ABGR8888 => SDL.GPUTextureFormat.R8G8B8A8Unorm,
-        SDL.PixelFormat.ARGB8888 => SDL.GPUTextureFormat.B8G8R8A8Unorm,
+        PixelFormat.ABGR8888 => SDL.GPUTextureFormat.R8G8B8A8Unorm,
+        PixelFormat.ARGB8888 => SDL.GPUTextureFormat.B8G8R8A8Unorm,
         _ => throw new NotSupportedException(
             $"Image pixel format '{format}' has no GPU texture format mapping. " +
             "Convert the image to ABGR8888 before sampling on the GPU."),

@@ -314,10 +314,10 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Creates a new <see cref="Texture"/> associated with this <see cref="Renderer2D"/>.
     /// </summary>
-    private Texture CreateTexture(int width, int height, SDL.PixelFormat pixelFormat, SDL.TextureAccess access)
+    private Texture CreateTexture(int width, int height, PixelFormat pixelFormat, SDL.TextureAccess access)
     {
         ThrowIfDisposed();
-        var id = SDL.CreateTexture(_rendererId, pixelFormat, access, width, height);
+        var id = SDL.CreateTexture(_rendererId, (SDL.PixelFormat)pixelFormat, access, width, height);
         if (id == 0)
             throw new InvalidOperationException($"SDL.CreateTexture failed: {SDL.GetError()}");
         return new Texture(this, id);

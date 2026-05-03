@@ -9,7 +9,7 @@ public static class ModelExtensions
         /// <summary>
         /// Creates an <see cref="Image"/> from an image file.
         /// </summary>
-        public static Image LoadImage(string filename, SDL.PixelFormat format = SDL.PixelFormat.BGRA8888)
+        public static Image LoadImage(string filename, Grape.PixelFormat format = Grape.PixelFormat.BGRA8888)
         {
             var bytes = File.ReadAllBytes(filename);
             return GetImageFromBytes(bytes, format);
@@ -30,7 +30,7 @@ public static class ModelExtensions
     /// <summary>
     /// Loads an image from bytes and creates an <see cref="Image"/> with the given pixel format.
     /// </summary>
-    private static Image GetImageFromBytes(Span<byte> bytes, SDL.PixelFormat format)
+    private static Image GetImageFromBytes(Span<byte> bytes, Grape.PixelFormat format)
     {
         using var skBitmap = SKBitmap.Decode(bytes);
         if (skBitmap == null)

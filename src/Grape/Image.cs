@@ -1,7 +1,7 @@
 namespace Grape;
 
 /// <summary>
-/// Represents a CPU-Side bitmap
+/// Represents an image bitmap in memory.
 /// </summary>
 public sealed class Image : IDisposable
 {
@@ -17,13 +17,13 @@ public sealed class Image : IDisposable
         _version = 1;
     }
 
-    public static Image Create(int width, int height, SDL.PixelFormat format)
+    public static Image Create(int width, int height, PixelFormat format)
     {
         // SDL must be initialised before any SDL.* call. Touching
         // Application.Current starts the app on demand.
         _ = Application.Current;
 
-        var imageId = SDL.CreateSurface(width, height, format);
+        var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
             throw new InvalidOperationException("Cannot create image");
         return new Image(imageId);
@@ -102,9 +102,9 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
-    /// Any flags used when creating the image.
+    /// Surface flags. Used internally to inspect surface state.
     /// </summary>
-    public SDL.SurfaceFlags Flags
+    internal SDL.SurfaceFlags Flags
     {
         get
         {
@@ -187,7 +187,7 @@ public sealed class Image : IDisposable
         }
     }
 
-    public SDL.PixelFormat PixelFormat
+    public PixelFormat PixelFormat
     {
         get
         {
@@ -196,17 +196,25 @@ public sealed class Image : IDisposable
             unsafe
             {
                 SDL.Surface* surface = (SDL.Surface*)_imageId;
-                return surface->Format;
+                return (PixelFormat)surface->Format;
             }
         }
     }
 
-    public SDL.PixelFormatDetails PixelFormatDetails
+    public PixelFormatDetails PixelFormatDetails
     {
         get
         {
             if (IsDisposed)
                 return default;
+            return PixelFormatDetails.From(SdlPixelFormatDetails);
+        }
+    }
+
+    private SDL.PixelFormatDetails SdlPixelFormatDetails
+    {
+        get
+        {
             unsafe
             {
                 SDL.Surface* surface = (SDL.Surface*)_imageId;
@@ -347,7 +355,7 @@ public sealed class Image : IDisposable
     {
         if (IsDisposed)
             return default;
-        var formatDetails = this.PixelFormatDetails;
+        var formatDetails = SdlPixelFormatDetails;
         SDL.GetRGBA(pixel, formatDetails, this.Palette?.Id ?? 0, out byte r, out byte g, out byte b, out byte a);
         return new Color(r, g, b, a);
     }
@@ -361,7 +369,7 @@ public sealed class Image : IDisposable
             return default;
         unsafe
         {
-            var formatDetails = this.PixelFormatDetails;
+            var formatDetails = SdlPixelFormatDetails;
             SDL.PixelFormatDetails* formatDetailsPtr = &formatDetails;
             var paletteId = this.Palette?.Id ?? 0;
             return SDL.MapRGBA((nint)formatDetailsPtr, paletteId, color.R, color.G, color.B, color.A);

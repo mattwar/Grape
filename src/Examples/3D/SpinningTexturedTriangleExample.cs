@@ -61,7 +61,7 @@ internal static class SpinningTexturedTriangleExample
 
     private static Grape.Image CreateCheckerboardImage(int width, int height, int cellSize)
     {
-        var image = Grape.Image.Create(width, height, SDL.PixelFormat.ABGR8888);
+        var image = Grape.Image.Create(width, height, Grape.PixelFormat.ABGR8888);
         var dark = new Color(32, 32, 32);
         var light = new Color(220, 220, 220);
 

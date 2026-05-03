@@ -196,7 +196,7 @@ public struct DisplayMode
     public int Width => _mode.W;
     public int Height => _mode.H;
     public float RefreshRate => _mode.RefreshRate;
-    public SDL.PixelFormat Format => _mode.Format;
+    public PixelFormat Format => (PixelFormat)_mode.Format;
     public float PixelDensity => _mode.PixelDensity;
 }
 

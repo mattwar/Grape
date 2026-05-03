@@ -514,13 +514,13 @@ public abstract class Window : IDisposable
     /// <summary>
     /// The pixel format of the window.
     /// </summary>
-    public SDL.PixelFormat PixelFormat
+    public PixelFormat PixelFormat
     {
         get
         {
             if (IsDisposed)
-                return SDL.PixelFormat.Unknown;
-            return SDL.GetWindowPixelFormat(_window);
+                return PixelFormat.Unknown;
+            return (PixelFormat)SDL.GetWindowPixelFormat(_window);
         }
     }
 
