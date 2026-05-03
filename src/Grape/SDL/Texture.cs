@@ -4,7 +4,7 @@ namespace Grape;
 /// <summary>
 /// A bitmap stored on the GPU that can be drawn.
 /// </summary>
-public sealed class Texture : IDisposable
+internal sealed class Texture : IDisposable
 {
     private readonly Renderer2D _renderer;
     private nint _textureId;

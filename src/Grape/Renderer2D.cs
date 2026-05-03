@@ -311,7 +311,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Creates a new <see cref="Texture"/> associated with this <see cref="Renderer2D"/>.
     /// </summary>
-    public Texture CreateTexture(int width, int height, SDL.PixelFormat pixelFormat, SDL.TextureAccess access)
+    private Texture CreateTexture(int width, int height, SDL.PixelFormat pixelFormat, SDL.TextureAccess access)
     {
         ThrowIfDisposed();
         var id = SDL.CreateTexture(_rendererId, pixelFormat, access, width, height);
@@ -323,7 +323,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Creates a <see cref="Texture"/> from a given <see cref="Surface"/>.
     /// </summary>
-    public Texture CreateTexture(Surface surface)
+    private Texture CreateTexture(Surface surface)
     {
         ThrowIfDisposed();
         surface.ThrowIfDisposed();      
@@ -382,7 +382,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the portion of the <see cref="Texture"/> the the destination in the window.
     /// </summary>
-    public bool RenderTexture(Texture texture, SDL.FRect source, SDL.FRect destination)
+    private bool RenderTexture(Texture texture, SDL.FRect source, SDL.FRect destination)
     {
         if (IsDisposed)
             return false;
@@ -392,7 +392,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the entire <see cref="Texture"/> the the destination in the window.
     /// </summary>
-    public bool RenderTexture(Texture texture, SDL.FRect destination)
+    private bool RenderTexture(Texture texture, SDL.FRect destination)
     {
         var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height};
         return RenderTexture(texture, source, destination);
@@ -401,7 +401,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the entire <see cref="Texture"/> to the location.
     /// </summary>
-    public bool RenderTexture(Texture texture, float x, float y, float scale = 1.0f)
+    private bool RenderTexture(Texture texture, float x, float y, float scale = 1.0f)
     {
         var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
         var dest = new SDL.FRect { X = x, Y = y, W = texture.Size.Width * scale, H = texture.Size.Height * scale };
@@ -411,7 +411,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders a portion of the <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
     /// </summary>
-    public bool RenderTextureRotated(Texture texture, SDL.FRect source, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
+    private bool RenderTextureRotated(Texture texture, SDL.FRect source, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
     {
         if (IsDisposed)
             return false;
@@ -421,7 +421,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the entire <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
     /// </summary>
-    public bool RenderTextureRotated(Texture texture, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
+    private bool RenderTextureRotated(Texture texture, SDL.FRect destination, float angle, SDL.FPoint center, SDL.FlipMode flip = SDL.FlipMode.None)
     {
         var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, center, flip);
@@ -430,7 +430,7 @@ public sealed class Renderer2D : IDisposable
     /// <summary>
     /// Renders the entire <see cref="Texture"/> rotated by the specified angle around the given center point, to the destination location in the window.
     /// </summary>
-    public bool RenderTextureRotated(Texture texture, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, SDL.FlipMode flip = SDL.FlipMode.None)
+    private bool RenderTextureRotated(Texture texture, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, SDL.FlipMode flip = SDL.FlipMode.None)
     {
         var source = new SDL.FRect { X = 0, Y = 0, W = texture.Size.Width, H = texture.Size.Height };
         var destination = new SDL.FRect { X = x, Y = y, W = texture.Size.Width * scale, H = texture.Size.Height * scale };
@@ -551,7 +551,7 @@ public sealed class Renderer2D : IDisposable
         return SDL.RenderFillRects(_rendererId, rects, rects.Length);
     }
 
-    public bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Texture? texture = null)
+    private bool RenderGeometry(SDL.Vertex[] vertices, int[] indices, Texture? texture = null)
     {
         return SDL.RenderGeometry(_rendererId, texture != null ? texture.Id : 0, vertices, vertices.Length, indices, indices.Length);
     }

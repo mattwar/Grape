@@ -9,13 +9,13 @@ public class Window3D : Window
     private Renderer3D? _renderer;
     private bool _claimed;
 
-    public Window3D(GpuDevice device, int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    internal Window3D(GpuDevice device, int width, int height, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
         : base(width, height, flags)
     {
         _device = device;
     }
 
-    public Window3D(GpuDevice device, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
+    internal Window3D(GpuDevice device, SDL.WindowFlags flags = SDL.WindowFlags.Resizable)
         : base(flags)
     {
         _device = device;

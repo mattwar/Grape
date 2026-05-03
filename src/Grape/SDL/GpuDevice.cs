@@ -6,7 +6,7 @@ namespace Grape;
 /// <summary>
 /// Corresponds to the GPU hardware device.
 /// </summary>
-public sealed class GpuDevice : IDisposable
+internal sealed class GpuDevice : IDisposable
 {
     private ImmutableList<IDisposable> _resources = ImmutableList<IDisposable>.Empty;
 
@@ -176,7 +176,7 @@ public sealed class GpuDevice : IDisposable
 /// <summary>
 /// A GPU texture resource that can be used as render target or sampled data.
 /// </summary>
-public sealed class GpuTexture : IDisposable
+internal sealed class GpuTexture : IDisposable
 {
     private readonly GpuDevice? _gpuDevice;
     private nint _textureId;
@@ -241,7 +241,7 @@ public sealed class GpuTexture : IDisposable
 /// <summary>
 /// A GPU sampler resource that controls how textures are sampled by shaders.
 /// </summary>
-public sealed class GpuSampler : IDisposable
+internal sealed class GpuSampler : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _samplerId;
@@ -294,7 +294,7 @@ public sealed class GpuSampler : IDisposable
 /// <summary>
 /// Describes a GPU sampler to be created.
 /// </summary>
-public record GpuSamplerCreateInfo
+internal record GpuSamplerCreateInfo
 {
     public SDL.GPUFilter MinFilter { get; init; }
     public SDL.GPUFilter MagFilter { get; init; }
@@ -311,7 +311,7 @@ public record GpuSamplerCreateInfo
     public bool EnableCompare { get; init; }
 }
 
-public record GpuTextureCreateInfo
+internal record GpuTextureCreateInfo
 {
     // GPUTextureCreateInfo;
 
@@ -364,7 +364,7 @@ public record GpuTextureCreateInfo
 /// <summary>
 /// A GPU buffer resource used to store raw data on the device.
 /// </summary>
-public abstract class GpuBuffer : IDisposable
+internal abstract class GpuBuffer : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _bufferId;
@@ -423,7 +423,7 @@ public abstract class GpuBuffer : IDisposable
 /// <summary>
 /// A staging buffer used to upload CPU data into GPU resources.
 /// </summary>
-public class GpuUploadBuffer : GpuBuffer
+internal class GpuUploadBuffer : GpuBuffer
 {
     private GpuUploadBuffer(GpuDevice device, nint bufferId, uint size)
         : base(device, bufferId, size)
@@ -504,7 +504,7 @@ public class GpuUploadBuffer : GpuBuffer
 /// <summary>
 /// A single frame of GPU work, including copy and render passes.
 /// </summary>
-public sealed class GpuRenderFrame : IDisposable
+internal sealed class GpuRenderFrame : IDisposable
 {
     private readonly GpuDevice _device;
     private readonly GpuCommandBuffer _commandBuffer;
@@ -578,7 +578,7 @@ public sealed class GpuRenderFrame : IDisposable
 /// <summary>
 /// A scoped phase for copying data to or from GPU resources.
 /// </summary>
-public sealed class GpuCopyPass : IDisposable
+internal sealed class GpuCopyPass : IDisposable
 {
     private readonly nint _copyPassId;
     private bool _disposed;
@@ -717,7 +717,7 @@ public sealed class GpuCopyPass : IDisposable
 /// <summary>
 /// A join point for GPU work.
 /// </summary>
-public sealed class GpuFence : IDisposable
+internal sealed class GpuFence : IDisposable
 {
     private readonly GpuDevice _device;
     private nint _fenceId;
@@ -745,7 +745,7 @@ public sealed class GpuFence : IDisposable
 /// <summary>
 /// Describes how vertex data is laid out inside a vertex buffer.
 /// </summary>
-public record GpuVertexBufferLayout
+internal record GpuVertexBufferLayout
 {
     /// <summary>
     /// The size of a single vertex + the offset between vertices.
@@ -766,7 +766,7 @@ public record GpuVertexBufferLayout
 /// <summary>
 /// Describes one element within a vertex layout.
 /// </summary>
-public record GpuVertexElement
+internal record GpuVertexElement
 {
     /// <summary>
     /// The size and type of the attribute data.
@@ -782,7 +782,7 @@ public record GpuVertexElement
 /// <summary>
 /// A GPU buffer that is intended for vertex input.
 /// </summary>
-public abstract class GpuVertexBuffer : GpuBuffer
+internal abstract class GpuVertexBuffer : GpuBuffer
 {
     private protected GpuVertexBuffer(GpuDevice device, nint bufferId, uint size, GpuVertexBufferLayout layout)
         : base(device, bufferId, size)
@@ -797,7 +797,7 @@ public abstract class GpuVertexBuffer : GpuBuffer
 /// <summary>
 /// A typed vertex buffer for structured vertex data.
 /// </summary>
-public class GpuVertexBuffer<TVertex> : GpuVertexBuffer
+internal class GpuVertexBuffer<TVertex> : GpuVertexBuffer
     where TVertex : unmanaged
 {
     private GpuVertexBuffer(GpuDevice device, nint bufferId, uint size, GpuVertexBufferLayout layout)
@@ -841,7 +841,7 @@ public class GpuVertexBuffer<TVertex> : GpuVertexBuffer
 /// <summary>
 /// A block of GPU copy and render instructions.
 /// </summary>
-public sealed class GpuCommandBuffer: IDisposable
+internal sealed class GpuCommandBuffer: IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _commandBufferId;
@@ -890,7 +890,7 @@ public sealed class GpuCommandBuffer: IDisposable
 /// <summary>
 /// A scoped render recording phase for drawing into one or more GPU targets.
 /// </summary>
-public sealed class GpuRenderPass : IDisposable
+internal sealed class GpuRenderPass : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private readonly GpuCommandBuffer _gpuCommandBuffer;
@@ -1244,14 +1244,14 @@ public sealed class GpuRenderPass : IDisposable
 /// <summary>
 /// A pairing of a texture and a sampler for binding to a render pass.
 /// </summary>
-public readonly record struct GpuTextureSamplerBinding(GpuTexture Texture, GpuSampler Sampler);
+internal readonly record struct GpuTextureSamplerBinding(GpuTexture Texture, GpuSampler Sampler);
 
 
 
 /// <summary>
 /// Describes one color target used by a render pass.
 /// </summary>
-public record GpuColorTargetInfo
+internal record GpuColorTargetInfo
 {
     // GPUColorTargetInfo
 
@@ -1314,7 +1314,7 @@ public record GpuColorTargetInfo
 /// <summary>
 /// Describes the depth and stencil target used by a render pass.
 /// </summary>
-public record GpuDepthStencilTargetInfo
+internal record GpuDepthStencilTargetInfo
 {
     // GPUDepthStencilTargetInfo
 
@@ -1362,7 +1362,7 @@ public record GpuDepthStencilTargetInfo
 /// <summary>
 /// A compiled graphics pipeline ready to bind for drawing.
 /// </summary>
-public sealed class GpuPipeline : IDisposable
+internal sealed class GpuPipeline : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _gpuPipelineID;
@@ -1435,7 +1435,7 @@ public sealed class GpuPipeline : IDisposable
 /// <summary>
 /// Describes how to create a graphics pipeline.
 /// </summary>
-public record GpuPipelineCreateInfo
+internal record GpuPipelineCreateInfo
 {
     // GPUGraphicsPipelineCreateInfo
 
@@ -1491,7 +1491,7 @@ public record GpuPipelineCreateInfo
 /// <summary>
 /// Describes the vertex buffers and attributes used by a pipeline.
 /// </summary>
-public record GpuVertexInputState
+internal record GpuVertexInputState
 {
     // SDL.GPUVertexInputState
 
@@ -1502,7 +1502,7 @@ public record GpuVertexInputState
 /// <summary>
 /// Describes the target formats and blending state for a pipeline.
 /// </summary>
-public record GpuPipelineTargetInfo
+internal record GpuPipelineTargetInfo
 {
     // GPUGraphicsPipelineTargetInfo
 
@@ -1525,7 +1525,7 @@ public record GpuPipelineTargetInfo
 /// <summary>
 /// A GPU shader module used when creating pipelines.
 /// </summary>
-public sealed class GpuShader : IDisposable
+internal sealed class GpuShader : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _shaderId;
@@ -1582,7 +1582,7 @@ public sealed class GpuShader : IDisposable
 /// <summary>
 /// Describes how to create a GPU shader module.
 /// </summary>
-public record GpuShaderCreateInfo
+internal record GpuShaderCreateInfo
 {
     // GPUShaderCreateInfo
 

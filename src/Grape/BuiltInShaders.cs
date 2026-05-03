@@ -27,7 +27,7 @@ public sealed class BuiltInShaders
     private Shader<TextureVertex3D>? _texturedQuad;
     private Shader<TextureVertex3D>? _texturedQuadWithMatrix;
 
-    public BuiltInShaders(GpuDevice device)
+    internal BuiltInShaders(GpuDevice device)
     {
         _device = device;
     }
@@ -83,7 +83,7 @@ public sealed class BuiltInShaders
     /// must already be in normalized device coordinates (the visible cube is
     /// -1 to 1 on each axis). Useful for screen-space drawing or testing.
     /// </summary>
-    public GpuShader PositionColorVert =>
+    internal GpuShader PositionColorVert =>
         _positionColorVert ??= CreateShader("PositionColor.vert");
 
     /// <summary>
@@ -91,7 +91,7 @@ public sealed class BuiltInShaders
     /// and does not alter the color. Use this for normal 3D drawing where you
     /// supply a model-view-projection matrix.
     /// </summary>
-    public GpuShader PositionColorTransformVert =>
+    internal GpuShader PositionColorTransformVert =>
         _positionColorTransformVert ??= CreateShader("PositionColorTransform.vert", numUniformBuffers: 1);
 
     /// <summary>
@@ -100,7 +100,7 @@ public sealed class BuiltInShaders
     /// cube is -1 to 1 on each axis). Useful for full-screen quads or
     /// screen-space drawing.
     /// </summary>
-    public GpuShader TexturedQuadVert =>
+    internal GpuShader TexturedQuadVert =>
         _texturedQuadVert ??= CreateShader("TexturedQuad.vert");
 
     /// <summary>
@@ -108,7 +108,7 @@ public sealed class BuiltInShaders
     /// and does not alter the texture coordinate. Use this for normal 3D drawing
     /// of textured meshes where you supply a model-view-projection matrix.
     /// </summary>
-    public GpuShader TexturedQuadWithMatrixVert =>
+    internal GpuShader TexturedQuadWithMatrixVert =>
         _texturedQuadWithMatrixVert ??= CreateShader("TexturedQuadWithMatrix.vert", numUniformBuffers: 1);
 
     /// <summary>
@@ -116,7 +116,7 @@ public sealed class BuiltInShaders
     /// with <see cref="PositionColorVert"/> or
     /// <see cref="PositionColorTransformVert"/>.
     /// </summary>
-    public GpuShader SolidColorFrag =>
+    internal GpuShader SolidColorFrag =>
         _solidColorFrag ??= CreateShader("SolidColor.frag");
 
     /// <summary>
@@ -124,7 +124,7 @@ public sealed class BuiltInShaders
     /// per-vertex texture coordinate. Pair with <see cref="TexturedQuadVert"/>
     /// or <see cref="TexturedQuadWithMatrixVert"/>.
     /// </summary>
-    public GpuShader TexturedQuadFrag =>
+    internal GpuShader TexturedQuadFrag =>
         _texturedQuadFrag ??= CreateShader("TexturedQuad.frag", numSamplers: 1);
 
     private GpuShader CreateShader(

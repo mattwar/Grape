@@ -4,59 +4,6 @@ using System.Runtime.InteropServices;
 using System.Numerics;
 
 namespace Grape;
-
-/// <summary>
-/// A vertex+fragment shader pair bound to a specific vertex layout.
-/// </summary>
-public abstract class Shader
-{
-    private protected Shader(
-        GpuShader vertexShader,
-        GpuShader fragmentShader,
-        GpuVertexLayout vertexLayout,
-        bool requiresTransform)
-    {
-        ArgumentNullException.ThrowIfNull(vertexShader);
-        ArgumentNullException.ThrowIfNull(fragmentShader);
-        ArgumentNullException.ThrowIfNull(vertexLayout);
-
-        VertexShader = vertexShader;
-        FragmentShader = fragmentShader;
-        VertexLayout = vertexLayout;
-        RequiresTransform = requiresTransform;
-    }
-
-    public GpuShader VertexShader { get; }
-    public GpuShader FragmentShader { get; }
-    public GpuVertexLayout VertexLayout { get; }
-
-    /// <summary>
-    /// True if the vertex shader reads a 4x4 transformation matrix from
-    /// vertex uniform slot 0. The renderer will push the per-draw transform
-    /// (or <see cref="Matrix4x4.Identity"/>) before each draw call.
-    /// </summary>
-    public bool RequiresTransform { get; }
-}
-
-/// <summary>
-/// A vertex+fragment shader pair bound to a specific vertex layout.
-/// </summary>
-/// <typeparam name="TVertex">
-/// The vertex struct that meshes drawn with this shader must use.
-/// </typeparam>
-public sealed class Shader<TVertex> : Shader where TVertex : unmanaged
-{
-    public Shader(
-        GpuShader vertexShader,
-        GpuShader fragmentShader,
-        GpuVertexLayout vertexLayout,
-        bool requiresTransform = false)
-        : base(vertexShader, fragmentShader, vertexLayout, requiresTransform)
-    {
-    }
-}
-
-/// <summary>
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
 public sealed class Renderer3D : IDisposable
@@ -96,7 +43,7 @@ public sealed class Renderer3D : IDisposable
     private SDL.GPUTextureFormat _colorFormat;
     private SDL.FColor _clearColor;
 
-    public Renderer3D(GpuDevice device)
+    internal Renderer3D(GpuDevice device)
     {
         _device = device;
     }
@@ -104,7 +51,7 @@ public sealed class Renderer3D : IDisposable
     /// <summary>
     /// The <see cref="GpuDevice"/> this renderer draws through.
     /// </summary>
-    public GpuDevice Device => _device;
+    internal GpuDevice Device => _device;
 
     /// <summary>
     /// Lazy access to the precompiled shaders bundled with Grape.
@@ -115,7 +62,7 @@ public sealed class Renderer3D : IDisposable
     /// A default linear-filtered, repeating sampler used by
     /// <see cref="RenderTexturedMesh"/> when the caller does not supply one.
     /// </summary>
-    public GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
+    internal GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
     {
         MinFilter = SDL.GPUFilter.Linear,
         MagFilter = SDL.GPUFilter.Linear,
@@ -244,7 +191,6 @@ public sealed class Renderer3D : IDisposable
         Mesh<TextureVertex3D> mesh,
         Shader<TextureVertex3D> shader,
         Surface texture,
-        GpuSampler? sampler = null,
         Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -256,7 +202,7 @@ public sealed class Renderer3D : IDisposable
                 "The mesh's vertex layout does not match the shader's expected vertex layout.",
                 nameof(mesh));
 
-        _commands.Add(new DrawCommand(mesh, shader, transform, texture, sampler));
+        _commands.Add(new DrawCommand(mesh, shader, transform, texture, Sampler: null));
     }
 
     /// <summary>
@@ -269,9 +215,19 @@ public sealed class Renderer3D : IDisposable
         TextureVertex3D[] vertices,
         Shader<TextureVertex3D> shader,
         Surface texture,
-        GpuSampler? sampler = null,
         Matrix4x4? transform = null,
         int? vertexCount = null)
+    {
+        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, transform, vertexCount);
+    }
+
+    internal void RenderTexturedMeshCore(
+        TextureVertex3D[] vertices,
+        Shader<TextureVertex3D> shader,
+        Surface texture,
+        GpuSampler? sampler,
+        Matrix4x4? transform,
+        int? vertexCount)
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
@@ -282,7 +238,13 @@ public sealed class Renderer3D : IDisposable
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
         var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
-        RenderTexturedMesh(mesh, shader, texture, sampler, transform);
+
+        if (mesh.Layout != shader.VertexLayout)
+            throw new ArgumentException(
+                "The mesh's vertex layout does not match the shader's expected vertex layout.",
+                nameof(vertices));
+
+        _commands.Add(new DrawCommand(mesh, shader, transform, texture, sampler));
     }
 
     /// <summary>
@@ -296,7 +258,6 @@ public sealed class Renderer3D : IDisposable
         ImmutableArray<TextureVertex3D> vertices,
         Shader<TextureVertex3D> shader,
         Surface texture,
-        GpuSampler? sampler = null,
         Matrix4x4? transform = null)
     {
         ArgumentNullException.ThrowIfNull(shader);
@@ -305,7 +266,7 @@ public sealed class Renderer3D : IDisposable
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
         var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
-        RenderTexturedMesh(mesh, shader, texture, sampler, transform);
+        RenderTexturedMesh(mesh, shader, texture, transform);
     }
 
     /// <summary>
@@ -402,7 +363,7 @@ public sealed class Renderer3D : IDisposable
             AddressModeW = SDL.GPUSamplerAddressMode.ClampToEdge,
         });
 
-        RenderTexturedMesh(
+        RenderTexturedMeshCore(
             verts,
             Shaders.TexturedQuadWithMatrix,
             atlas,
@@ -462,7 +423,7 @@ public sealed class Renderer3D : IDisposable
         return atlas;
     }
 
-    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, GpuVertexLayout layout)
+    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, VertexLayout layout)
         where TVertex : unmanaged
     {
         var span = vertices.AsSpan(0, count);
@@ -487,7 +448,7 @@ public sealed class Renderer3D : IDisposable
         return mesh;
     }
 
-    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, GpuVertexLayout layout)
+    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, VertexLayout layout)
         where TVertex : unmanaged
     {
         // Key on the immutable array's underlying T[]. Two ImmutableArrays
@@ -832,7 +793,7 @@ public sealed class Renderer3D : IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        GpuVertexLayout layout)
+        VertexLayout layout)
     {
         var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout);
         if (!_pipelines.TryGetValue(key, out var pipeline))
@@ -848,7 +809,7 @@ public sealed class Renderer3D : IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        GpuVertexLayout layout)
+        VertexLayout layout)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
@@ -918,7 +879,7 @@ public sealed class Renderer3D : IDisposable
         GpuShader VertexShader,
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
-        GpuVertexLayout Layout);
+        VertexLayout Layout);
 
     private sealed record DrawCommand(
         Mesh Mesh,
@@ -986,315 +947,4 @@ public sealed class Renderer3D : IDisposable
 
         return prepared;
     }
-}
-
-/// <summary>
-/// CPU-side mesh data used by the high-level renderer. Mesh instances are
-/// compared by reference identity; reuse the same instance frame-to-frame to
-/// reuse the cached GPU vertex buffer.
-/// </summary>
-public abstract class Mesh
-{
-    private protected Mesh() { }
-
-    public abstract int VertexCount { get; }
-    public abstract int IndexCount { get; }
-    public abstract GpuVertexLayout Layout { get; }
-    public abstract ReadOnlySpan<byte> GetVertexBytes();
-    public abstract ReadOnlySpan<uint> GetIndices();
-
-    /// <summary>
-    /// Bumped each time the mesh's contents are replaced. The renderer uses
-    /// this to detect when its cached GPU vertex buffer needs to be re-uploaded.
-    /// </summary>
-    public int Version { get; private protected set; }
-}
-
-/// <summary>
-/// CPU-Side mesh data used by <see cref="Renderer3D"/>.
-/// Can be updated with fresh vertex/index data.
-/// </summary>
-public class Mesh<TVertex> : Mesh
-    where TVertex : unmanaged
-{
-    // Either an array we own (writable) or one borrowed from an
-    // ImmutableArray (must not be mutated). _ownsVertices/_ownsIndices
-    // tells which.
-    private TVertex[] _vertices;
-    private int _vertexCount;
-    private bool _ownsVertices;
-
-    private uint[] _indices;
-    private int _indexCount;
-    private bool _ownsIndices;
-
-    public Mesh(
-        ReadOnlySpan<TVertex> vertices,
-        ReadOnlySpan<uint> indices,
-        GpuVertexLayout vertexLayout)
-    {
-        ArgumentNullException.ThrowIfNull(vertexLayout);
-
-        _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
-        vertices.CopyTo(_vertices);
-        _vertexCount = vertices.Length;
-        _ownsVertices = true;
-
-        _indices = indices.Length == 0 ? Array.Empty<uint>() : new uint[indices.Length];
-        indices.CopyTo(_indices);
-        _indexCount = indices.Length;
-        _ownsIndices = true;
-
-        VertexLayout = vertexLayout;
-        Version = 1;
-    }
-
-    public Mesh(
-        ImmutableArray<TVertex> vertices,
-        ImmutableArray<uint> indices,
-        GpuVertexLayout vertexLayout)
-    {
-        ArgumentNullException.ThrowIfNull(vertexLayout);
-        ThrowIfDefault(vertices, nameof(vertices));
-        ThrowIfDefault(indices, nameof(indices));
-
-        // Borrow the immutable arrays' backing storage directly. Immutable
-        // arrays guarantee their contents won't change, so we can safely
-        // read from them without copying.
-        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
-        _vertexCount = vertices.Length;
-        _ownsVertices = false;
-
-        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
-        _indexCount = indices.Length;
-        _ownsIndices = false;
-
-        VertexLayout = vertexLayout;
-        Version = 1;
-    }
-
-    public GpuVertexLayout VertexLayout { get; }
-
-    public override int VertexCount => _vertexCount;
-
-    public override int IndexCount => _indexCount;
-
-    public override GpuVertexLayout Layout => VertexLayout;
-
-    public override ReadOnlySpan<byte> GetVertexBytes() =>
-        MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
-
-    public override ReadOnlySpan<uint> GetIndices() =>
-        _indices.AsSpan(0, _indexCount);
-
-    /// <summary>
-    /// Replaces the vertex and index data with new contents copied from the
-    /// supplied spans. The mesh's vertex layout is unchanged. Bumps
-    /// <see cref="Mesh.Version"/> so the renderer re-uploads the GPU
-    /// buffer on the next draw.
-    /// </summary>
-    public void Reset(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
-    {
-        EnsureOwnedVertexCapacity(vertices.Length);
-        vertices.CopyTo(_vertices);
-        _vertexCount = vertices.Length;
-
-        EnsureOwnedIndexCapacity(indices.Length);
-        indices.CopyTo(_indices);
-        _indexCount = indices.Length;
-
-        unchecked { Version++; }
-    }
-
-    /// <summary>
-    /// Replaces the vertex and index data with the supplied immutable arrays.
-    /// The arrays' underlying storage is borrowed in-place (zero copy).
-    /// Bumps <see cref="Mesh.Version"/>.
-    /// </summary>
-    public void Reset(ImmutableArray<TVertex> vertices, ImmutableArray<uint> indices)
-    {
-        ThrowIfDefault(vertices, nameof(vertices));
-        ThrowIfDefault(indices, nameof(indices));
-
-        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
-        _vertexCount = vertices.Length;
-        _ownsVertices = false;
-
-        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
-        _indexCount = indices.Length;
-        _ownsIndices = false;
-
-        unchecked { Version++; }
-    }
-
-    private void EnsureOwnedVertexCapacity(int count)
-    {
-        if (!_ownsVertices || _vertices.Length < count)
-        {
-            // Either we're holding a borrowed (immutable) array we mustn't
-            // overwrite, or the owned array is too small. Allocate fresh.
-            _vertices = count == 0 ? Array.Empty<TVertex>() : new TVertex[count];
-            _ownsVertices = true;
-        }
-    }
-
-    private void EnsureOwnedIndexCapacity(int count)
-    {
-        if (!_ownsIndices || _indices.Length < count)
-        {
-            _indices = count == 0 ? Array.Empty<uint>() : new uint[count];
-            _ownsIndices = true;
-        }
-    }
-
-    private static void ThrowIfDefault<T>(ImmutableArray<T> array, string paramName)
-    {
-        if (array.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", paramName);
-    }
-}
-
-/// <summary>
-/// Mesh with position-only vertices.
-/// </summary>
-public sealed class VertexOnlyMesh : Mesh<Vertex3D>
-{
-    public VertexOnlyMesh(ReadOnlySpan<Vertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    public VertexOnlyMesh(ImmutableArray<Vertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the built-in mesh type.
-    /// </summary>
-    public static new GpuVertexLayout VertexLayout { get; } = new(
-        ImmutableArray.Create(
-            new MeshVertexElement(VertexElementKind.Position3)),
-        1);
-}
-
-/// <summary>
-/// A vertex with with just a 3D position.
-/// </summary>
-[StructLayout(LayoutKind.Sequential)]
-public readonly struct Vertex3D
-{
-    public readonly float X;
-    public readonly float Y;
-    public readonly float Z;
-
-    public Vertex3D(float x, float y, float z)
-    {
-        X = x;
-        Y = y;
-        Z = z;
-    }
-}
-
-/// <summary>
-/// A vertex with position and color
-/// </summary>
-[StructLayout(LayoutKind.Sequential)]
-public readonly struct ColorVertex3D
-{
-    public readonly Vertex3D Position;
-    public readonly SDL.Color Color;
-
-    public ColorVertex3D(Vertex3D vertex, SDL.Color color)
-    {
-        Position = vertex;
-        Color = color;
-    }
-}
-
-/// <summary>
-/// A vertex that carries a position and a texture coordinate. Matches the
-/// vertex input of the bundled <c>TexturedQuad</c> shaders.
-/// </summary>
-[StructLayout(LayoutKind.Sequential)]
-public readonly struct TextureVertex3D
-{
-    public readonly Vertex3D Position;
-    public readonly Vector2 TextureCoordinate;
-
-    public TextureVertex3D(Vertex3D vertex, Vector2 textureCoordinate)
-    {
-        Position = vertex;
-        TextureCoordinate = textureCoordinate;
-    }
-}
-
-/// <summary>
-/// Mesh with vertex positions and colors.
-/// </summary>
-public sealed class ColoredMesh : Mesh<ColorVertex3D>
-{
-    public ColoredMesh(ReadOnlySpan<ColorVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    public ColoredMesh(ImmutableArray<ColorVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the colored mesh type.
-    /// </summary>
-    public static new GpuVertexLayout VertexLayout { get; } = new(
-        ImmutableArray.Create(
-            new MeshVertexElement(VertexElementKind.Position3),
-            new MeshVertexElement(VertexElementKind.Color4)),
-        1);
-}
-
-/// <summary>
-/// Mesh with vertex positions and texture coordinates.
-/// </summary>
-public sealed class TexturedMesh : Mesh<TextureVertex3D>
-{
-    public TexturedMesh(ReadOnlySpan<TextureVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    public TexturedMesh(ImmutableArray<TextureVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the textured mesh type.
-    /// </summary>
-    public static new GpuVertexLayout VertexLayout { get; } = new(
-        ImmutableArray.Create(
-            new MeshVertexElement(VertexElementKind.Position3),
-            new MeshVertexElement(VertexElementKind.TextureCoordinate2)),
-        1);
-}
-
-/// <summary>
-/// Describes the layout of vertices in a mesh.
-/// </summary>
-public sealed record GpuVertexLayout(ImmutableArray<MeshVertexElement> Elements, int VertexBufferSlotCount = 1);
-
-/// <summary>
-/// Describes one element in a vertex layout.
-/// </summary>
-public sealed record MeshVertexElement(VertexElementKind Kind);
-
-/// <summary>
-/// The kind of data represented by a vertex element.
-/// </summary>
-public enum VertexElementKind
-{
-    Position3,
-    TextureCoordinate2,
-    Color4
 }
