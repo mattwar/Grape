@@ -50,7 +50,7 @@ public class SpirvReflectionTests
 
     /// <summary>
     /// The strongest invariant: whatever <see cref="ShaderCompiler"/> set on
-    /// each <see cref="StageShader.Resources"/> during compilation should
+    /// each <c>StageShader</c>'s resource counts during compilation should
     /// match what <see cref="SpirvReflection"/> independently extracts from
     /// the same bytes. Runs against every built-in shader so any future
     /// shape (samplers, uniform buffers, transform matrices) is covered.
@@ -61,13 +61,15 @@ public class SpirvReflectionTests
     {
         _ = name; // displayed in test output
 
-        var vsInfo = SpirvReflection.GetShaderInfo(shader.Vertex.Code.AsSpan());
+        var vsBytes = shader.Vertex.GetCode(ShaderFormat.Spirv);
+        var vsInfo = SpirvReflection.GetShaderInfo(vsBytes.AsSpan());
         Assert.Equal(StageShaderKind.Vertex, vsInfo.Stage);
-        Assert.Equal(shader.Vertex.Resources, vsInfo.Resources);
+        Assert.Equal(shader.Vertex.GetResources(), vsInfo.Resources);
 
-        var fsInfo = SpirvReflection.GetShaderInfo(shader.Fragment.Code.AsSpan());
+        var fsBytes = shader.Fragment.GetCode(ShaderFormat.Spirv);
+        var fsInfo = SpirvReflection.GetShaderInfo(fsBytes.AsSpan());
         Assert.Equal(StageShaderKind.Fragment, fsInfo.Stage);
-        Assert.Equal(shader.Fragment.Resources, fsInfo.Resources);
+        Assert.Equal(shader.Fragment.GetResources(), fsInfo.Resources);
     }
 
     public static IEnumerable<object[]> BuiltInShaders() =>
@@ -83,36 +85,39 @@ public class SpirvReflectionTests
         };
 
     [Fact]
-    public void LoadSpirv_produces_StageShader_matching_the_original()
+    public void LoadFromFile_produces_StageShader_matching_the_original()
     {
         var bytes = EmitTexturedQuadFragment();
-        var loaded = StageShader.LoadSpirv(bytes);
+        var loaded = new StageShader(
+            StageShaderKind.Fragment,
+            ShaderFormat.Spirv,
+            System.Collections.Immutable.ImmutableArray.Create(bytes));
 
-        Assert.Equal(ShaderFormat.Spirv, loaded.Format);
         Assert.Equal(StageShaderKind.Fragment, loaded.Kind);
         Assert.Equal("main", loaded.Entrypoint);
-        Assert.Equal(1u, loaded.Resources.NumSamplers);
-        Assert.Equal(bytes.Length, loaded.Code.Length);
+        Assert.Equal(1u, loaded.GetResources().NumSamplers);
+        Assert.Equal(bytes.Length, loaded.GetCode(ShaderFormat.Spirv).Length);
     }
 
     [Fact]
-    public void Save_then_LoadSpirv_round_trips_via_disk()
+    public void Save_then_LoadFromFile_round_trips_via_disk()
     {
         var original = Shaders.TexturedQuadWithMatrix.Vertex;
+        var originalBytes = original.GetCode(ShaderFormat.Spirv);
 
         var path = Path.Combine(Path.GetTempPath(),
             $"grape-spirv-test-{Guid.NewGuid():N}.spv");
         try
         {
-            original.Save(path);
-            var loaded = StageShader.LoadSpirv(path);
+            original.Save(path, ShaderFormat.Spirv);
+            var loaded = StageShader.Load(path, original.Kind, ShaderFormat.Spirv);
 
             Assert.Equal(original.Kind, loaded.Kind);
-            Assert.Equal(original.Format, loaded.Format);
             Assert.Equal(original.Entrypoint, loaded.Entrypoint);
-            Assert.Equal(original.Resources, loaded.Resources);
-            Assert.Equal(original.Code.Length, loaded.Code.Length);
-            Assert.True(original.Code.AsSpan().SequenceEqual(loaded.Code.AsSpan()));
+            Assert.Equal(original.GetResources(), loaded.GetResources());
+            var loadedBytes = loaded.GetCode(ShaderFormat.Spirv);
+            Assert.Equal(originalBytes.Length, loadedBytes.Length);
+            Assert.True(originalBytes.AsSpan().SequenceEqual(loadedBytes.AsSpan()));
         }
         finally
         {

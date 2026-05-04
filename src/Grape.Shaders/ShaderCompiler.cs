@@ -119,8 +119,8 @@ public sealed class ShaderCompiler
         var output = new SpvEmitter().Emit(laidOut);
 
         var shader = new Shader<TVertex>(
-            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   vertexResources),
-            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), fragmentResources),
+            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
+            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
             ShaderVertexLayout);
 
         return new CompileResult<TVertex>(shader, diagnostics);
@@ -246,8 +246,8 @@ public sealed class ShaderCompiler
         var output = new SpvEmitter().Emit(laidOut);
 
         var shader = new Shader<TVertex, TArgs>(
-            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   vertexResources),
-            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), fragmentResources),
+            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
+            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
             ShaderVertexLayout,
             argsLayout);
 

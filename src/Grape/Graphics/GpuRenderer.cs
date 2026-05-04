@@ -948,21 +948,39 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if (_stageShaders.TryGetValue(stage, out var existing))
             return existing;
 
+        var format = SelectShaderFormat(_device.ShaderFormat);
+        var code = stage.GetCode(format);
+        var resources = stage.GetResources();
         var created = _device.CreateShader(new GpuShaderCreateInfo
         {
-            Code = stage.Code,
+            Code = code,
             Entrypoint = stage.Entrypoint,
-            Format = MapShaderFormat(stage.Format),
+            Format = MapShaderFormat(format),
             Stage = stage.Kind == StageShaderKind.Vertex
                 ? SDL.GPUShaderStage.Vertex
                 : SDL.GPUShaderStage.Fragment,
-            NumSamplers = stage.Resources.NumSamplers,
-            NumUniformBuffers = stage.Resources.NumUniformBuffers,
-            NumStorageTextures = stage.Resources.NumStorageTextures,
-            NumStorageBuffers = stage.Resources.NumStorageBuffers,
+            NumSamplers = resources.NumSamplers,
+            NumUniformBuffers = resources.NumUniformBuffers,
+            NumStorageTextures = resources.NumStorageTextures,
+            NumStorageBuffers = resources.NumStorageBuffers,
         });
         _stageShaders[stage] = created;
         return created;
+    }
+
+    /// <summary>
+    /// Picks one concrete <see cref="ShaderFormat"/> from the formats the
+    /// GPU device reports it accepts. Vulkan/SPIR-V is preferred when
+    /// available, then DXIL on D3D12, then MSL on Metal -- the same priority
+    /// order Grape's built-in shader loader uses.
+    /// </summary>
+    private static ShaderFormat SelectShaderFormat(SDL.GPUShaderFormat supported)
+    {
+        if ((supported & SDL.GPUShaderFormat.SPIRV) != 0) return ShaderFormat.Spirv;
+        if ((supported & SDL.GPUShaderFormat.DXIL)  != 0) return ShaderFormat.Dxil;
+        if ((supported & SDL.GPUShaderFormat.MSL)   != 0) return ShaderFormat.Msl;
+        throw new NotSupportedException(
+            $"GPU device reports no shader format Grape can produce. Reported: {supported}.");
     }
 
     private static SDL.GPUShaderFormat MapShaderFormat(ShaderFormat format) => format switch

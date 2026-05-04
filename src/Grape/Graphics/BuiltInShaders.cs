@@ -120,7 +120,7 @@ public sealed class BuiltInShaders
         var (format, folder, fileExt, entryPoint) = SelectFormat(_device.ShaderFormat);
         var resourcePath = $"{folder}.{shaderName}.{fileExt}";
         var code = LoadEmbedded(resourcePath);
-        return new StageShader(kind, format, code, resources, entryPoint);
+        return new StageShader(kind, format, code, entryPoint, resources);
     }
 
     private static (ShaderFormat format, string folder, string fileExt, string entryPoint) SelectFormat(GPUShaderFormat supported)
