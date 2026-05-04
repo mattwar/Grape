@@ -19,7 +19,7 @@ public class SpirvReflectionTests
         var bytes = EmitTexturedQuadVertex();
         var info = SpirvReflection.GetShaderInfo(bytes);
 
-        Assert.Equal(StageShaderKind.Vertex, info.Stage);
+        Assert.Equal(ShaderKind.Vertex, info.Stage);
         Assert.Equal("main", info.Entrypoint);
     }
 
@@ -29,7 +29,7 @@ public class SpirvReflectionTests
         var bytes = EmitTexturedQuadFragment();
         var info = SpirvReflection.GetShaderInfo(bytes);
 
-        Assert.Equal(StageShaderKind.Fragment, info.Stage);
+        Assert.Equal(ShaderKind.Fragment, info.Stage);
         Assert.Equal("main", info.Entrypoint);
     }
 
@@ -57,18 +57,18 @@ public class SpirvReflectionTests
     /// </summary>
     [Theory]
     [MemberData(nameof(BuiltInShaders))]
-    public void Reflected_counts_match_compiler_derived_counts(string name, Shader shader)
+    public void Reflected_counts_match_compiler_derived_counts(string name, Grape.ShaderSet shader)
     {
         _ = name; // displayed in test output
 
         var vsBytes = shader.Vertex.GetCode(ShaderFormat.Spirv);
         var vsInfo = SpirvReflection.GetShaderInfo(vsBytes.AsSpan());
-        Assert.Equal(StageShaderKind.Vertex, vsInfo.Stage);
+        Assert.Equal(ShaderKind.Vertex, vsInfo.Stage);
         Assert.Equal(shader.Vertex.GetResources(), vsInfo.Resources);
 
         var fsBytes = shader.Fragment.GetCode(ShaderFormat.Spirv);
         var fsInfo = SpirvReflection.GetShaderInfo(fsBytes.AsSpan());
-        Assert.Equal(StageShaderKind.Fragment, fsInfo.Stage);
+        Assert.Equal(ShaderKind.Fragment, fsInfo.Stage);
         Assert.Equal(shader.Fragment.GetResources(), fsInfo.Resources);
     }
 
@@ -88,12 +88,12 @@ public class SpirvReflectionTests
     public void LoadFromFile_produces_StageShader_matching_the_original()
     {
         var bytes = EmitTexturedQuadFragment();
-        var loaded = new StageShader(
-            StageShaderKind.Fragment,
+        var loaded = new Shader(
+            ShaderKind.Fragment,
             ShaderFormat.Spirv,
             System.Collections.Immutable.ImmutableArray.Create(bytes));
 
-        Assert.Equal(StageShaderKind.Fragment, loaded.Kind);
+        Assert.Equal(ShaderKind.Fragment, loaded.Kind);
         Assert.Equal("main", loaded.Entrypoint);
         Assert.Equal(1u, loaded.GetResources().NumSamplers);
         Assert.Equal(bytes.Length, loaded.GetCode(ShaderFormat.Spirv).Length);
@@ -110,7 +110,7 @@ public class SpirvReflectionTests
         try
         {
             original.Save(path, ShaderFormat.Spirv);
-            var loaded = StageShader.Load(path, original.Kind, ShaderFormat.Spirv);
+            var loaded = Shader.Load(path, original.Kind, ShaderFormat.Spirv);
 
             Assert.Equal(original.Kind, loaded.Kind);
             Assert.Equal(original.Entrypoint, loaded.Entrypoint);

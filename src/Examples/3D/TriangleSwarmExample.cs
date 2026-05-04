@@ -63,7 +63,7 @@ internal static class TriangleSwarmExample
 
                 // Render same triangle with different transforms many times per frame
                 // (no GPU upload cost since the vertex data is shared via ImmutableArray)
-                renderer.RenderMesh(triangle, renderer.Shaders.PositionColorTransform, transform);
+                renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
             }
         };
 

@@ -20,14 +20,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
-    private readonly Dictionary<StageShader, GpuShader> _stageShaders = new();
+    private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
     // Maps caller-owned vertex arrays to the renderer-owned Mesh that wraps
     // them. Lifetime is tied to the array reference: when the user drops
     // their array, the mesh becomes collectible, the renderer's weak ref
     // goes empty, and SweepCaches() disposes the GPU buffer.
     private readonly ConditionalWeakTable<Array, Mesh> _arrayMeshCache = new();
-    private BuiltInShaders? _shaders;
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
@@ -55,11 +54,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// The <see cref="GpuDevice"/> this renderer draws through.
     /// </summary>
     internal GpuDevice Device => _device;
-
-    /// <summary>
-    /// Lazy access to the precompiled shaders bundled with Grape.
-    /// </summary>
-    public override BuiltInShaders Shaders => _shaders ??= new BuiltInShaders(_device);
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
@@ -120,7 +114,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// The vertex type of the mesh and the shader must match. The mesh's
     /// vertex layout must also match the shader's expected vertex layout.
     /// </remarks>
-    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader)
+    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -137,11 +131,11 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// Draws a mesh using a shader that takes a typed per-draw arguments
     /// value. The bytes of <paramref name="args"/> are split across
     /// stage/slot pairs as described by
-    /// <see cref="Shader{TVertex,TArgs}.ArgsLayout"/>.
+    /// <see cref="ShaderSet{TVertex,TArgs}.ArgsLayout"/>.
     /// </summary>
     public override void RenderMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -174,7 +168,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// resources are released once you stop using it (either when the array
     /// is collected, or after a short idle period).
     /// </remarks>
-    public override void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, int? vertexCount = null)
+    public override void RenderMesh<TVertex>(TVertex[] vertices, ShaderSet<TVertex> shader, int? vertexCount = null)
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
@@ -188,11 +182,11 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Array overload of <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// Array overload of <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
     /// </summary>
     public override void RenderMesh<TVertex, TArgs>(
         TVertex[] vertices,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args,
         int? vertexCount = null)
     {
@@ -215,7 +209,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// over the same underlying array) on later frames reuses the cached
     /// GPU buffer with no re-upload, since immutable arrays cannot change.
     /// </summary>
-    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader)
+    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, ShaderSet<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(shader);
         if (vertices.IsDefault)
@@ -227,11 +221,11 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// <see cref="ImmutableArray{T}"/> overload of
-    /// <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
     /// </summary>
     public override void RenderMesh<TVertex, TArgs>(
         ImmutableArray<TVertex> vertices,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(shader);
@@ -254,7 +248,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </remarks>
     public override void RenderTexturedMesh(
         Mesh<TextureVertex3D> mesh,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -274,7 +268,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void RenderTexturedMesh<TArgs>(
         Mesh<TextureVertex3D> mesh,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args)
     {
@@ -302,7 +296,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void RenderTexturedMesh(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture,
         int? vertexCount = null)
     {
@@ -314,7 +308,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void RenderTexturedMesh<TArgs>(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args,
         int? vertexCount = null)
@@ -324,7 +318,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     internal void RenderTexturedMeshCore(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture,
         GpuSampler? sampler,
         int? vertexCount)
@@ -349,7 +343,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     internal void RenderTexturedMeshCore<TArgs>(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         GpuSampler? sampler,
         in TArgs args,
@@ -386,7 +380,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void RenderTexturedMesh(
         ImmutableArray<TextureVertex3D> vertices,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture)
     {
         ArgumentNullException.ThrowIfNull(shader);
@@ -403,7 +397,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void RenderTexturedMesh<TArgs>(
         ImmutableArray<TextureVertex3D> vertices,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args)
     {
@@ -943,7 +937,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         return pipeline;
     }
 
-    private GpuShader GetOrCreateGpuShader(StageShader stage)
+    private GpuShader GetOrCreateGpuShader(Shader stage)
     {
         if (_stageShaders.TryGetValue(stage, out var existing))
             return existing;
@@ -956,7 +950,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Code = code,
             Entrypoint = stage.Entrypoint,
             Format = MapShaderFormat(format),
-            Stage = stage.Kind == StageShaderKind.Vertex
+            Stage = stage.Kind == ShaderKind.Vertex
                 ? SDL.GPUShaderStage.Vertex
                 : SDL.GPUShaderStage.Fragment,
             NumSamplers = resources.NumSamplers,
@@ -1069,7 +1063,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     private record DrawCommand(
         Mesh Mesh,
-        Shader Shader,
+        ShaderSet Shader,
         Image? Texture,
         GpuSampler? Sampler)
     {
@@ -1084,7 +1078,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     private sealed record DrawCommand<TArgs>(
         Mesh Mesh,
-        Shader Shader,
+        ShaderSet Shader,
         Image? Texture,
         GpuSampler? Sampler,
         ShaderArgsLayout Layout,

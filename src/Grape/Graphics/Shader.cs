@@ -15,14 +15,14 @@ public readonly record struct ShaderResourceCounts(
     uint NumStorageTextures = 0,
     uint NumStorageBuffers = 0);
 
-/// <summary>Pipeline stage a <see cref="StageShader"/> targets.</summary>
-public enum StageShaderKind
+/// <summary>Pipeline stage a <see cref="Shader"/> targets.</summary>
+public enum ShaderKind
 {
     Vertex,
     Fragment,
 }
 
-/// <summary>Bytecode format of a <see cref="StageShader"/>.</summary>
+/// <summary>Bytecode format of a <see cref="Shader"/>.</summary>
 public enum ShaderFormat
 {
     Spirv,
@@ -33,7 +33,7 @@ public enum ShaderFormat
 /// <summary>
 /// One stage of a shader pipeline (vertex or fragment)
 /// </summary>
-public sealed class StageShader
+public sealed class Shader
 {
     // The HLSL source text, if supplied at construction.
     private readonly string? _source;
@@ -61,7 +61,7 @@ public sealed class StageShader
     /// The entry-point function name in <paramref name="source"/>.
     /// Defaults to <c>"main"</c>.
     /// </param>
-    public StageShader(StageShaderKind kind, string source, string entrypoint = "main")
+    public Shader(ShaderKind kind, string source, string entrypoint = "main")
     {
         ArgumentException.ThrowIfNullOrEmpty(source);
         ArgumentException.ThrowIfNullOrEmpty(entrypoint);
@@ -84,8 +84,8 @@ public sealed class StageShader
     /// because Grape cannot reflect those formats; optional for
     /// <see cref="ShaderFormat.Spirv"/> (reflected on demand if not supplied).
     /// </param>
-    public StageShader(
-        StageShaderKind kind,
+    public Shader(
+        ShaderKind kind,
         ShaderFormat format,
         ImmutableArray<byte> code,
         string entrypoint = "main",
@@ -108,7 +108,7 @@ public sealed class StageShader
     }
 
     /// <summary>The pipeline stage this shader targets.</summary>
-    public StageShaderKind Kind { get; }
+    public ShaderKind Kind { get; }
 
     /// <summary>The entry-point function name within the shader source/bytecode.</summary>
     public string Entrypoint { get; }
@@ -159,16 +159,16 @@ public sealed class StageShader
     /// Loads a shader from a file containing precompiled shader code in
     /// <paramref name="format"/>. 
     /// </summary>
-    public static StageShader Load(
+    public static Shader Load(
         string path,
-        StageShaderKind kind,
+        ShaderKind kind,
         ShaderFormat format,
         string entrypoint = "main",
         ShaderResourceCounts? resources = null)
     {
         ArgumentException.ThrowIfNullOrEmpty(path);
         var bytes = File.ReadAllBytes(path);
-        return new StageShader(
+        return new Shader(
             kind,
             format,
             ImmutableCollectionsMarshal.AsImmutableArray(bytes),
@@ -306,7 +306,7 @@ public sealed class StageShader
 
     private static ImmutableArray<byte> SpirvToMsl(
         ReadOnlySpan<byte> spirv,
-        StageShaderKind stage,
+        ShaderKind stage,
         string entrypoint)
     {
         EnsureShaderCrossInitialized();
@@ -344,10 +344,10 @@ public sealed class StageShader
         }
     }
 
-    private static SDL3.ShaderCross.ShaderStage ToShaderCrossStage(StageShaderKind kind) => kind switch
+    private static SDL3.ShaderCross.ShaderStage ToShaderCrossStage(ShaderKind kind) => kind switch
     {
-        StageShaderKind.Vertex   => SDL3.ShaderCross.ShaderStage.Vertex,
-        StageShaderKind.Fragment => SDL3.ShaderCross.ShaderStage.Fragment,
+        ShaderKind.Vertex   => SDL3.ShaderCross.ShaderStage.Vertex,
+        ShaderKind.Fragment => SDL3.ShaderCross.ShaderStage.Fragment,
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
@@ -395,19 +395,19 @@ public sealed class StageShader
 /// CPU-side bytecode; GPU resources are created lazily by a renderer when
 /// the shader is first drawn.
 /// </summary>
-public abstract class Shader
+public abstract class ShaderSet
 {
-    private protected Shader(
-        StageShader vertex,
-        StageShader fragment,
+    private protected ShaderSet(
+        Shader vertex,
+        Shader fragment,
         ShaderVertexLayout vertexLayout)
     {
         ArgumentNullException.ThrowIfNull(vertex);
         ArgumentNullException.ThrowIfNull(fragment);
         ArgumentNullException.ThrowIfNull(vertexLayout);
-        if (vertex.Kind != StageShaderKind.Vertex)
+        if (vertex.Kind != ShaderKind.Vertex)
             throw new ArgumentException("Vertex stage must have Vertex kind.", nameof(vertex));
-        if (fragment.Kind != StageShaderKind.Fragment)
+        if (fragment.Kind != ShaderKind.Fragment)
             throw new ArgumentException("Fragment stage must have Fragment kind.", nameof(fragment));
 
         Vertex = vertex;
@@ -416,14 +416,14 @@ public abstract class Shader
     }
 
     /// <summary>
-    /// The vertex shader stage. Must have <see cref="StageShaderKind.Vertex"/> kind.   
+    /// The vertex shader stage. Must have <see cref="ShaderKind.Vertex"/> kind.   
     /// </summary>
-    public StageShader Vertex { get; }
+    public Shader Vertex { get; }
 
     /// <summary>
-    /// The fragment shader stage. Must have <see cref="StageShaderKind.Fragment"/> kind.
+    /// The fragment shader stage. Must have <see cref="ShaderKind.Fragment"/> kind.
     /// </summary>
-    public StageShader Fragment { get; }
+    public Shader Fragment { get; }
 
     /// <summary>
     /// The layout of the vertex data the vertex shader receives.
@@ -437,11 +437,11 @@ public abstract class Shader
 /// <typeparam name="TVertex">
 /// The vertex struct that meshes drawn with this shader must use.
 /// </typeparam>
-public class Shader<TVertex> : Shader where TVertex : unmanaged
+public class ShaderSet<TVertex> : ShaderSet where TVertex : unmanaged
 {
-    public Shader(
-        StageShader vertex,
-        StageShader fragment,
+    public ShaderSet(
+        Shader vertex,
+        Shader fragment,
         ShaderVertexLayout vertexLayout)
         : base(vertex, fragment, vertexLayout)
     {
@@ -463,13 +463,13 @@ public class Shader<TVertex> : Shader where TVertex : unmanaged
 /// elements of <see cref="ArgsLayout"/>. <c>sizeof(TArgs)</c> must
 /// equal <see cref="ShaderArgsLayout.TotalSize"/>.
 /// </typeparam>
-public sealed class Shader<TVertex, TArgs> : Shader<TVertex>
+public sealed class ShaderSet<TVertex, TArgs> : ShaderSet<TVertex>
     where TVertex : unmanaged
     where TArgs : unmanaged
 {
-    public Shader(
-        StageShader vertex,
-        StageShader fragment,
+    public ShaderSet(
+        Shader vertex,
+        Shader fragment,
         ShaderVertexLayout vertexLayout,
         ShaderArgsLayout argsLayout)
         : base(vertex, fragment, vertexLayout)

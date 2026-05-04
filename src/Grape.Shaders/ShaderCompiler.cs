@@ -5,15 +5,15 @@ namespace Grape.Shaders;
 
 /// <summary>
 /// Outcome of <see cref="ShaderCompiler.Compile{TVertex}"/>: the compiled
-/// <see cref="Shader{TVertex}"/> when compilation succeeded, plus every
+/// <see cref="ShaderSet{TVertex}"/> when compilation succeeded, plus every
 /// diagnostic recorded along the way.
 /// </summary>
 public sealed class CompileResult<TVertex>(
-    Shader<TVertex>? shader,
+    ShaderSet<TVertex>? shader,
     ImmutableList<ShaderDiagnostic> diagnostics)
     where TVertex : unmanaged
 {
-    public Shader<TVertex>? Shader { get; } = shader;
+    public ShaderSet<TVertex>? Shader { get; } = shader;
     public ImmutableList<ShaderDiagnostic> Diagnostics { get; } = diagnostics;
 
     /// <summary>True if any diagnostic has <see cref="ShaderDiagnosticSeverity.Error"/>.</summary>
@@ -27,7 +27,7 @@ public sealed class CompileResult<TVertex>(
         }
     }
 
-    public void Deconstruct(out Shader<TVertex>? shader, out ImmutableList<ShaderDiagnostic> diagnostics)
+    public void Deconstruct(out ShaderSet<TVertex>? shader, out ImmutableList<ShaderDiagnostic> diagnostics)
     {
         shader = Shader;
         diagnostics = Diagnostics;
@@ -36,16 +36,16 @@ public sealed class CompileResult<TVertex>(
 
 /// <summary>
 /// Outcome of <see cref="ShaderCompiler.Compile{TVertex,TArgs}"/>: the
-/// compiled <see cref="Shader{TVertex,TArgs}"/> when compilation succeeded,
+/// compiled <see cref="ShaderSet{TVertex,TArgs}"/> when compilation succeeded,
 /// plus every diagnostic recorded along the way.
 /// </summary>
 public sealed class CompileResult<TVertex, TArgs>(
-    Shader<TVertex, TArgs>? shader,
+    ShaderSet<TVertex, TArgs>? shader,
     ImmutableList<ShaderDiagnostic> diagnostics)
     where TVertex : unmanaged
     where TArgs : unmanaged
 {
-    public Shader<TVertex, TArgs>? Shader { get; } = shader;
+    public ShaderSet<TVertex, TArgs>? Shader { get; } = shader;
     public ImmutableList<ShaderDiagnostic> Diagnostics { get; } = diagnostics;
 
     public bool HasErrors
@@ -58,7 +58,7 @@ public sealed class CompileResult<TVertex, TArgs>(
         }
     }
 
-    public void Deconstruct(out Shader<TVertex, TArgs>? shader, out ImmutableList<ShaderDiagnostic> diagnostics)
+    public void Deconstruct(out ShaderSet<TVertex, TArgs>? shader, out ImmutableList<ShaderDiagnostic> diagnostics)
     {
         shader = Shader;
         diagnostics = Diagnostics;
@@ -67,7 +67,7 @@ public sealed class CompileResult<TVertex, TArgs>(
 
 /// <summary>
 /// Drives the full compile pipeline -- bind, layout, emit -- and packages the
-/// resulting bytecode as a <see cref="Shader{TVertex}"/> ready to hand to a
+/// resulting bytecode as a <see cref="ShaderSet{TVertex}"/> ready to hand to a
 /// renderer. Targets SPIR-V; emission is device-independent.
 /// </summary>
 public sealed class ShaderCompiler
@@ -84,7 +84,7 @@ public sealed class ShaderCompiler
 
     /// <summary>
     /// Binds, lays out, and emits <paramref name="set"/>, returning a
-    /// <see cref="Shader{TVertex}"/> on success. If binding produces any
+    /// <see cref="ShaderSet{TVertex}"/> on success. If binding produces any
     /// errors, the result holds <c>null</c> and the diagnostics; emission is
     /// not attempted.
     /// </summary>
@@ -118,9 +118,9 @@ public sealed class ShaderCompiler
         var laidOut = ShaderLayout.AssignLayout(bound);
         var output = new SpvEmitter().Emit(laidOut);
 
-        var shader = new Shader<TVertex>(
-            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
-            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
+        var shader = new ShaderSet<TVertex>(
+            new Shader(ShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
+            new Shader(ShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
             ShaderVertexLayout);
 
         return new CompileResult<TVertex>(shader, diagnostics);
@@ -245,9 +245,9 @@ public sealed class ShaderCompiler
         var laidOut = ShaderLayout.AssignLayout(bound);
         var output = new SpvEmitter().Emit(laidOut);
 
-        var shader = new Shader<TVertex, TArgs>(
-            new StageShader(StageShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
-            new StageShader(StageShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
+        var shader = new ShaderSet<TVertex, TArgs>(
+            new Shader(ShaderKind.Vertex,   ShaderFormat.Spirv, ImmutableArray.Create(output.Vertex),   resources: vertexResources),
+            new Shader(ShaderKind.Fragment, ShaderFormat.Spirv, ImmutableArray.Create(output.Fragment), resources: fragmentResources),
             ShaderVertexLayout,
             argsLayout);
 

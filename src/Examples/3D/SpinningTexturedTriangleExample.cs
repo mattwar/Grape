@@ -45,7 +45,7 @@ internal static class SpinningTexturedTriangleExample
 
             renderer.RenderTexturedMesh(
                 triangle,
-                renderer.Shaders.TexturedQuadWithMatrix,
+                Shaders.TexturedQuadWithMatrix,
                 checker,
                 transform);
         };

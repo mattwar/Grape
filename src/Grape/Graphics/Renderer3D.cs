@@ -8,22 +8,19 @@ namespace Grape;
 /// </summary>
 public abstract class Renderer3D
 {
-    /// <summary>Lazy access to the precompiled shaders bundled with Grape.</summary>
-    public abstract BuiltInShaders Shaders { get; }
-
     /// <summary>Draws a mesh using the given shader.</summary>
-    public abstract void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader)
+    public abstract void RenderMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>
     /// Draws a mesh using a shader that takes a typed per-draw arguments
     /// value. The bytes of <paramref name="args"/> are split across
     /// stage/slot pairs as described by
-    /// <see cref="Shader{TVertex,TArgs}.UniformLayout"/>.
+    /// <see cref="ShaderSet{TVertex,TArgs}.UniformLayout"/>.
     /// </summary>
     public abstract void RenderMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
@@ -34,7 +31,7 @@ public abstract class Renderer3D
     /// <see cref="Mesh{TVertex}"/> so subsequent frames reuse the cached
     /// GPU buffer when contents have not changed.
     /// </summary>
-    public abstract void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, int? vertexCount = null)
+    public abstract void RenderMesh<TVertex>(TVertex[] vertices, ShaderSet<TVertex> shader, int? vertexCount = null)
         where TVertex : unmanaged;
 
     /// <summary>
@@ -43,7 +40,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void RenderMesh<TVertex, TArgs>(
         TVertex[] vertices,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args,
         int? vertexCount = null)
         where TVertex : unmanaged
@@ -53,7 +50,7 @@ public abstract class Renderer3D
     /// Draws a mesh sourced from an <see cref="ImmutableArray{T}"/>; the
     /// renderer borrows the array's backing storage zero-copy.
     /// </summary>
-    public abstract void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader)
+    public abstract void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, ShaderSet<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>
@@ -62,7 +59,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void RenderMesh<TVertex, TArgs>(
         ImmutableArray<TVertex> vertices,
-        Shader<TVertex, TArgs> shader,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
@@ -70,13 +67,13 @@ public abstract class Renderer3D
     /// <summary>Draws a textured mesh sampling from the given image.</summary>
     public abstract void RenderTexturedMesh(
         Mesh<TextureVertex3D> mesh,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture);
 
     /// <summary>Draws a textured mesh using a shader with typed per-draw args.</summary>
     public abstract void RenderTexturedMesh<TArgs>(
         Mesh<TextureVertex3D> mesh,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args)
         where TArgs : unmanaged;
@@ -84,7 +81,7 @@ public abstract class Renderer3D
     /// <summary>Draws a textured mesh from a caller-owned vertex array.</summary>
     public abstract void RenderTexturedMesh(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture,
         int? vertexCount = null);
 
@@ -94,7 +91,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void RenderTexturedMesh<TArgs>(
         TextureVertex3D[] vertices,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args,
         int? vertexCount = null)
@@ -103,7 +100,7 @@ public abstract class Renderer3D
     /// <summary>Draws a textured mesh from an <see cref="ImmutableArray{T}"/>.</summary>
     public abstract void RenderTexturedMesh(
         ImmutableArray<TextureVertex3D> vertices,
-        Shader<TextureVertex3D> shader,
+        ShaderSet<TextureVertex3D> shader,
         Image texture);
 
     /// <summary>
@@ -112,7 +109,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void RenderTexturedMesh<TArgs>(
         ImmutableArray<TextureVertex3D> vertices,
-        Shader<TextureVertex3D, TArgs> shader,
+        ShaderSet<TextureVertex3D, TArgs> shader,
         Image texture,
         in TArgs args)
         where TArgs : unmanaged;

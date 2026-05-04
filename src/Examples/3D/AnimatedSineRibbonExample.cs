@@ -71,7 +71,7 @@ internal static class AnimatedSineRibbonExample
             var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
             // reuse same array with different vertex data each frame
-            renderer.RenderMesh(vertices, renderer.Shaders.PositionColorTransform, transform);
+            renderer.RenderMesh(vertices, Shaders.PositionColorTransform, transform);
         };
 
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));

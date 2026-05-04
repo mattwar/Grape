@@ -9,13 +9,13 @@ namespace Grape;
 /// name, and the resource counts SDL3 GPU needs to create the shader.
 /// </summary>
 public sealed record SpirvShaderInfo(
-    StageShaderKind Stage,
+    ShaderKind Stage,
     string Entrypoint,
     ShaderResourceCounts Resources);
 
 /// <summary>
 /// A small SPIR-V binary reflector. Walks a SPIR-V module to extract the
-/// information SDL3 GPU needs to create a <see cref="StageShader"/> from raw
+/// information SDL3 GPU needs to create a <see cref="Shader"/> from raw
 /// bytes -- the stage kind, entry-point name, and resource counts -- so
 /// callers don't have to track that metadata separately when loading
 /// precompiled shaders.
@@ -240,10 +240,10 @@ public static class SpirvReflection
                 NumStorageBuffers: numStorageBuffers));
     }
 
-    private static StageShaderKind? ToStage(uint executionModel) => executionModel switch
+    private static ShaderKind? ToStage(uint executionModel) => executionModel switch
     {
-        0u => StageShaderKind.Vertex,    // Vertex
-        4u => StageShaderKind.Fragment,  // Fragment
+        0u => ShaderKind.Vertex,    // Vertex
+        4u => ShaderKind.Fragment,  // Fragment
         _  => null,                      // TessControl/Eval, Geometry, GLCompute, etc.
     };
 
@@ -278,7 +278,7 @@ public static class SpirvReflection
             BinaryPrimitives.ReadUInt32LittleEndian(_bytes.Slice(wordIndex * 4, 4));
     }
 
-    private readonly record struct EntryPoint(StageShaderKind Stage, string Name);
+    private readonly record struct EntryPoint(ShaderKind Stage, string Name);
 
     private readonly record struct VariableInfo(uint Id, uint PointerTypeId, SpvStorageClass Storage);
 

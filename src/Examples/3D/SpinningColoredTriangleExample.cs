@@ -38,7 +38,7 @@ internal static class SpinningColoredTriangleExample
                 Matrix4x4.CreateScale(0.8f) *
                 Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-            renderer.RenderMesh(triangle, renderer.Shaders.PositionColorTransform, transform);
+            renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
         };
 
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));

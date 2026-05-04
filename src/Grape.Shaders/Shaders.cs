@@ -20,20 +20,20 @@ public static class Shaders
     private static readonly ShaderTypeSystem _types = new StandardShaderTypeSystem();
     private static readonly ShaderCompiler _compiler = new(_types);
 
-    private static Shader<ColorVertex3D>? _positionColor;
-    private static Shader<ColorVertex3D, Matrix4x4>? _positionColorTransform;
-    private static Shader<TextureVertex3D>? _texturedQuad;
-    private static Shader<TextureVertex3D, Matrix4x4>? _texturedQuadWithMatrix;
-    private static Shader<Vertex3D>? _position;
-    private static Shader<Vertex3D, Matrix4x4>? _positionTransform;
-    private static Shader<Vertex3D, PositionTransformColorArgs>? _positionTransformColor;
+    private static ShaderSet<ColorVertex3D>? _positionColor;
+    private static ShaderSet<ColorVertex3D, Matrix4x4>? _positionColorTransform;
+    private static ShaderSet<TextureVertex3D>? _texturedQuad;
+    private static ShaderSet<TextureVertex3D, Matrix4x4>? _texturedQuadWithMatrix;
+    private static ShaderSet<Vertex3D>? _position;
+    private static ShaderSet<Vertex3D, Matrix4x4>? _positionTransform;
+    private static ShaderSet<Vertex3D, PositionTransformColorArgs>? _positionTransformColor;
 
     /// <summary>Position-only vertices, no transform; emits a solid white pixel.</summary>
-    public static Shader<Vertex3D> Position =>
+    public static ShaderSet<Vertex3D> Position =>
         _position ??= BuildPosition();
 
     /// <summary>Position-only vertices, transformed by a per-draw 4x4 matrix; emits a solid white pixel.</summary>
-    public static Shader<Vertex3D, Matrix4x4> PositionTransform =>
+    public static ShaderSet<Vertex3D, Matrix4x4> PositionTransform =>
         _positionTransform ??= BuildPositionTransform();
 
     /// <summary>
@@ -41,23 +41,23 @@ public static class Shaders
     /// per-draw fragment color. Pair with
     /// <see cref="PositionTransformColorArgs"/>.
     /// </summary>
-    public static Shader<Vertex3D, PositionTransformColorArgs> PositionTransformColor =>
+    public static ShaderSet<Vertex3D, PositionTransformColorArgs> PositionTransformColor =>
         _positionTransformColor ??= BuildPositionTransformColor();
 
     /// <summary>Position + per-vertex color, no transform.</summary>
-    public static Shader<ColorVertex3D> PositionColor =>
+    public static ShaderSet<ColorVertex3D> PositionColor =>
         _positionColor ??= BuildPositionColor();
 
     /// <summary>Position + per-vertex color, transformed by a per-draw 4x4 matrix.</summary>
-    public static Shader<ColorVertex3D, Matrix4x4> PositionColorTransform =>
+    public static ShaderSet<ColorVertex3D, Matrix4x4> PositionColorTransform =>
         _positionColorTransform ??= BuildPositionColorTransform();
 
     /// <summary>Position + UV, no transform; samples the bound texture.</summary>
-    public static Shader<TextureVertex3D> TexturedQuad =>
+    public static ShaderSet<TextureVertex3D> TexturedQuad =>
         _texturedQuad ??= BuildTexturedQuad();
 
     /// <summary>Position + UV, transformed by a per-draw 4x4 matrix; samples the bound texture.</summary>
-    public static Shader<TextureVertex3D, Matrix4x4> TexturedQuadWithMatrix =>
+    public static ShaderSet<TextureVertex3D, Matrix4x4> TexturedQuadWithMatrix =>
         _texturedQuadWithMatrix ??= BuildTexturedQuadWithMatrix();
 
     /// <summary>Sugar for <see cref="ShaderCompiler.Compile{TVertex}"/> using the shared default compiler.</summary>
@@ -86,13 +86,13 @@ public static class Shaders
     private static readonly ShaderArgsLayout TransformLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex, 0, ShaderArgKind.Matrix4x4));
 
-    private static Shader<Vertex3D> BuildPosition()
+    private static ShaderSet<Vertex3D> BuildPosition()
     {
         var (set, vRes) = ComposePosition(transform: false);
         return CompileOrThrow<Vertex3D>(set, VertexOnlyMesh.ShaderVertexLayout, vRes, default);
     }
 
-    private static Shader<Vertex3D, Matrix4x4> BuildPositionTransform()
+    private static ShaderSet<Vertex3D, Matrix4x4> BuildPositionTransform()
     {
         var (set, _) = ComposePosition(transform: true);
         return CompileTransformOrThrow<Vertex3D>(set, VertexOnlyMesh.ShaderVertexLayout);
@@ -138,13 +138,13 @@ public static class Shaders
         return (Set(vs, fs), vertexResources);
     }
 
-    private static Shader<ColorVertex3D> BuildPositionColor()
+    private static ShaderSet<ColorVertex3D> BuildPositionColor()
     {
         var (set, vRes) = ComposePositionColor(transform: false);
         return CompileOrThrow<ColorVertex3D>(set, ColoredMesh.ShaderVertexLayout, vRes, default);
     }
 
-    private static Shader<ColorVertex3D, Matrix4x4> BuildPositionColorTransform()
+    private static ShaderSet<ColorVertex3D, Matrix4x4> BuildPositionColorTransform()
     {
         var (set, _) = ComposePositionColor(transform: true);
         return CompileTransformOrThrow<ColorVertex3D>(set, ColoredMesh.ShaderVertexLayout);
@@ -187,13 +187,13 @@ public static class Shaders
         return (Set(vs, fs), vertexResources);
     }
 
-    private static Shader<TextureVertex3D> BuildTexturedQuad()
+    private static ShaderSet<TextureVertex3D> BuildTexturedQuad()
     {
         var (set, vRes, fRes) = ComposeTexturedQuad(transform: false);
         return CompileOrThrow<TextureVertex3D>(set, TexturedMesh.ShaderVertexLayout, vRes, fRes);
     }
 
-    private static Shader<TextureVertex3D, Matrix4x4> BuildTexturedQuadWithMatrix()
+    private static ShaderSet<TextureVertex3D, Matrix4x4> BuildTexturedQuadWithMatrix()
     {
         var (set, _, _) = ComposeTexturedQuad(transform: true);
         return CompileTransformOrThrow<TextureVertex3D>(set, TexturedMesh.ShaderVertexLayout);
@@ -259,7 +259,7 @@ public static class Shaders
             );
     }
 
-    private static Shader<TVertex> CompileOrThrow<TVertex>(
+    private static ShaderSet<TVertex> CompileOrThrow<TVertex>(
         ShaderSet set,
         ShaderVertexLayout ShaderVertexLayout,
         ShaderResourceCounts vertexResources,
@@ -273,7 +273,7 @@ public static class Shaders
         return result.Shader;
     }
 
-    private static Shader<TVertex, Matrix4x4> CompileTransformOrThrow<TVertex>(
+    private static ShaderSet<TVertex, Matrix4x4> CompileTransformOrThrow<TVertex>(
         ShaderSet set,
         ShaderVertexLayout ShaderVertexLayout)
         where TVertex : unmanaged
@@ -288,7 +288,7 @@ public static class Shaders
         return result.Shader;
     }
 
-    private static Shader<Vertex3D, PositionTransformColorArgs> BuildPositionTransformColor()
+    private static ShaderSet<Vertex3D, PositionTransformColorArgs> BuildPositionTransformColor()
     {
         var vec3 = _types.GetVector(ShaderTypeSystem.Float, 3);
         var vec4 = _types.GetVector(ShaderTypeSystem.Float, 4);
