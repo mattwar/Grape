@@ -1,7 +1,7 @@
 namespace Grape.Shaders;
 
 /// <summary>
-/// Reference to a module-level <see cref="ShaderGlobal"/>. Carries a
+/// Reference to a set-level <see cref="ShaderGlobal"/>. Carries a
 /// <see cref="Name"/> for unbound use and an optional resolved
 /// <see cref="Global"/> (set by the binder; sets <see cref="ShaderElement.IsUnbound"/>
 /// to false once present).

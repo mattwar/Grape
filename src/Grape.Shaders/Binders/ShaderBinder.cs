@@ -2,33 +2,34 @@ namespace Grape.Shaders;
 
 /// <summary>
 /// Resolves global references and infers result types for every
-/// <see cref="ShaderExpression"/> in a tree. Bind errors are recorded as
-/// diagnostics on the offending node rather than thrown, so partially-broken
-/// trees can still be inspected and re-bound.
+/// <see cref="ShaderExpression"/> in a tree. Errors surface as diagnostics on
+/// the offending node, never as exceptions, so partially-broken trees remain
+/// inspectable.
 /// </summary>
 public class ShaderBinder(ShaderTypeSystem types)
 {
-    /// <summary>Type system used to construct inferred vector/matrix/array result types.</summary>
+    /// <summary>Type system used to infer result types.</summary>
     public ShaderTypeSystem Types { get; } = types;
 
-    /// <summary>
-    /// Binds <paramref name="element"/>: walks the tree bottom-up, resolves
-    /// global references against any enclosing <see cref="ShaderStage"/>'s
-    /// globals, and infers <see cref="ShaderExpression.ResultType"/> for every
-    /// expression. Returns the bound element and a flat list of every
-    /// diagnostic recorded anywhere in the tree.
-    /// </summary>
-    public BindResult<TElement> Bind<TElement>(TElement element) where TElement : ShaderElement
+    /// <summary>Binds <paramref name="set"/> and runs cross-stage validation.</summary>
+    public BindResult<ShaderSet> Bind(ShaderSet set)
     {
-        var bound = (TElement)new Rewriter(this).Rewrite(element)!;
-        return new BindResult<TElement>(bound, bound.GetContainedDiagnostics());
+        var bound = (ShaderSet)new Rewriter(this).Rewrite(set)!;
+        return ShaderSetValidator.Validate(bound);
     }
 
     /// <summary>
-    /// The rewriter that performs the actual bottom-up binding pass.
-    /// Nested in <see cref="ShaderBinder"/> so that binder state (the
-    /// global-scope stack) is private to a single binding operation.
+    /// Binds a single <paramref name="stage"/> in isolation. Useful for tests
+    /// and for compute-only pipelines built one stage at a time; cross-stage
+    /// checks are skipped.
     /// </summary>
+    public BindResult<ShaderStage> Bind(ShaderStage stage)
+    {
+        var bound = (ShaderStage)new Rewriter(this).Rewrite(stage)!;
+        return new BindResult<ShaderStage>(bound, bound.GetContainedDiagnostics());
+    }
+
+    /// <summary>Performs the binding pass; nested so its scope state is private to one bind.</summary>
     private sealed class Rewriter(ShaderBinder binder) : ShaderRewriter
     {
         private ShaderTypeSystem Types => binder.Types;
@@ -490,8 +491,9 @@ public class ShaderBinder(ShaderTypeSystem types)
 }
 
 /// <summary>
-/// Result of <see cref="ShaderBinder.Bind{TElement}(TElement)"/>: the bound
-/// element and a flat list of every diagnostic recorded in the tree.
+/// Result of <see cref="ShaderBinder.Bind(ShaderSet)"/> or
+/// <see cref="ShaderBinder.Bind(ShaderStage)"/>: the bound element and a flat
+/// list of every diagnostic recorded in the tree.
 /// </summary>
 public sealed class BindResult<TElement>(TElement element, ImmutableList<ShaderDiagnostic> diagnostics)
     where TElement : ShaderElement

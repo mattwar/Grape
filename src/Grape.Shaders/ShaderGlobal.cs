@@ -13,7 +13,7 @@ public enum ShaderGlobalKind
 }
 
 /// <summary>
-/// A module-level binding: name, type, role, and (when relevant) the built-in
+/// A set-level binding: name, type, role, and (when relevant) the built-in
 /// it represents. Layout numbers (<see cref="Location"/>, <see cref="BindingSet"/>,
 /// <see cref="BindingSlot"/>) are nullable and assigned monotonically by a
 /// layout-pass rewriter.

@@ -20,27 +20,35 @@ public static class ShaderFactory
 
     public static ParameterExpression Parameter(string name, ShaderType type) => new(name, type);
 
+    /// <summary>Per-vertex attribute read from a vertex buffer (vertex stage only).</summary>
     public static ShaderGlobal VertexInput(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.VertexInput);
 
+    /// <summary>Varying received from the previous pipeline stage, interpolated per-invocation.</summary>
     public static ShaderGlobal StageInput(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.StageInput);
 
+    /// <summary>Value written by this stage and consumed by the next stage (or a render target, in the fragment stage).</summary>
     public static ShaderGlobal StageOutput(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.StageOutput);
 
+    /// <summary>Read-only buffer-backed value uploaded by the CPU and constant for the entire draw.</summary>
     public static ShaderGlobal Uniform(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.Uniform);
 
+    /// <summary>Tiny constant block stored directly in the command buffer; cheaper than a uniform but size-limited.</summary>
     public static ShaderGlobal PushConstant(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.PushConstant);
 
+    /// <summary>Sampled image resource; combined with a <see cref="Sampler"/> to read filtered texels.</summary>
     public static ShaderGlobal Texture(string name, ShaderType type)
         => new(name, type, ShaderGlobalKind.Texture);
 
+    /// <summary>Filtering / addressing state used to sample a texture; bound separately from the texture itself.</summary>
     public static ShaderGlobal Sampler(string name)
         => new(name, ShaderTypeSystem.Sampler, ShaderGlobalKind.Sampler);
 
+    /// <summary>Pipeline-defined variable like <c>gl_Position</c> or <c>gl_FragCoord</c>; written or read by the GPU itself, not laid out by location or binding.</summary>
     public static ShaderGlobal Builtin(ShaderBuiltin builtin, ShaderGlobalKind direction, ShaderType type)
         => new(builtin.ToString(), type, direction, builtin);
 
@@ -234,7 +242,7 @@ public static class ShaderFactory
     public static BreakExpression   Break()    => new();
     public static ContinueExpression Continue() => new();
 
-    // ---- Module-level -------------------------------------------------------
+    // ---- Set-level ----------------------------------------------------------
 
     public static ShaderFunction Function(
         string name,
@@ -295,6 +303,6 @@ public static class ShaderFactory
         ShaderExpression entryBody)
         => new(kind, globals, functions, entryBody);
 
-    public static ShaderModule Module(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute = null)
+    public static ShaderSet Set(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute = null)
         => new(vertex, fragment, compute);
 }

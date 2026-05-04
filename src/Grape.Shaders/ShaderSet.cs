@@ -1,16 +1,16 @@
 namespace Grape.Shaders;
 
 /// <summary>A complete pipeline: typically a vertex stage + fragment stage, or a compute stage.</summary>
-public sealed class ShaderModule : ShaderElement
+public sealed class ShaderSet : ShaderElement
 {
     public ShaderStage? Vertex   { get; }
     public ShaderStage? Fragment { get; }
     public ShaderStage? Compute  { get; }
 
-    public ShaderModule(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute = null)
+    public ShaderSet(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute = null)
         : this(vertex, fragment, compute, null) { }
 
-    private ShaderModule(
+    private ShaderSet(
         ShaderStage? vertex,
         ShaderStage? fragment,
         ShaderStage? compute,
@@ -22,16 +22,16 @@ public sealed class ShaderModule : ShaderElement
         Compute = compute;
     }
 
-    public ShaderModule WithStages(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute)
+    public ShaderSet WithStages(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute)
         => ReferenceEquals(vertex, Vertex)
             && ReferenceEquals(fragment, Fragment)
             && ReferenceEquals(compute, Compute)
                 ? this
-                : new ShaderModule(vertex, fragment, compute, Diagnostics);
+                : new ShaderSet(vertex, fragment, compute, Diagnostics);
 
-    public override ShaderModule WithDiagnostics(ImmutableList<ShaderDiagnostic> diagnostics)
+    public override ShaderSet WithDiagnostics(ImmutableList<ShaderDiagnostic> diagnostics)
         => diagnostics == Diagnostics ? this
-            : new ShaderModule(Vertex, Fragment, Compute, diagnostics);
+            : new ShaderSet(Vertex, Fragment, Compute, diagnostics);
 
     public override int ChildCount => 3;
     public override ShaderElement? GetChild(int index) => index switch
@@ -42,7 +42,7 @@ public sealed class ShaderModule : ShaderElement
         _ => throw new ArgumentOutOfRangeException(nameof(index)),
     };
 
-    public override ShaderModule RewriteChildren(ShaderRewriter rewriter)
+    public override ShaderSet RewriteChildren(ShaderRewriter rewriter)
     {
         var v = (ShaderStage?)rewriter.Rewrite(Vertex);
         var f = (ShaderStage?)rewriter.Rewrite(Fragment);

@@ -75,7 +75,7 @@ public abstract class ShaderTypeSystem
 /// Default type system. Vectors, matrices, and arrays are structurally
 /// interned. Structs are nominal -- each call returns a distinct instance.
 /// </summary>
-public sealed class DefaultShaderTypeSystem : ShaderTypeSystem
+public sealed class StandardShaderTypeSystem : ShaderTypeSystem
 {
     private readonly ConcurrentDictionary<(ShaderType Component, int N), VectorType> _vectors = new();
     private readonly ConcurrentDictionary<(ShaderType Component, int Rows, int Cols), MatrixType> _matrices = new();
