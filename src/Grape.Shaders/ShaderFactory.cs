@@ -178,6 +178,28 @@ public static class ShaderFactory
     public static DeclareLocalExpression Var(ParameterExpression variable, ShaderExpression? init = null)
         => new(variable, init, isMutable: true);
 
+    /// <summary>
+    /// Introduces an immutable local with <paramref name="init"/> and invokes
+    /// <paramref name="body"/> with the local in scope. Returns a block that
+    /// declares the local and then evaluates the body.
+    /// </summary>
+    public static BlockExpression Let(
+        ParameterExpression variable,
+        ShaderExpression init,
+        Func<ParameterExpression, ShaderExpression> body)
+        => new([new DeclareLocalExpression(variable, init, isMutable: false), body(variable)]);
+
+    /// <summary>
+    /// Introduces a mutable local (optionally initialized) and invokes
+    /// <paramref name="body"/> with the local in scope. Returns a block that
+    /// declares the local and then evaluates the body.
+    /// </summary>
+    public static BlockExpression Var(
+        ParameterExpression variable,
+        ShaderExpression? init,
+        Func<ParameterExpression, ShaderExpression> body)
+        => new([new DeclareLocalExpression(variable, init, isMutable: true), body(variable)]);
+
     public static AssignExpression Assign(ShaderExpression target, ShaderExpression value)
         => new(target, value);
 
@@ -192,6 +214,18 @@ public static class ShaderFactory
         ShaderExpression step,
         ShaderExpression body)
         => new(variable, initial, test, step, body);
+
+    /// <summary>
+    /// Bounded for-loop where <paramref name="test"/>, <paramref name="step"/>,
+    /// and <paramref name="body"/> are lambdas that receive the loop variable.
+    /// </summary>
+    public static ForExpression For(
+        ParameterExpression variable,
+        ShaderExpression initial,
+        Func<ParameterExpression, ShaderExpression> test,
+        Func<ParameterExpression, ShaderExpression> step,
+        Func<ParameterExpression, ShaderExpression> body)
+        => new(variable, initial, test(variable), step(variable), body(variable));
 
     public static WhileExpression While(ShaderExpression test, ShaderExpression body) => new(test, body);
 
@@ -208,6 +242,51 @@ public static class ShaderFactory
         ImmutableArray<ParameterExpression> parameters,
         ShaderExpression body)
         => new(name, returnType, parameters, body);
+
+
+    public static ShaderFunction Function(
+        string name,
+        ShaderType returnType,
+        ShaderExpression body)
+        => new(name, returnType, [.. Array.Empty<ParameterExpression>()], body);
+
+    public static ShaderFunction Function(
+        string name,
+        ShaderType returnType,
+        ParameterExpression param1,
+        Func<ParameterExpression, ShaderExpression> bodyFunc) 
+        =>
+        new(name, returnType, [param1], bodyFunc(param1));
+
+    public static ShaderFunction Function(
+        string name,
+        ShaderType returnType,
+        ParameterExpression param1,
+        ParameterExpression param2,
+        Func<ParameterExpression, ParameterExpression, ShaderExpression> bodyFunc) 
+        =>
+        new(name, returnType, [param1, param2], bodyFunc(param1, param2));
+
+    public static ShaderFunction Function(
+        string name,
+        ShaderType returnType,
+        ParameterExpression param1,
+        ParameterExpression param2,
+        ParameterExpression param3,
+        Func<ParameterExpression, ParameterExpression, ParameterExpression, ShaderExpression> bodyFunc) 
+        =>
+        new(name, returnType, [param1, param2, param3], bodyFunc(param1, param2, param3));
+
+    public static ShaderFunction Function(
+        string name,
+        ShaderType returnType,
+        ParameterExpression param1,
+        ParameterExpression param2,
+        ParameterExpression param3,
+        ParameterExpression param4,
+        Func<ParameterExpression, ParameterExpression, ParameterExpression, ParameterExpression, ShaderExpression> bodyFunc) 
+        =>
+        new(name, returnType, [param1, param2, param3, param4], bodyFunc(param1, param2, param3, param4));
 
     public static ShaderStage Stage(
         ShaderStageKind kind,
