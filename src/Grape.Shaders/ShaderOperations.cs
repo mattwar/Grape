@@ -2,7 +2,7 @@ namespace Grape.Shaders;
 
 public enum ShaderBinaryOp
 {
-    Add, Sub, Mul, Div, Mod,
+    Add, Sub, Mul, Div, Rem,
     MatMul,
     Eq, Ne, Lt, Le, Gt, Ge,
     And, Or,
