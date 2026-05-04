@@ -20,6 +20,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
+    private readonly Dictionary<StageShader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
     // Maps caller-owned vertex arrays to the renderer-owned Mesh that wraps
     // them. Lifetime is tied to the array reference: when the user drops
@@ -573,9 +574,11 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 foreach (var command in prepared)
                 {
                     var shader = command.Command.Shader;
+                    var vsGpu = GetOrCreateGpuShader(shader.Vertex);
+                    var fsGpu = GetOrCreateGpuShader(shader.Fragment);
                     var pipeline = GetOrCreatePipeline(
-                        shader.VertexShader,
-                        shader.FragmentShader,
+                        vsGpu,
+                        fsGpu,
                         _colorFormat,
                         shader.VertexLayout);
                     renderPass!.BindGraphicsPipeline(pipeline);
@@ -803,6 +806,36 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
         return pipeline;
     }
+
+    private GpuShader GetOrCreateGpuShader(StageShader stage)
+    {
+        if (_stageShaders.TryGetValue(stage, out var existing))
+            return existing;
+
+        var created = _device.CreateShader(new GpuShaderCreateInfo
+        {
+            Code = stage.Code,
+            Entrypoint = stage.Entrypoint,
+            Format = MapShaderFormat(stage.Format),
+            Stage = stage.Kind == StageShaderKind.Vertex
+                ? SDL.GPUShaderStage.Vertex
+                : SDL.GPUShaderStage.Fragment,
+            NumSamplers = stage.Resources.NumSamplers,
+            NumUniformBuffers = stage.Resources.NumUniformBuffers,
+            NumStorageTextures = stage.Resources.NumStorageTextures,
+            NumStorageBuffers = stage.Resources.NumStorageBuffers,
+        });
+        _stageShaders[stage] = created;
+        return created;
+    }
+
+    private static SDL.GPUShaderFormat MapShaderFormat(ShaderFormat format) => format switch
+    {
+        ShaderFormat.Spirv => SDL.GPUShaderFormat.SPIRV,
+        ShaderFormat.Dxil  => SDL.GPUShaderFormat.DXIL,
+        ShaderFormat.Msl   => SDL.GPUShaderFormat.MSL,
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+    };
 
     private GpuPipeline CreatePipeline(
         GpuShader vertexShader,

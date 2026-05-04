@@ -9,18 +9,19 @@ namespace Grape;
 /// <remarks>
 /// Three precompiled formats ship with the library: SPIR-V (Vulkan), DXIL (D3D12),
 /// and MSL (Metal). The loader picks the first supported format reported by the
-/// device.
+/// device. Returned shaders hold CPU-side bytecode only; the renderer uploads
+/// them to the GPU on first use.
 /// </remarks>
 public sealed class BuiltInShaders
 {
     private readonly GpuDevice _device;
 
-    private GpuShader? _positionColorVert;
-    private GpuShader? _positionColorTransformVert;
-    private GpuShader? _texturedQuadVert;
-    private GpuShader? _texturedQuadWithMatrixVert;
-    private GpuShader? _solidColorFrag;
-    private GpuShader? _texturedQuadFrag;
+    private StageShader? _positionColorVert;
+    private StageShader? _positionColorTransformVert;
+    private StageShader? _texturedQuadVert;
+    private StageShader? _texturedQuadWithMatrixVert;
+    private StageShader? _solidColorFrag;
+    private StageShader? _texturedQuadFrag;
 
     private Shader<ColorVertex3D>? _positionColor;
     private Shader<ColorVertex3D>? _positionColorTransform;
@@ -78,91 +79,49 @@ public sealed class BuiltInShaders
             TexturedMesh.VertexLayout,
             requiresTransform: true);
 
-    /// <summary>
-    /// Vertex shader: does not alter the vertex position or color. Positions
-    /// must already be in normalized device coordinates (the visible cube is
-    /// -1 to 1 on each axis). Useful for screen-space drawing or testing.
-    /// </summary>
-    internal GpuShader PositionColorVert =>
-        _positionColorVert ??= CreateShader("PositionColor.vert");
+    private StageShader PositionColorVert =>
+        _positionColorVert ??= LoadStage("PositionColor.vert", StageShaderKind.Vertex);
 
-    /// <summary>
-    /// Vertex shader: transforms the vertex position via a 4x4 matrix (in slot 0)
-    /// and does not alter the color. Use this for normal 3D drawing where you
-    /// supply a model-view-projection matrix.
-    /// </summary>
-    internal GpuShader PositionColorTransformVert =>
-        _positionColorTransformVert ??= CreateShader("PositionColorTransform.vert", numUniformBuffers: 1);
+    private StageShader PositionColorTransformVert =>
+        _positionColorTransformVert ??= LoadStage(
+            "PositionColorTransform.vert", StageShaderKind.Vertex,
+            new ShaderResourceCounts(NumUniformBuffers: 1));
 
-    /// <summary>
-    /// Vertex shader: does not alter the vertex position or texture coordinate.
-    /// Positions must already be in normalized device coordinates (the visible
-    /// cube is -1 to 1 on each axis). Useful for full-screen quads or
-    /// screen-space drawing.
-    /// </summary>
-    internal GpuShader TexturedQuadVert =>
-        _texturedQuadVert ??= CreateShader("TexturedQuad.vert");
+    private StageShader TexturedQuadVert =>
+        _texturedQuadVert ??= LoadStage("TexturedQuad.vert", StageShaderKind.Vertex);
 
-    /// <summary>
-    /// Vertex shader: transforms the vertex position via a 4x4 matrix (in slot 0)
-    /// and does not alter the texture coordinate. Use this for normal 3D drawing
-    /// of textured meshes where you supply a model-view-projection matrix.
-    /// </summary>
-    internal GpuShader TexturedQuadWithMatrixVert =>
-        _texturedQuadWithMatrixVert ??= CreateShader("TexturedQuadWithMatrix.vert", numUniformBuffers: 1);
+    private StageShader TexturedQuadWithMatrixVert =>
+        _texturedQuadWithMatrixVert ??= LoadStage(
+            "TexturedQuadWithMatrix.vert", StageShaderKind.Vertex,
+            new ShaderResourceCounts(NumUniformBuffers: 1));
 
-    /// <summary>
-    /// Fragment shader: outputs the per-vertex color as the pixel color. Pair
-    /// with <see cref="PositionColorVert"/> or
-    /// <see cref="PositionColorTransformVert"/>.
-    /// </summary>
-    internal GpuShader SolidColorFrag =>
-        _solidColorFrag ??= CreateShader("SolidColor.frag");
+    private StageShader SolidColorFrag =>
+        _solidColorFrag ??= LoadStage("SolidColor.frag", StageShaderKind.Fragment);
 
-    /// <summary>
-    /// Fragment shader: looks up a pixel from a bound texture using the
-    /// per-vertex texture coordinate. Pair with <see cref="TexturedQuadVert"/>
-    /// or <see cref="TexturedQuadWithMatrixVert"/>.
-    /// </summary>
-    internal GpuShader TexturedQuadFrag =>
-        _texturedQuadFrag ??= CreateShader("TexturedQuad.frag", numSamplers: 1);
+    private StageShader TexturedQuadFrag =>
+        _texturedQuadFrag ??= LoadStage(
+            "TexturedQuad.frag", StageShaderKind.Fragment,
+            new ShaderResourceCounts(NumSamplers: 1));
 
-    private GpuShader CreateShader(
+    private StageShader LoadStage(
         string shaderName,
-        uint numSamplers = 0,
-        uint numUniformBuffers = 0,
-        uint numStorageTextures = 0,
-        uint numStorageBuffers = 0)
+        StageShaderKind kind,
+        ShaderResourceCounts resources = default)
     {
-        var stage = shaderName.EndsWith(".vert", StringComparison.Ordinal)
-            ? GPUShaderStage.Vertex
-            : GPUShaderStage.Fragment;
-
         var (format, folder, fileExt, entryPoint) = SelectFormat(_device.ShaderFormat);
         var resourcePath = $"{folder}.{shaderName}.{fileExt}";
         var code = LoadEmbedded(resourcePath);
-
-        return _device.CreateShader(new GpuShaderCreateInfo
-        {
-            Code = code,
-            Entrypoint = entryPoint,
-            Format = format,
-            Stage = stage,
-            NumSamplers = numSamplers,
-            NumUniformBuffers = numUniformBuffers,
-            NumStorageTextures = numStorageTextures,
-            NumStorageBuffers = numStorageBuffers,
-        });
+        return new StageShader(kind, format, code, resources, entryPoint);
     }
 
-    private static (GPUShaderFormat format, string folder, string fileExt, string entryPoint) SelectFormat(GPUShaderFormat supported)
+    private static (ShaderFormat format, string folder, string fileExt, string entryPoint) SelectFormat(GPUShaderFormat supported)
     {
         if ((supported & GPUShaderFormat.SPIRV) != 0)
-            return (GPUShaderFormat.SPIRV, "SPIRV", "spv", "main");
+            return (ShaderFormat.Spirv, "SPIRV", "spv", "main");
         if ((supported & GPUShaderFormat.DXIL) != 0)
-            return (GPUShaderFormat.DXIL, "DXIL", "dxil", "main");
+            return (ShaderFormat.Dxil, "DXIL", "dxil", "main");
         if ((supported & GPUShaderFormat.MSL) != 0)
-            return (GPUShaderFormat.MSL, "MSL", "msl", "main0");
+            return (ShaderFormat.Msl, "MSL", "msl", "main0");
 
         throw new NotSupportedException(
             $"GpuDevice reports no supported shader format compatible with bundled shaders. Reported: {supported}");
