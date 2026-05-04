@@ -144,6 +144,61 @@ public static class Shaders
         }
         """;
 
+    // Position-only vertex shader -- passes the position through unchanged.
+    private const string PositionVertHlsl = """
+        struct Input  { float3 Position : TEXCOORD0; };
+        struct Output { float4 Position : SV_Position; };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.Position = float4(input.Position, 1.0f);
+            return output;
+        }
+        """;
+
+    // Position-only vertex shader with a per-draw 4x4 transform matrix.
+    private const string PositionTransformVertHlsl = """
+        cbuffer UBO : register(b0, space1)
+        {
+            float4x4 transform : packoffset(c0);
+        };
+
+        struct Input  { float3 Position : TEXCOORD0; };
+        struct Output { float4 Position : SV_Position; };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.Position = mul(transform, float4(input.Position, 1.0f));
+            return output;
+        }
+        """;
+
+    // Fragment shader that emits a single per-draw color from a uniform
+    // buffer. Fragment uniform buffers live in space3 by SDL3 GPU's
+    // SPIR-V binding convention.
+    private const string SolidColorUniformFragHlsl = """
+        cbuffer ColorBlock : register(b0, space3)
+        {
+            float4 Color : packoffset(c0);
+        };
+
+        float4 main() : SV_Target0
+        {
+            return Color;
+        }
+        """;
+
+    // Fragment shader that emits opaque white. Useful for proving geometry
+    // without paying for any per-vertex or per-draw color data.
+    private const string WhiteFragHlsl = """
+        float4 main() : SV_Target0
+        {
+            return float4(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+        """;
+
     // ---- Per-stage Shader instances. Several sets share a fragment stage
     // (e.g. SolidColor is used by both PositionColor variants), so we cache
     // each stage shader as a singleton to keep GPU upload bookkeeping
@@ -167,6 +222,18 @@ public static class Shaders
     private static readonly Shader TexturedQuadFrag =
         new(ShaderKind.Fragment, TexturedQuadFragHlsl);
 
+    private static readonly Shader PositionVert =
+        new(ShaderKind.Vertex, PositionVertHlsl);
+
+    private static readonly Shader PositionTransformVert =
+        new(ShaderKind.Vertex, PositionTransformVertHlsl);
+
+    private static readonly Shader SolidColorUniformFrag =
+        new(ShaderKind.Fragment, SolidColorUniformFragHlsl);
+
+    private static readonly Shader WhiteFrag =
+        new(ShaderKind.Fragment, WhiteFragHlsl);
+
     /// <summary>
     /// A single-element <see cref="ShaderArgsLayout"/> describing a 4x4
     /// matrix at vertex slot 0 -- the convention shared by every built-in
@@ -174,6 +241,37 @@ public static class Shaders
     /// </summary>
     private static readonly ShaderArgsLayout TransformLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex, 0, ShaderArgKind.Matrix4x4));
+
+    /// <summary>
+    /// Two-element layout: a vertex-stage 4x4 transform at slot 0 plus a
+    /// fragment-stage <c>float4</c> color at slot 0. Pairs with
+    /// <see cref="PositionTransformColorArgs"/>.
+    /// </summary>
+    private static readonly ShaderArgsLayout TransformAndColorLayout = new(
+        new ShaderArgElement(ShaderArgStage.Vertex,   0, ShaderArgKind.Matrix4x4),
+        new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4));
+
+    /// <summary>
+    /// Position-only vertices, no transform; emits opaque white. Positions
+    /// must already be in normalized device coordinates.
+    /// </summary>
+    public static ShaderSet<Vertex3D> Position { get; } =
+        new(PositionVert, WhiteFrag, VertexOnlyMesh.ShaderVertexLayout);
+
+    /// <summary>
+    /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
+    /// opaque white.
+    /// </summary>
+    public static ShaderSet<Vertex3D, Matrix4x4> PositionTransform { get; } =
+        new(PositionTransformVert, WhiteFrag, VertexOnlyMesh.ShaderVertexLayout, TransformLayout);
+
+    /// <summary>
+    /// Position-only vertices, transformed by a per-draw 4x4 matrix, with a
+    /// per-draw fragment color. Pair with
+    /// <see cref="PositionTransformColorArgs"/>.
+    /// </summary>
+    public static ShaderSet<Vertex3D, PositionTransformColorArgs> PositionTransformColor { get; } =
+        new(PositionTransformVert, SolidColorUniformFrag, VertexOnlyMesh.ShaderVertexLayout, TransformAndColorLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its baked color, with no
