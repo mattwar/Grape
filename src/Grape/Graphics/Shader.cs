@@ -112,6 +112,223 @@ public sealed class StageShader
         ArgumentException.ThrowIfNullOrEmpty(path);
         File.WriteAllBytes(path, Code.AsSpan().ToArray());
     }
+
+    /// <summary>
+    /// Compiles HLSL source code at runtime into a shader for the format the
+    /// current GPU device expects (SPIR-V on Vulkan, DXIL on D3D12, MSL on
+    /// Metal). Resource counts and entry-point metadata are reflected from
+    /// the compiled SPIR-V automatically -- the caller doesn't need to know
+    /// how many uniform buffers or samplers the shader uses.
+    /// </summary>
+    /// <param name="hlslSource">The HLSL source code to compile.</param>
+    /// <param name="kind">The pipeline stage to compile for.</param>
+    /// <param name="entrypoint">
+    /// The entry-point function name in <paramref name="hlslSource"/>.
+    /// Defaults to <c>"main"</c>.
+    /// </param>
+    /// <remarks>
+    /// Compilation is delegated to <c>SDL_shadercross</c>, which bundles
+    /// <c>dxcompiler</c> and SPIRV-Cross. The first call may have noticeable
+    /// startup cost (tens of ms) as those native components initialize;
+    /// subsequent calls are fast.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// HLSL compilation failed; <see cref="SDL3.SDL.GetError"/> contains the
+    /// underlying message.
+    /// </exception>
+    public static StageShader Compile(
+        string hlslSource,
+        StageShaderKind kind,
+        string entrypoint = "main") =>
+        Compile(hlslSource, kind, ResolveDeviceTargetFormat(), entrypoint);
+
+    /// <summary>
+    /// Compiles HLSL source code at runtime into a shader of the requested
+    /// <paramref name="targetFormat"/>. Use this overload when you need to
+    /// produce bytecode for a specific format regardless of which backend
+    /// the current GPU device chose -- e.g. when pre-baking shader bundles.
+    /// </summary>
+    /// <inheritdoc cref="Compile(string, StageShaderKind, string)"
+    ///     path="/exception"/>
+    public static StageShader Compile(
+        string hlslSource,
+        StageShaderKind kind,
+        ShaderFormat targetFormat,
+        string entrypoint = "main")
+    {
+        ArgumentException.ThrowIfNullOrEmpty(hlslSource);
+        ArgumentException.ThrowIfNullOrEmpty(entrypoint);
+
+        EnsureShaderCrossInitialized();
+
+        // Always go HLSL -> SPIR-V first: shadercross uses DXC as the HLSL
+        // front end and produces SPIR-V natively, then SPIRV-Cross translates
+        // onward to MSL, etc. The SPIR-V copy doubles as our reflection
+        // source so we always learn the resource counts the same way,
+        // regardless of which target format we emit.
+        using var hlslInfo = new SDL3.ShaderCross.HLSLInfo
+        {
+            Source = hlslSource,
+            Entrypoint = entrypoint,
+            ShaderStage = kind switch
+            {
+                StageShaderKind.Vertex   => SDL3.ShaderCross.ShaderStage.Vertex,
+                StageShaderKind.Fragment => SDL3.ShaderCross.ShaderStage.Fragment,
+                _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+            },
+        };
+
+        var spirvPtr = SDL3.ShaderCross.CompileSPIRVFromHLSL(in hlslInfo, out var spirvSize);
+        if (spirvPtr == IntPtr.Zero)
+            throw new InvalidOperationException(
+                $"HLSL -> SPIR-V compile failed: {SDL3.SDL.GetError()}");
+
+        SpirvShaderInfo info;
+        byte[] spirvBytes;
+        try
+        {
+            spirvBytes = GC.AllocateUninitializedArray<byte>((int)spirvSize);
+            Marshal.Copy(spirvPtr, spirvBytes, 0, spirvBytes.Length);
+            info = SpirvReflection.GetShaderInfo(spirvBytes);
+        }
+        finally
+        {
+            // We're about to either reuse spirvBytes (managed) or transpile
+            // to a different format from a fresh SPIRVInfo, so the native
+            // SPIR-V buffer is no longer needed.
+            SDL3.SDL.Free(spirvPtr);
+        }
+
+        if (info.Stage != kind)
+            throw new InvalidOperationException(
+                $"Compiled HLSL has stage {info.Stage} but caller requested {kind}.");
+
+        byte[] resultBytes;
+        switch (targetFormat)
+        {
+            case ShaderFormat.Spirv:
+                resultBytes = spirvBytes;
+                break;
+
+            case ShaderFormat.Dxil:
+            {
+                // Compile straight from HLSL to DXIL via DXC -- avoids a
+                // SPIR-V round trip and gives us the highest-fidelity DXIL.
+                var dxilPtr = SDL3.ShaderCross.CompileDXILFromHLSL(in hlslInfo, out var dxilSize);
+                if (dxilPtr == IntPtr.Zero)
+                    throw new InvalidOperationException(
+                        $"HLSL -> DXIL compile failed: {SDL3.SDL.GetError()}");
+                try
+                {
+                    resultBytes = GC.AllocateUninitializedArray<byte>((int)dxilSize);
+                    Marshal.Copy(dxilPtr, resultBytes, 0, resultBytes.Length);
+                }
+                finally
+                {
+                    SDL3.SDL.Free(dxilPtr);
+                }
+                break;
+            }
+
+            case ShaderFormat.Msl:
+            {
+                resultBytes = TranspileToMsl(spirvBytes, info.Stage, info.Entrypoint);
+                break;
+            }
+
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(targetFormat), targetFormat, "Unknown shader format.");
+        }
+
+        return new StageShader(
+            kind,
+            targetFormat,
+            ImmutableCollectionsMarshal.AsImmutableArray(resultBytes),
+            info.Resources,
+            info.Entrypoint);
+    }
+
+    /// <summary>
+    /// Picks a single concrete shader format from the GPU device's reported
+    /// supported set, using the same priority order as
+    /// <c>BuiltInShaders</c>: SPIR-V first, then DXIL, then MSL.
+    /// </summary>
+    private static ShaderFormat ResolveDeviceTargetFormat()
+    {
+        var supported = GpuDevice.Default.ShaderFormat;
+        if ((supported & SDL3.SDL.GPUShaderFormat.SPIRV) != 0) return ShaderFormat.Spirv;
+        if ((supported & SDL3.SDL.GPUShaderFormat.DXIL) != 0)  return ShaderFormat.Dxil;
+        if ((supported & SDL3.SDL.GPUShaderFormat.MSL) != 0)   return ShaderFormat.Msl;
+        throw new NotSupportedException(
+            $"GPU device reports no shader format supported by Grape. Reported: {supported}.");
+    }
+
+    /// <summary>
+    /// Transpiles SPIR-V bytecode to MSL source via SPIRV-Cross. SDL3's
+    /// Metal backend consumes MSL as a NUL-terminated UTF-8 string, so the
+    /// returned bytes include a trailing zero byte.
+    /// </summary>
+    private static unsafe byte[] TranspileToMsl(
+        ReadOnlySpan<byte> spirvBytes,
+        StageShaderKind stage,
+        string entrypoint)
+    {
+        fixed (byte* pSpirv = spirvBytes)
+        {
+            using var spv = new SDL3.ShaderCross.SPIRVInfo
+            {
+                ByteCode = (IntPtr)pSpirv,
+                ByteCodeSize = (UIntPtr)spirvBytes.Length,
+                Entrypoint = entrypoint,
+                ShaderStage = stage switch
+                {
+                    StageShaderKind.Vertex   => SDL3.ShaderCross.ShaderStage.Vertex,
+                    StageShaderKind.Fragment => SDL3.ShaderCross.ShaderStage.Fragment,
+                    _ => throw new ArgumentOutOfRangeException(nameof(stage)),
+                },
+            };
+
+            var mslPtr = SDL3.ShaderCross.TranspileMSLFromSPIRV(in spv);
+            if (mslPtr == IntPtr.Zero)
+                throw new InvalidOperationException(
+                    $"SPIR-V -> MSL transpile failed: {SDL3.SDL.GetError()}");
+            try
+            {
+                var text = Marshal.PtrToStringUTF8(mslPtr) ?? string.Empty;
+                var byteCount = System.Text.Encoding.UTF8.GetByteCount(text);
+                var bytes = new byte[byteCount + 1]; // +1 for NUL terminator
+                System.Text.Encoding.UTF8.GetBytes(text, bytes);
+                bytes[byteCount] = 0;
+                return bytes;
+            }
+            finally
+            {
+                SDL3.SDL.Free(mslPtr);
+            }
+        }
+    }
+
+    private static int _shaderCrossInitialized;
+
+    /// <summary>
+    /// Lazily initializes <c>SDL_shadercross</c> on first use. The native
+    /// library is reference-counted internally and safe to call from any
+    /// thread, but we still gate on a flag to keep startup cheap.
+    /// </summary>
+    private static void EnsureShaderCrossInitialized()
+    {
+        if (Interlocked.CompareExchange(ref _shaderCrossInitialized, 1, 0) != 0)
+            return;
+        if (!SDL3.ShaderCross.Init())
+        {
+            // Reset so a later attempt can retry once the underlying issue
+            // (e.g., missing native dependency) is fixed.
+            Interlocked.Exchange(ref _shaderCrossInitialized, 0);
+            throw new InvalidOperationException(
+                $"Failed to initialize SDL_shadercross: {SDL3.SDL.GetError()}");
+        }
+    }
 }
 
 /// <summary>

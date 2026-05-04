@@ -12,6 +12,7 @@
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
+    <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
   </ItemGroup>
 
