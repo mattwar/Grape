@@ -110,19 +110,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Draws a mesh using the given shader.
     /// </summary>
-    /// <remarks>
-    /// The vertex type of the mesh and the shader must match. The mesh's
-    /// vertex layout must also match the shader's expected vertex layout.
-    /// </remarks>
     public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
-
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(mesh));
 
         _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null));
     }
@@ -140,11 +131,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
-
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(mesh));
 
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
@@ -177,7 +163,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if ((uint)count > (uint)vertices.Length)
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
-        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
+        var mesh = GetOrCreateArrayMesh(vertices, count);
         RenderMesh(mesh, shader);
     }
 
@@ -197,7 +183,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if ((uint)count > (uint)vertices.Length)
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
-        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
+        var mesh = GetOrCreateArrayMesh(vertices, count);
         RenderMesh(mesh, shader, in args);
     }
 
@@ -215,7 +201,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if (vertices.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
-        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        var mesh = GetOrCreateImmutableArrayMesh(vertices);
         RenderMesh(mesh, shader);
     }
 
@@ -232,7 +218,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if (vertices.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
-        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        var mesh = GetOrCreateImmutableArrayMesh(vertices);
         RenderMesh(mesh, shader, in args);
     }
 
@@ -255,11 +241,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(mesh));
-
         _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null));
     }
 
@@ -275,11 +256,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
-
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(mesh));
 
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
@@ -331,12 +307,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if ((uint)count > (uint)vertices.Length)
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
-        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
-
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(vertices));
+        var mesh = GetOrCreateArrayMesh(vertices, count);
 
         _commands.Add(new DrawCommand(mesh, shader, texture, sampler));
     }
@@ -358,12 +329,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if ((uint)count > (uint)vertices.Length)
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
-        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
-
-        if (mesh.Layout != shader.VertexLayout)
-            throw new ArgumentException(
-                "The mesh's vertex layout does not match the shader's expected vertex layout.",
-                nameof(vertices));
+        var mesh = GetOrCreateArrayMesh(vertices, count);
 
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
@@ -388,7 +354,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if (vertices.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
-        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        var mesh = GetOrCreateImmutableArrayMesh(vertices);
         RenderTexturedMesh(mesh, shader, texture);
     }
 
@@ -406,7 +372,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         if (vertices.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
-        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        var mesh = GetOrCreateImmutableArrayMesh(vertices);
         RenderTexturedMesh(mesh, shader, texture, in args);
     }
 
@@ -564,7 +530,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         return atlas;
     }
 
-    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, ShaderVertexLayout layout)
+    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count)
         where TVertex : unmanaged
     {
         var span = vertices.AsSpan(0, count);
@@ -584,12 +550,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             return typed;
         }
 
-        var mesh = new Mesh<TVertex>(span, ReadOnlySpan<uint>.Empty, layout);
+        var mesh = new Mesh<TVertex>(span, ReadOnlySpan<uint>.Empty);
         _arrayMeshCache.Add(vertices, mesh);
         return mesh;
     }
 
-    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, ShaderVertexLayout layout)
+    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices)
         where TVertex : unmanaged
     {
         // Key on the immutable array's underlying T[]. Two ImmutableArrays
@@ -611,7 +577,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         }
 
         // Borrow the backing array zero-copy via the ImmutableArray ctor.
-        var mesh = new Mesh<TVertex>(vertices, ImmutableArray<uint>.Empty, layout);
+        var mesh = new Mesh<TVertex>(vertices, ImmutableArray<uint>.Empty);
         _arrayMeshCache.Add(backing, mesh);
         return mesh;
     }

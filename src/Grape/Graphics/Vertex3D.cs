@@ -20,6 +20,15 @@ public readonly struct Vertex3D
     {
         Position = new Vector3(x, y, z);
     }
+
+    /// <summary>
+    /// The shader-side vertex layout that pairs with this vertex struct.
+    /// Reused by every <see cref="ShaderSet{TVertex}"/> built over
+    /// <see cref="Vertex3D"/> so all such pipelines see the same attribute
+    /// description.
+    /// </summary>
+    public static ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3);
 }
 
 /// <summary>
@@ -41,6 +50,13 @@ public readonly struct ColorVertex3D
         : this(vertex.Position, color)
     {
     }
+
+    /// <summary>
+    /// The shader-side vertex layout that pairs with this vertex struct.
+    /// </summary>
+    public static ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.Color4);
 }
 
 /// <summary>
@@ -63,4 +79,11 @@ public readonly struct TextureVertex3D
         : this(vertex.Position, textureCoordinate)
     {
     }
+
+    /// <summary>
+    /// The shader-side vertex layout that pairs with this vertex struct.
+    /// </summary>
+    public static ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.TextureCoordinate2);
 }

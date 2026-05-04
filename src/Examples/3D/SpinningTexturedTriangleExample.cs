@@ -8,7 +8,7 @@ internal static class SpinningTexturedTriangleExample
     {
         // A textured triangle. Position is in NDC; UVs are in [0,1] with
         // (0,0) at the top-left of the texture and (1,1) at the bottom-right.
-        var triangle = new TexturedMesh(
+        var triangle = new Mesh<TextureVertex3D>(
             vertices: ImmutableArray.Create(
                 new TextureVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Vector2(0.5f, 0f)),
                 new TextureVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), new Vector2(1f,   1f)),

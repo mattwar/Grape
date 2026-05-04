@@ -19,7 +19,7 @@ internal static class PositionShadersExample
         // Position-only triangle, ~1 unit tall, centered at origin in model
         // space. The same vertex data drives every shader so any visual
         // difference between quadrants is purely the shader/uniform path.
-        var triangle = new VertexOnlyMesh(
+        var triangle = new Mesh<Vertex3D>(
             vertices: ImmutableArray.Create(
                 new Vertex3D( 0.0f,  0.5f, 0f),
                 new Vertex3D( 0.5f, -0.5f, 0f),
@@ -122,7 +122,7 @@ internal static class PositionShadersExample
     /// space inside the top-left quadrant. Used to exercise
     /// <see cref="Shaders.Position"/>, which takes no per-draw transform.
     /// </summary>
-    private static readonly VertexOnlyMesh StaticTopLeft = new(
+    private static readonly Mesh<Vertex3D> StaticTopLeft = new(
         vertices: ImmutableArray.Create(
             new Vertex3D(-0.5f,  0.7f, 0f),
             new Vertex3D(-0.3f,  0.3f, 0f),

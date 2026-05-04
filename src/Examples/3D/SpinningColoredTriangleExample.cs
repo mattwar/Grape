@@ -7,7 +7,7 @@ internal static class SpinningColoredTriangleExample
     public static async Task Run()
     {
         // A colored triangle in model space (centered at the origin, ~1 unit tall).
-        var triangle = new ColoredMesh(
+        var triangle = new Mesh<ColorVertex3D>(
             vertices: ImmutableArray.Create(
                 new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
                 new ColorVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), new Color(0,   255, 0)),

@@ -15,7 +15,6 @@ public abstract class Mesh
 
     public abstract int VertexCount { get; }
     public abstract int IndexCount { get; }
-    public abstract ShaderVertexLayout Layout { get; }
     public abstract ReadOnlySpan<byte> GetVertexBytes();
     public abstract ReadOnlySpan<uint> GetIndices();
 
@@ -27,8 +26,8 @@ public abstract class Mesh
 }
 
 /// <summary>
-/// CPU-Side mesh data used by <see cref="Renderer3D"/>.
-/// Can be updated with fresh vertex/index data.
+/// CPU-side mesh data used by <see cref="Renderer3D"/>. Can be updated with
+/// fresh vertex/index data.
 /// </summary>
 public class Mesh<TVertex> : Mesh
     where TVertex : unmanaged
@@ -44,13 +43,18 @@ public class Mesh<TVertex> : Mesh
     private int _indexCount;
     private bool _ownsIndices;
 
-    public Mesh(
-        ReadOnlySpan<TVertex> vertices,
-        ReadOnlySpan<uint> indices,
-        ShaderVertexLayout layout)
+    public Mesh(ReadOnlySpan<TVertex> vertices)
+        : this(vertices, ReadOnlySpan<uint>.Empty)
     {
-        ArgumentNullException.ThrowIfNull(layout);
+    }
 
+    public Mesh(ImmutableArray<TVertex> vertices)
+        : this(vertices, ImmutableArray<uint>.Empty)
+    {
+    }
+
+    public Mesh(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    {
         _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
         vertices.CopyTo(_vertices);
         _vertexCount = vertices.Length;
@@ -61,16 +65,11 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = true;
 
-        ShaderVertexLayout = layout;
         Version = 1;
     }
 
-    public Mesh(
-        ImmutableArray<TVertex> vertices,
-        ImmutableArray<uint> indices,
-        ShaderVertexLayout layout)
+    public Mesh(ImmutableArray<TVertex> vertices, ImmutableArray<uint> indices)
     {
-        ArgumentNullException.ThrowIfNull(layout);
         ThrowIfDefault(vertices, nameof(vertices));
         ThrowIfDefault(indices, nameof(indices));
 
@@ -85,17 +84,12 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = false;
 
-        ShaderVertexLayout = layout;
         Version = 1;
     }
-
-    public ShaderVertexLayout ShaderVertexLayout { get; }
 
     public override int VertexCount => _vertexCount;
 
     public override int IndexCount => _indexCount;
-
-    public override ShaderVertexLayout Layout => ShaderVertexLayout;
 
     public override ReadOnlySpan<byte> GetVertexBytes() =>
         MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
@@ -105,9 +99,8 @@ public class Mesh<TVertex> : Mesh
 
     /// <summary>
     /// Replaces the vertex and index data with new contents copied from the
-    /// supplied spans. The mesh's vertex layout is unchanged. Bumps
-    /// <see cref="Mesh.Version"/> so the renderer re-uploads the GPU
-    /// buffer on the next draw.
+    /// supplied spans. Bumps <see cref="Mesh.Version"/> so the renderer
+    /// re-uploads the GPU buffer on the next draw.
     /// </summary>
     public void Reset(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
     {
@@ -168,72 +161,4 @@ public class Mesh<TVertex> : Mesh
         if (array.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", paramName);
     }
-}
-
-/// <summary>
-/// Mesh with position-only vertices.
-/// </summary>
-public sealed class VertexOnlyMesh : Mesh<Vertex3D>
-{
-    public VertexOnlyMesh(ReadOnlySpan<Vertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    public VertexOnlyMesh(ImmutableArray<Vertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the built-in mesh type.
-    /// </summary>
-    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
-        ShaderVertexElementKind.Position3);
-}
-
-/// <summary>
-/// Mesh with vertex positions and colors.
-/// </summary>
-public sealed class ColoredMesh : Mesh<ColorVertex3D>
-{
-    public ColoredMesh(ReadOnlySpan<ColorVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    public ColoredMesh(ImmutableArray<ColorVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the colored mesh type.
-    /// </summary>
-    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
-        ShaderVertexElementKind.Position3,
-        ShaderVertexElementKind.Color4);
-}
-
-/// <summary>
-/// Mesh with vertex positions and texture coordinates.
-/// </summary>
-public sealed class TexturedMesh : Mesh<TextureVertex3D>
-{
-    public TexturedMesh(ReadOnlySpan<TextureVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    public TexturedMesh(ImmutableArray<TextureVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, ShaderVertexLayout)
-    {
-    }
-
-    /// <summary>
-    /// The default vertex layout used by the textured mesh type.
-    /// </summary>
-    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
-        ShaderVertexElementKind.Position3,
-        ShaderVertexElementKind.TextureCoordinate2);
 }

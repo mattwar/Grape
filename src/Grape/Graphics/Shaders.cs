@@ -256,14 +256,14 @@ public static class Shaders
     /// must already be in normalized device coordinates.
     /// </summary>
     public static ShaderSet<Vertex3D> Position { get; } =
-        new(PositionVert, WhiteFrag, VertexOnlyMesh.ShaderVertexLayout);
+        new(PositionVert, WhiteFrag, Vertex3D.ShaderVertexLayout);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
     /// opaque white.
     /// </summary>
     public static ShaderSet<Vertex3D, Matrix4x4> PositionTransform { get; } =
-        new(PositionTransformVert, WhiteFrag, VertexOnlyMesh.ShaderVertexLayout, TransformLayout);
+        new(PositionTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix, with a
@@ -271,7 +271,7 @@ public static class Shaders
     /// <see cref="PositionTransformColorArgs"/>.
     /// </summary>
     public static ShaderSet<Vertex3D, PositionTransformColorArgs> PositionTransformColor { get; } =
-        new(PositionTransformVert, SolidColorUniformFrag, VertexOnlyMesh.ShaderVertexLayout, TransformAndColorLayout);
+        new(PositionTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its baked color, with no
@@ -280,14 +280,14 @@ public static class Shaders
     /// screen-space drawing or testing.
     /// </summary>
     public static ShaderSet<ColorVertex3D> PositionColor { get; } =
-        new(PositionColorVert, SolidColorFrag, ColoredMesh.ShaderVertexLayout);
+        new(PositionColorVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its color, transforming the
     /// position by a per-draw 4x4 model-view-projection matrix.
     /// </summary>
     public static ShaderSet<ColorVertex3D, Matrix4x4> PositionColorTransform { get; } =
-        new(PositionColorTransformVert, SolidColorFrag, ColoredMesh.ShaderVertexLayout, TransformLayout);
+        new(PositionColorTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
     /// Draws each vertex at its position, sampling the bound texture using
@@ -295,7 +295,7 @@ public static class Shaders
     /// already be in normalized device coordinates.
     /// </summary>
     public static ShaderSet<TextureVertex3D> TexturedQuad { get; } =
-        new(TexturedQuadVert, TexturedQuadFrag, TexturedMesh.ShaderVertexLayout);
+        new(TexturedQuadVert, TexturedQuadFrag, TextureVertex3D.ShaderVertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position transformed by a per-draw 4x4
@@ -303,5 +303,5 @@ public static class Shaders
     /// vertex texture coordinate.
     /// </summary>
     public static ShaderSet<TextureVertex3D, Matrix4x4> TexturedQuadWithMatrix { get; } =
-        new(TexturedQuadWithMatrixVert, TexturedQuadFrag, TexturedMesh.ShaderVertexLayout, TransformLayout);
+        new(TexturedQuadWithMatrixVert, TexturedQuadFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
 }
