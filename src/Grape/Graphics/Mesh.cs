@@ -15,7 +15,7 @@ public abstract class Mesh
 
     public abstract int VertexCount { get; }
     public abstract int IndexCount { get; }
-    public abstract VertexLayout Layout { get; }
+    public abstract ShaderVertexLayout Layout { get; }
     public abstract ReadOnlySpan<byte> GetVertexBytes();
     public abstract ReadOnlySpan<uint> GetIndices();
 
@@ -47,9 +47,9 @@ public class Mesh<TVertex> : Mesh
     public Mesh(
         ReadOnlySpan<TVertex> vertices,
         ReadOnlySpan<uint> indices,
-        VertexLayout vertexLayout)
+        ShaderVertexLayout layout)
     {
-        ArgumentNullException.ThrowIfNull(vertexLayout);
+        ArgumentNullException.ThrowIfNull(layout);
 
         _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
         vertices.CopyTo(_vertices);
@@ -61,16 +61,16 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = true;
 
-        VertexLayout = vertexLayout;
+        ShaderVertexLayout = layout;
         Version = 1;
     }
 
     public Mesh(
         ImmutableArray<TVertex> vertices,
         ImmutableArray<uint> indices,
-        VertexLayout vertexLayout)
+        ShaderVertexLayout layout)
     {
-        ArgumentNullException.ThrowIfNull(vertexLayout);
+        ArgumentNullException.ThrowIfNull(layout);
         ThrowIfDefault(vertices, nameof(vertices));
         ThrowIfDefault(indices, nameof(indices));
 
@@ -85,17 +85,17 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = false;
 
-        VertexLayout = vertexLayout;
+        ShaderVertexLayout = layout;
         Version = 1;
     }
 
-    public VertexLayout VertexLayout { get; }
+    public ShaderVertexLayout ShaderVertexLayout { get; }
 
     public override int VertexCount => _vertexCount;
 
     public override int IndexCount => _indexCount;
 
-    public override VertexLayout Layout => VertexLayout;
+    public override ShaderVertexLayout Layout => ShaderVertexLayout;
 
     public override ReadOnlySpan<byte> GetVertexBytes() =>
         MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
@@ -176,20 +176,20 @@ public class Mesh<TVertex> : Mesh
 public sealed class VertexOnlyMesh : Mesh<Vertex3D>
 {
     public VertexOnlyMesh(ReadOnlySpan<Vertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     public VertexOnlyMesh(ImmutableArray<Vertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     /// <summary>
     /// The default vertex layout used by the built-in mesh type.
     /// </summary>
-    public static new VertexLayout VertexLayout { get; } = new(
-        VertexElementKind.Position3);
+    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3);
 }
 
 /// <summary>
@@ -198,21 +198,21 @@ public sealed class VertexOnlyMesh : Mesh<Vertex3D>
 public sealed class ColoredMesh : Mesh<ColorVertex3D>
 {
     public ColoredMesh(ReadOnlySpan<ColorVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     public ColoredMesh(ImmutableArray<ColorVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     /// <summary>
     /// The default vertex layout used by the colored mesh type.
     /// </summary>
-    public static new VertexLayout VertexLayout { get; } = new(
-        VertexElementKind.Position3,
-        VertexElementKind.Color4);
+    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.Color4);
 }
 
 /// <summary>
@@ -221,19 +221,19 @@ public sealed class ColoredMesh : Mesh<ColorVertex3D>
 public sealed class TexturedMesh : Mesh<TextureVertex3D>
 {
     public TexturedMesh(ReadOnlySpan<TextureVertex3D> vertices, ReadOnlySpan<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     public TexturedMesh(ImmutableArray<TextureVertex3D> vertices, ImmutableArray<uint> indices)
-        : base(vertices, indices, VertexLayout)
+        : base(vertices, indices, ShaderVertexLayout)
     {
     }
 
     /// <summary>
     /// The default vertex layout used by the textured mesh type.
     /// </summary>
-    public static new VertexLayout VertexLayout { get; } = new(
-        VertexElementKind.Position3,
-        VertexElementKind.TextureCoordinate2);
+    public static new ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.TextureCoordinate2);
 }

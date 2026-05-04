@@ -758,7 +758,7 @@ internal record GpuVertexBufferLayout
     /// <summary>
     /// The description of the data elements of each vertex.
     /// </summary>
-    public ImmutableArray<GpuVertexElement> Elements { get; init; }
+    public ImmutableArray<GpuShaderVertexElement> Elements { get; init; }
 
     /// <summary>
     /// Whether attribute addressing is a function of the vertex index or instance index.
@@ -769,7 +769,7 @@ internal record GpuVertexBufferLayout
 /// <summary>
 /// Describes one element within a vertex layout.
 /// </summary>
-internal record GpuVertexElement
+internal record GpuShaderVertexElement
 {
     /// <summary>
     /// The size and type of the attribute data.
@@ -1115,6 +1115,22 @@ internal sealed class GpuRenderPass : IDisposable
         }
     }
 
+    /// <summary>Pushes raw vertex uniform bytes for the given slot.</summary>
+    public void PushVertexUniformData(uint slotIndex, ReadOnlySpan<byte> data)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+        if (data.IsEmpty) return;
+
+        unsafe
+        {
+            fixed (byte* pData = data)
+            {
+                SDL.PushGPUVertexUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
+            }
+        }
+    }
+
     /// <summary>
     /// Draws non-indexed primitives using the currently bound graphics state.
     /// </summary>
@@ -1151,6 +1167,22 @@ internal sealed class GpuRenderPass : IDisposable
             fixed (T* pData = &data)
             {
                 SDL.PushGPUFragmentUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
+            }
+        }
+    }
+
+    /// <summary>Pushes raw fragment uniform bytes for the given slot.</summary>
+    public void PushFragmentUniformData(uint slotIndex, ReadOnlySpan<byte> data)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+        if (data.IsEmpty) return;
+
+        unsafe
+        {
+            fixed (byte* pData = data)
+            {
+                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
             }
         }
     }

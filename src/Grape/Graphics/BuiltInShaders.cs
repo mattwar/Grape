@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Numerics;
 using static SDL3.SDL;
 
 namespace Grape;
@@ -24,9 +25,9 @@ public sealed class BuiltInShaders
     private StageShader? _texturedQuadFrag;
 
     private Shader<ColorVertex3D>? _positionColor;
-    private Shader<ColorVertex3D>? _positionColorTransform;
+    private Shader<ColorVertex3D, Matrix4x4>? _positionColorTransform;
     private Shader<TextureVertex3D>? _texturedQuad;
-    private Shader<TextureVertex3D>? _texturedQuadWithMatrix;
+    private Shader<TextureVertex3D, Matrix4x4>? _texturedQuadWithMatrix;
 
     internal BuiltInShaders(GpuDevice device)
     {
@@ -43,18 +44,18 @@ public sealed class BuiltInShaders
         _positionColor ??= new Shader<ColorVertex3D>(
             PositionColorVert,
             SolidColorFrag,
-            ColoredMesh.VertexLayout);
+            ColoredMesh.ShaderVertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its color, transforming
-    /// the position by a 4x4 model-view-projection matrix.
+    /// the position by a per-draw 4x4 model-view-projection matrix.
     /// </summary>
-    public Shader<ColorVertex3D> PositionColorTransform =>
-        _positionColorTransform ??= new Shader<ColorVertex3D>(
+    public Shader<ColorVertex3D, Matrix4x4> PositionColorTransform =>
+        _positionColorTransform ??= new Shader<ColorVertex3D, Matrix4x4>(
             PositionColorTransformVert,
             SolidColorFrag,
-            ColoredMesh.VertexLayout,
-            requiresTransform: true);
+            ColoredMesh.ShaderVertexLayout,
+            TransformLayout);
 
     /// <summary>
     /// Draws each vertex at its position, sampling the bound texture using the
@@ -65,19 +66,27 @@ public sealed class BuiltInShaders
         _texturedQuad ??= new Shader<TextureVertex3D>(
             TexturedQuadVert,
             TexturedQuadFrag,
-            TexturedMesh.VertexLayout);
+            TexturedMesh.ShaderVertexLayout);
 
     /// <summary>
-    /// Draws each vertex at its position transformed by a 4x4
+    /// Draws each vertex at its position transformed by a per-draw 4x4
     /// model-view-projection matrix, sampling the bound texture using the
     /// vertex texture coordinate.
     /// </summary>
-    public Shader<TextureVertex3D> TexturedQuadWithMatrix =>
-        _texturedQuadWithMatrix ??= new Shader<TextureVertex3D>(
+    public Shader<TextureVertex3D, Matrix4x4> TexturedQuadWithMatrix =>
+        _texturedQuadWithMatrix ??= new Shader<TextureVertex3D, Matrix4x4>(
             TexturedQuadWithMatrixVert,
             TexturedQuadFrag,
-            TexturedMesh.VertexLayout,
-            requiresTransform: true);
+            TexturedMesh.ShaderVertexLayout,
+            TransformLayout);
+
+    /// <summary>
+    /// A single-element <see cref="ShaderArgsLayout"/> describing a 4x4 matrix
+    /// at vertex slot 0 -- the convention used by the built-in transform
+    /// shaders.
+    /// </summary>
+    private static ShaderArgsLayout TransformLayout { get; } = new ShaderArgsLayout(
+        new ShaderArgElement(ShaderArgStage.Vertex, 0, ShaderArgKind.Matrix4x4));
 
     private StageShader PositionColorVert =>
         _positionColorVert ??= LoadStage("PositionColor.vert", StageShaderKind.Vertex);

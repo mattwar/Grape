@@ -303,6 +303,73 @@ public static class ShaderFactory
         ShaderExpression entryBody)
         => new(kind, globals, functions, entryBody);
 
-    public static ShaderSet Set(ShaderStage? vertex, ShaderStage? fragment, ShaderStage? compute = null)
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        Func<ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1], ImmutableArray<ShaderFunction>.Empty, entryBodyFn(global1));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        Func<ShaderGlobal, ImmutableArray<ShaderFunction>> funcsFn,
+        Func<ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1], funcsFn(global1), entryBodyFn(global1));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        Func<ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2], ImmutableArray<ShaderFunction>.Empty, entryBodyFn(global1, global2));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        Func<ShaderGlobal, ShaderGlobal, ImmutableArray<ShaderFunction>> funcsFn,
+        Func<ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2], funcsFn(global1, global2), entryBodyFn(global1, global2));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        ShaderGlobal global3,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2, global3], ImmutableArray<ShaderFunction>.Empty, entryBodyFn(global1, global2, global3));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        ShaderGlobal global3,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ImmutableArray<ShaderFunction>> funcsFn,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2, global3], funcsFn(global1, global2, global3), entryBodyFn(global1, global2, global3));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        ShaderGlobal global3,
+        ShaderGlobal global4,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2, global3, global4], ImmutableArray<ShaderFunction>.Empty, entryBodyFn(global1, global2, global3, global4));
+
+    public static ShaderStage Stage(
+        ShaderStageKind kind,
+        ShaderGlobal global1,
+        ShaderGlobal global2,
+        ShaderGlobal global3,
+        ShaderGlobal global4,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderGlobal, ImmutableArray<ShaderFunction>> funcsFn,
+        Func<ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderGlobal, ShaderExpression> entryBodyFn)
+        => Stage(kind, [global1, global2, global3, global4], funcsFn(global1, global2, global3, global4), entryBodyFn(global1, global2, global3, global4));
+
+    public static ShaderSet Set(
+        ShaderStage? vertex, 
+        ShaderStage? fragment, 
+        ShaderStage? compute = null)
         => new(vertex, fragment, compute);
 }

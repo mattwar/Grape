@@ -47,7 +47,7 @@ internal static class SpinningTexturedTriangleExample
                 triangle,
                 renderer.Shaders.TexturedQuadWithMatrix,
                 checker,
-                transform: transform);
+                transform);
         };
 
         var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));

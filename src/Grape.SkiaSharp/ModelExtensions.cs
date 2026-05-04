@@ -61,13 +61,9 @@ public static class ModelExtensions
         }
 
         /// <summary>
-        /// Renders into the image using a SkiaSharp <see cref="SKCanvas"/>.
-        /// The image's contents are first transferred into an internal Skia
-        /// bitmap, the callback receives a canvas drawing into that bitmap,
-        /// and the resulting pixels are copied back into the image when the
-        /// callback returns.
+        /// Renders image using SkiaSharp Canvas API.
         /// </summary>
-        public void RenderFrame(Action<SKCanvas> renderAction)
+        public void RenderCanvas(Action<SKCanvas> renderAction)
         {
             ArgumentNullException.ThrowIfNull(renderAction);
             ObjectDisposedException.ThrowIf(image.IsDisposed, image);
@@ -160,29 +156,6 @@ public static class ModelExtensions
                 throw new InvalidOperationException("Cannot decode image from bytes");
 
             return skBitmap.ToImage(format);
-
-#if false
-            var width = skBitmap.Width;
-            var height = skBitmap.Height;
-            var image = Image.Create(width, height, format ?? skBitmap.PixelFormat);
-
-            SDL.Color sdColor = default;
-            var bbp = skBitmap.BytesPerPixel;
-
-            // copy pixels manually to ensure correct pixel format and colors
-            for (int y = 0; y < height; y++)
-            {
-                for (int x = 0; x < width; x++)
-                {
-                    (sdColor.R, sdColor.G, sdColor.B, sdColor.A) = skBitmap.GetPixel(x, y);
-                    if (bbp == 3)
-                        sdColor.A = 0xFF; // no alpha channel in 3 byte images.. make sure it is opaque
-                    image.SetPixel(x, y, sdColor);
-                }
-            }
-
-            return image;
-#endif            
         }
     }
 

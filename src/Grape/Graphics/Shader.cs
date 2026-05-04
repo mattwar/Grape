@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
-using System.Numerics;
+using System.IO;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Grape;
 
@@ -59,6 +61,57 @@ public sealed class StageShader
     public ImmutableArray<byte> Code { get; }
     public ShaderResourceCounts Resources { get; }
     public string Entrypoint { get; }
+
+    /// <summary>
+    /// Loads a precompiled SPIR-V shader, deriving the stage kind, entry-point
+    /// name, and resource counts from the module itself via reflection. This
+    /// is the recommended way to consume <c>.spv</c> files that were produced
+    /// elsewhere -- the caller does not need to know the resource counts up
+    /// front, the same way loading a PNG does not require the caller to know
+    /// the image's pixel format.
+    /// </summary>
+    /// <param name="code">The raw SPIR-V module bytes.</param>
+    /// <returns>
+    /// A <see cref="StageShader"/> whose <see cref="Format"/> is
+    /// <see cref="ShaderFormat.Spirv"/>, with metadata populated from the
+    /// module.
+    /// </returns>
+    /// <exception cref="ArgumentException">
+    /// The bytes are not a valid SPIR-V module, or describe more than one
+    /// entry point, or use an unsupported execution model.
+    /// </exception>
+    public static StageShader LoadSpirv(ReadOnlySpan<byte> code)
+    {
+        var info = SpirvReflection.GetShaderInfo(code);
+        return new StageShader(
+            info.Stage,
+            ShaderFormat.Spirv,
+            ImmutableCollectionsMarshal.AsImmutableArray(code.ToArray()),
+            info.Resources,
+            info.Entrypoint);
+    }
+
+    /// <summary>
+    /// Convenience overload of <see cref="LoadSpirv(ReadOnlySpan{byte})"/>
+    /// that reads the SPIR-V bytes from <paramref name="path"/>.
+    /// </summary>
+    public static StageShader LoadSpirv(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        return LoadSpirv(File.ReadAllBytes(path));
+    }
+
+    /// <summary>
+    /// Writes this shader's bytes to <paramref name="path"/>. The file's
+    /// contents are exactly <see cref="Code"/>, so for SPIR-V shaders the
+    /// resulting file is a standard <c>.spv</c> module that any conforming
+    /// loader (including <see cref="LoadSpirv(string)"/>) can read back.
+    /// </summary>
+    public void Save(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        File.WriteAllBytes(path, Code.AsSpan().ToArray());
+    }
 }
 
 /// <summary>
@@ -71,8 +124,7 @@ public abstract class Shader
     private protected Shader(
         StageShader vertex,
         StageShader fragment,
-        VertexLayout vertexLayout,
-        bool requiresTransform)
+        ShaderVertexLayout vertexLayout)
     {
         ArgumentNullException.ThrowIfNull(vertex);
         ArgumentNullException.ThrowIfNull(fragment);
@@ -85,19 +137,22 @@ public abstract class Shader
         Vertex = vertex;
         Fragment = fragment;
         VertexLayout = vertexLayout;
-        RequiresTransform = requiresTransform;
     }
 
+    /// <summary>
+    /// The vertex shader stage. Must have <see cref="StageShaderKind.Vertex"/> kind.   
+    /// </summary>
     public StageShader Vertex { get; }
-    public StageShader Fragment { get; }
-    public VertexLayout VertexLayout { get; }
 
     /// <summary>
-    /// True if the vertex shader reads a 4x4 transformation matrix from
-    /// vertex uniform slot 0. The renderer will push the per-draw transform
-    /// (or <see cref="Matrix4x4.Identity"/>) before each draw call.
+    /// The fragment shader stage. Must have <see cref="StageShaderKind.Fragment"/> kind.
     /// </summary>
-    public bool RequiresTransform { get; }
+    public StageShader Fragment { get; }
+
+    /// <summary>
+    /// The layout of the vertex data the vertex shader receives.
+    /// </summary>
+    public ShaderVertexLayout VertexLayout { get; }
 }
 
 /// <summary>
@@ -106,14 +161,57 @@ public abstract class Shader
 /// <typeparam name="TVertex">
 /// The vertex struct that meshes drawn with this shader must use.
 /// </typeparam>
-public sealed class Shader<TVertex> : Shader where TVertex : unmanaged
+public class Shader<TVertex> : Shader where TVertex : unmanaged
 {
     public Shader(
         StageShader vertex,
         StageShader fragment,
-        VertexLayout vertexLayout,
-        bool requiresTransform = false)
-        : base(vertex, fragment, vertexLayout, requiresTransform)
+        ShaderVertexLayout vertexLayout)
+        : base(vertex, fragment, vertexLayout)
     {
     }
+}
+
+/// <summary>
+/// A shader pair that also accepts a typed per-draw arguments value. The
+/// bytes of <typeparamref name="TArgs"/> are split across stage/slot pairs as
+/// described by <see cref="ArgsLayout"/>; the renderer pushes each slot
+/// before the draw.
+/// </summary>
+/// <typeparam name="TVertex">
+/// The vertex struct that meshes drawn with this shader must use.
+/// </typeparam>
+/// <typeparam name="TArgs">
+/// An <see cref="System.Runtime.InteropServices.StructLayoutAttribute"/>-friendly
+/// unmanaged struct whose fields, in declaration order, correspond to the
+/// elements of <see cref="ArgsLayout"/>. <c>sizeof(TArgs)</c> must
+/// equal <see cref="ShaderArgsLayout.TotalSize"/>.
+/// </typeparam>
+public sealed class Shader<TVertex, TArgs> : Shader<TVertex>
+    where TVertex : unmanaged
+    where TArgs : unmanaged
+{
+    public Shader(
+        StageShader vertex,
+        StageShader fragment,
+        ShaderVertexLayout vertexLayout,
+        ShaderArgsLayout argsLayout)
+        : base(vertex, fragment, vertexLayout)
+    {
+        ArgumentNullException.ThrowIfNull(argsLayout);
+
+        var actual = Unsafe.SizeOf<TArgs>();
+        if (actual != argsLayout.TotalSize)
+            throw new ArgumentException(
+                $"sizeof({typeof(TArgs).Name}) = {actual} but ShaderArgsLayout describes {argsLayout.TotalSize} bytes.",
+                nameof(argsLayout));
+
+        ArgsLayout = argsLayout;
+    }
+
+    /// <summary>
+    /// The layout of the per-draw arguments the shaders receive.
+    /// This describes the arguments for both stages together, so the data can be supplied by the user in one struct.
+    /// </summary>
+    public ShaderArgsLayout ArgsLayout { get; }
 }

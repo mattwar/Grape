@@ -120,7 +120,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// The vertex type of the mesh and the shader must match. The mesh's
     /// vertex layout must also match the shader's expected vertex layout.
     /// </remarks>
-    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader, Matrix4x4? transform = null)
+    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -130,7 +130,35 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 "The mesh's vertex layout does not match the shader's expected vertex layout.",
                 nameof(mesh));
 
-        _commands.Add(new DrawCommand(mesh, shader, transform, Texture: null, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null));
+    }
+
+    /// <summary>
+    /// Draws a mesh using a shader that takes a typed per-draw arguments
+    /// value. The bytes of <paramref name="args"/> are split across
+    /// stage/slot pairs as described by
+    /// <see cref="Shader{TVertex,TArgs}.ArgsLayout"/>.
+    /// </summary>
+    public override void RenderMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+
+        if (mesh.Layout != shader.VertexLayout)
+            throw new ArgumentException(
+                "The mesh's vertex layout does not match the shader's expected vertex layout.",
+                nameof(mesh));
+
+        _commands.Add(new DrawCommand<TArgs>(
+            mesh,
+            shader,
+            Texture: null,
+            Sampler: null,
+            shader.ArgsLayout,
+            args));
     }
 
     /// <summary>
@@ -146,7 +174,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// resources are released once you stop using it (either when the array
     /// is collected, or after a short idle period).
     /// </remarks>
-    public override void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, Matrix4x4? transform = null, int? vertexCount = null)
+    public override void RenderMesh<TVertex>(TVertex[] vertices, Shader<TVertex> shader, int? vertexCount = null)
     {
         ArgumentNullException.ThrowIfNull(vertices);
         ArgumentNullException.ThrowIfNull(shader);
@@ -156,7 +184,27 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
         var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
-        RenderMesh(mesh, shader, transform);
+        RenderMesh(mesh, shader);
+    }
+
+    /// <summary>
+    /// Array overload of <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// </summary>
+    public override void RenderMesh<TVertex, TArgs>(
+        TVertex[] vertices,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args,
+        int? vertexCount = null)
+    {
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
+        RenderMesh(mesh, shader, in args);
     }
 
     /// <summary>
@@ -167,14 +215,31 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// over the same underlying array) on later frames reuses the cached
     /// GPU buffer with no re-upload, since immutable arrays cannot change.
     /// </summary>
-    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader, Matrix4x4? transform = null)
+    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(shader);
         if (vertices.IsDefault)
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
         var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
-        RenderMesh(mesh, shader, transform);
+        RenderMesh(mesh, shader);
+    }
+
+    /// <summary>
+    /// <see cref="ImmutableArray{T}"/> overload of
+    /// <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// </summary>
+    public override void RenderMesh<TVertex, TArgs>(
+        ImmutableArray<TVertex> vertices,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(shader);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        RenderMesh(mesh, shader, in args);
     }
 
     /// <summary>
@@ -190,8 +255,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     public override void RenderTexturedMesh(
         Mesh<TextureVertex3D> mesh,
         Shader<TextureVertex3D> shader,
-        Image texture,
-        Matrix4x4? transform = null)
+        Image texture)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -202,23 +266,60 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 "The mesh's vertex layout does not match the shader's expected vertex layout.",
                 nameof(mesh));
 
-        _commands.Add(new DrawCommand(mesh, shader, transform, texture, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null));
+    }
+
+    /// <summary>
+    /// Draws a textured mesh using a shader that takes typed per-draw args.
+    /// </summary>
+    public override void RenderTexturedMesh<TArgs>(
+        Mesh<TextureVertex3D> mesh,
+        Shader<TextureVertex3D, TArgs> shader,
+        Image texture,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+
+        if (mesh.Layout != shader.VertexLayout)
+            throw new ArgumentException(
+                "The mesh's vertex layout does not match the shader's expected vertex layout.",
+                nameof(mesh));
+
+        _commands.Add(new DrawCommand<TArgs>(
+            mesh,
+            shader,
+            texture,
+            Sampler: null,
+            shader.ArgsLayout,
+            args));
     }
 
     /// <summary>
     /// Draws a textured mesh using the given shader and image as the source
-    /// texture, sourcing vertex data directly from a caller-owned array. See
-    /// <see cref="RenderMesh{TVertex}(TVertex[], Shader{TVertex}, Matrix4x4?)"/>
-    /// for caching semantics.
+    /// texture, sourcing vertex data directly from a caller-owned array.
     /// </summary>
     public override void RenderTexturedMesh(
         TextureVertex3D[] vertices,
         Shader<TextureVertex3D> shader,
         Image texture,
-        Matrix4x4? transform = null,
         int? vertexCount = null)
     {
-        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, transform, vertexCount);
+        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, vertexCount);
+    }
+
+    /// <summary>
+    /// Array overload of textured rendering with typed per-draw args.
+    /// </summary>
+    public override void RenderTexturedMesh<TArgs>(
+        TextureVertex3D[] vertices,
+        Shader<TextureVertex3D, TArgs> shader,
+        Image texture,
+        in TArgs args,
+        int? vertexCount = null)
+    {
+        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, in args, vertexCount);
     }
 
     internal void RenderTexturedMeshCore(
@@ -226,7 +327,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         Shader<TextureVertex3D> shader,
         Image texture,
         GpuSampler? sampler,
-        Matrix4x4? transform,
         int? vertexCount)
     {
         ArgumentNullException.ThrowIfNull(vertices);
@@ -244,21 +344,50 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 "The mesh's vertex layout does not match the shader's expected vertex layout.",
                 nameof(vertices));
 
-        _commands.Add(new DrawCommand(mesh, shader, transform, texture, sampler));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler));
+    }
+
+    internal void RenderTexturedMeshCore<TArgs>(
+        TextureVertex3D[] vertices,
+        Shader<TextureVertex3D, TArgs> shader,
+        Image texture,
+        GpuSampler? sampler,
+        in TArgs args,
+        int? vertexCount)
+        where TArgs : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = GetOrCreateArrayMesh(vertices, count, shader.VertexLayout);
+
+        if (mesh.Layout != shader.VertexLayout)
+            throw new ArgumentException(
+                "The mesh's vertex layout does not match the shader's expected vertex layout.",
+                nameof(vertices));
+
+        _commands.Add(new DrawCommand<TArgs>(
+            mesh,
+            shader,
+            texture,
+            sampler,
+            shader.ArgsLayout,
+            args));
     }
 
     /// <summary>
     /// Draws a textured mesh using the given shader and image, sourcing
-    /// vertex data from an <see cref="ImmutableArray{T}"/>. The renderer
-    /// borrows the array's backing storage zero-copy. See
-    /// <see cref="RenderMesh{TVertex}(ImmutableArray{TVertex}, Shader{TVertex}, Matrix4x4?)"/>
-    /// for caching semantics.
+    /// vertex data from an <see cref="ImmutableArray{T}"/>.
     /// </summary>
     public override void RenderTexturedMesh(
         ImmutableArray<TextureVertex3D> vertices,
         Shader<TextureVertex3D> shader,
-        Image texture,
-        Matrix4x4? transform = null)
+        Image texture)
     {
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
@@ -266,7 +395,25 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
         var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
-        RenderTexturedMesh(mesh, shader, texture, transform);
+        RenderTexturedMesh(mesh, shader, texture);
+    }
+
+    /// <summary>
+    /// <see cref="ImmutableArray{T}"/> overload of textured rendering with typed per-draw args.
+    /// </summary>
+    public override void RenderTexturedMesh<TArgs>(
+        ImmutableArray<TextureVertex3D> vertices,
+        Shader<TextureVertex3D, TArgs> shader,
+        Image texture,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = GetOrCreateImmutableArrayMesh(vertices, shader.VertexLayout);
+        RenderTexturedMesh(mesh, shader, texture, in args);
     }
 
     /// <summary>
@@ -368,7 +515,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Shaders.TexturedQuadWithMatrix,
             atlas,
             sampler,
-            transform,
+            in transform,
             vertexCount: needed);
     }
 
@@ -423,7 +570,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         return atlas;
     }
 
-    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, VertexLayout layout)
+    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count, ShaderVertexLayout layout)
         where TVertex : unmanaged
     {
         var span = vertices.AsSpan(0, count);
@@ -448,7 +595,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         return mesh;
     }
 
-    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, VertexLayout layout)
+    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices, ShaderVertexLayout layout)
         where TVertex : unmanaged
     {
         // Key on the immutable array's underlying T[]. Two ImmutableArrays
@@ -534,7 +681,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                                 new GpuVertexBufferLayout
                                 {
                                     Pitch = vertexBytes.Length / mesh.VertexCount,
-                                    Elements = ImmutableArray<GpuVertexElement>.Empty
+                                    Elements = ImmutableArray<GpuShaderVertexElement>.Empty
                                 });
 
                             resources.UploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)vertexBytes.Length);
@@ -583,18 +730,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         shader.VertexLayout);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
-                    if (shader.RequiresTransform)
-                    {
-                        // System.Numerics.Matrix4x4 is row-major in memory;
-                        // HLSL reads cbuffer matrices column-major by default.
-                        // The two interpretations cancel out: pushing the
-                        // System.Numerics matrix raw produces the same
-                        // transformation HLSL's mul(M, v) does for a
-                        // column-vector v that csharp's `v * M` does for a
-                        // row-vector v. So no transpose is needed.
-                        var transform = command.Command.Transform ?? Matrix4x4.Identity;
-                        renderPass.PushVertexUniformData(0, in transform);
-                    }
+                    command.Command.PushArgs(renderPass);
                     if (command.Command.Texture is { } image)
                     {
                         var gpuTexture = LookupTexture(image)
@@ -795,7 +931,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        VertexLayout layout)
+        ShaderVertexLayout layout)
     {
         var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout);
         if (!_pipelines.TryGetValue(key, out var pipeline))
@@ -841,14 +977,14 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        VertexLayout layout)
+        ShaderVertexLayout layout)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
         for (var i = 0; i < layout.Elements.Length; i++)
         {
             var element = layout.Elements[i];
-            var (format, size) = MapVertexElement(element.Kind);
+            var (format, size) = MapShaderVertexElement(element.Kind);
             attributes.Add(new SDL.GPUVertexAttribute
             {
                 Location = (uint)i,
@@ -899,11 +1035,11 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         });
     }
 
-    private static (SDL.GPUVertexElementFormat Format, uint Size) MapVertexElement(VertexElementKind kind) => kind switch
+    private static (SDL.GPUVertexElementFormat Format, uint Size) MapShaderVertexElement(ShaderVertexElementKind kind) => kind switch
     {
-        VertexElementKind.Position3 => (SDL.GPUVertexElementFormat.Float3, 12u),
-        VertexElementKind.TextureCoordinate2 => (SDL.GPUVertexElementFormat.Float2, 8u),
-        VertexElementKind.Color4 => (SDL.GPUVertexElementFormat.Ubyte4Norm, 4u),
+        ShaderVertexElementKind.Position3 => (SDL.GPUVertexElementFormat.Float3, 12u),
+        ShaderVertexElementKind.TextureCoordinate2 => (SDL.GPUVertexElementFormat.Float2, 8u),
+        ShaderVertexElementKind.Color4 => (SDL.GPUVertexElementFormat.Ubyte4Norm, 4u),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
@@ -911,14 +1047,64 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader VertexShader,
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
-        VertexLayout Layout);
+        ShaderVertexLayout Layout);
 
-    private sealed record DrawCommand(
+    private record DrawCommand(
         Mesh Mesh,
         Shader Shader,
-        Matrix4x4? Transform,
         Image? Texture,
-        GpuSampler? Sampler);
+        GpuSampler? Sampler)
+    {
+        /// <summary>
+        /// Pushes any per-draw arguments this command carries to the given
+        /// render pass. The base command has no args; the generic
+        /// <see cref="DrawCommand{TArgs}"/> subtype overrides this to push
+        /// the slots described by its <see cref="ShaderArgsLayout"/>.
+        /// </summary>
+        public virtual void PushArgs(GpuRenderPass renderPass) { }
+    }
+
+    private sealed record DrawCommand<TArgs>(
+        Mesh Mesh,
+        Shader Shader,
+        Image? Texture,
+        GpuSampler? Sampler,
+        ShaderArgsLayout Layout,
+        TArgs Args)
+        : DrawCommand(Mesh, Shader, Texture, Sampler)
+        where TArgs : unmanaged
+    {
+        public override void PushArgs(GpuRenderPass renderPass)
+        {
+            // Read the typed value into a local so we have a stable ref
+            // for the span; this avoids any heap allocation per draw.
+            //
+            // Note for Matrix4x4 args: System.Numerics.Matrix4x4 is row-major
+            // in memory while HLSL reads cbuffer matrices column-major by
+            // default. The two interpretations cancel out: pushing the
+            // System.Numerics matrix raw produces the same transformation
+            // HLSL's mul(M, v) does for a column-vector v that csharp's
+            // `v * M` does for a row-vector v. So no transpose is needed.
+            var value = Args;
+            var bytes = MemoryMarshal.AsBytes(
+                MemoryMarshal.CreateReadOnlySpan(ref value, 1));
+            int offset = 0;
+            foreach (var element in Layout.Elements)
+            {
+                var slice = bytes.Slice(offset, element.Size);
+                switch (element.Stage)
+                {
+                    case ShaderArgStage.Vertex:
+                        renderPass.PushVertexUniformData((uint)element.Slot, slice);
+                        break;
+                    case ShaderArgStage.Fragment:
+                        renderPass.PushFragmentUniformData((uint)element.Slot, slice);
+                        break;
+                }
+                offset += element.Size;
+            }
+        }
+    }
 
     private sealed record PreparedDrawCommand(
         DrawCommand Command,
