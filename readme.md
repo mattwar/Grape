@@ -104,6 +104,53 @@ while (!window.IsClosed)
 };
 ```
 
+## Subscribe to events to handle input
+
+```csharp
+var window = new Window2D(800, 600);
+
+window.KeyDown += (w, e) =>
+{
+    switch (e.Key)
+    {
+        case Key.Left:
+            ...;
+            break;
+        case Key.Right:
+            ...;
+            break;
+        case Key.Esc:
+            window.Close();
+            break;
+    }
+};
+
+await window.WaitForCloseAsync();
+```
+
+## Poll for input directly
+
+```csharp
+var window = new Window2D(800, 600);
+
+while (!window.IsClosed)
+{
+    if (Keyboard.IsDown(Key.Left))
+    {
+        ...
+    }
+    else if (Keyboard.IsDown(Key.Right))
+    {
+        ...
+    }
+    else if (Keyboard.IsDown(Key.Esc))
+    {
+        window.Close();
+        continue;
+    }
+}
+```
+
 ## A 3D Triangle Swarm
 
 ```csharp
@@ -118,7 +165,7 @@ var triangle = ImmutableArray.Create(
 
 var window = new Window3D(800, 600) { Title = "Triangle Swarm", CloseKey = Key.Esc };
 
-window.RenderingFrame += (w, frame) =>
+window.Rendering += (w, frame) =>
 {
     var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
     var transform = Matrix4x4.CreateRotationZ(t);
