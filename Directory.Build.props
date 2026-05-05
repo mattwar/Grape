@@ -1,0 +1,36 @@
+<Project>
+
+  <!--
+    Shared MSBuild properties for every project in the Grape repo.
+    Project-specific properties (e.g. PackageId, AllowUnsafeBlocks, OutputType)
+    stay in the individual .csproj files.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- Common metadata for any project that ends up packed -->
+  <PropertyGroup>
+    <Authors>Matt Warren</Authors>
+    <Company>Matt Warren</Company>
+    <Copyright>Copyright (c) Matt Warren</Copyright>
+    <PackageProjectUrl>https://github.com/mattwar/Grape</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mattwar/Grape.git</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- Reproducible / debuggable builds -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>portable</DebugType>
+  </PropertyGroup>
+
+</Project>

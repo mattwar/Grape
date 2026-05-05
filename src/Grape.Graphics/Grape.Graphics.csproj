@@ -1,0 +1,85 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Grape.Graphics is the public NuGet metapackage. It produces a single
+    .nupkg containing the DLLs (and PDBs) of every project it references,
+    plus the public package metadata, readme, icon, and notices.
+
+    The project itself has no source files of its own. Future slim/SKU
+    variants can live as sibling projects (e.g. Grape.Graphics.Core)
+    that reference a different subset of libraries.
+  -->
+
+  <PropertyGroup>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <!-- This project has nothing to compile, so don't try to produce its own DLL. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <!-- NU5128: 'lib/<tfm>' is empty in our build output; we add it via <None Pack> below. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>Grape.Graphics</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Grape - Graphics Programming Extensions. Class wrappers around SDL3 for graphics, input, audio, and more. Bundles the core Grape library together with SkiaSharp-powered image loading and Skia rendering helpers.</Description>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageIcon>grape.png</PackageIcon>
+    <PackageTags>graphics;sdl3;sdl;gamedev;rendering;skiasharp</PackageTags>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <!-- Files at the package root -->
+  <ItemGroup>
+    <None Include="..\..\readme.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\assets\grape.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!--
+    Reference the libraries we want bundled into this package.
+    PrivateAssets="all" prevents them from being declared as NuGet
+    <dependencies> in the resulting .nuspec (they aren't published as
+    standalone packages).
+
+    They are still built before this project, ensuring their DLLs/PDBs
+    exist on disk by the time pack runs.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\Grape\Grape.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!--
+    Public NuGet dependencies of the bundled libraries. Declared here so
+    they appear as <dependencies> in this metapackage's .nuspec and reach
+    consumers transitively. Keep these versions in sync with the matching
+    PackageReferences in Grape.csproj and Grape.SkiaSharp.csproj.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
+    <PackageReference Include="SDL3-CS" Version="3.2.20" />
+    <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
+    <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
+  </ItemGroup>
+
+  <!--
+    Pack the build outputs of the referenced libraries into lib/<tfm>/.
+    The paths are relative to this csproj's directory.
+  -->
+  <ItemGroup>
+    <None Include="..\Grape\bin\$(Configuration)\net9.0\Grape.dll"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Grape\bin\$(Configuration)\net9.0\Grape.pdb"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.dll"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.pdb"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+  </ItemGroup>
+
+</Project>

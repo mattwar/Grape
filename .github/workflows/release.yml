@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to pack (e.g. 1.2.3 or 1.2.3-preview.1). If omitted on a release, the tag name is used."
+        required: false
+
+jobs:
+  pack:
+    name: Pack & Publish
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          $raw = ""
+          if ("${{ github.event_name }}" -eq "release") {
+            $raw = "${{ github.event.release.tag_name }}"
+          } elseif ("${{ inputs.version }}") {
+            $raw = "${{ inputs.version }}"
+          } else {
+            Write-Error "No version supplied."
+            exit 1
+          }
+          $version = $raw.TrimStart('v','V')
+          if (-not ($version -match '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$')) {
+            Write-Error "Tag/version '$raw' is not a valid SemVer (expected like 1.2.3 or v1.2.3-preview.1)."
+            exit 1
+          }
+          Write-Host "Using version: $version"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Restore
+        run: dotnet restore src/Grape.sln
+
+      - name: Build
+        run: dotnet build src/Grape.sln -c Release --no-restore /p:Version=${{ steps.version.outputs.version }}
+
+      - name: Pack
+        run: dotnet pack src/Grape.Graphics/Grape.Graphics.csproj -c Release --no-build -o artifacts/nuget /p:Version=${{ steps.version.outputs.version }}
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages-${{ steps.version.outputs.version }}
+          path: artifacts/nuget/*.*nupkg
+          if-no-files-found: error
+
+      - name: Attach packages to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/nuget/*.*nupkg
+
+      - name: Push to NuGet.org
+        if: github.event_name == 'release' && env.NUGET_API_KEY != ''
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: dotnet nuget push "artifacts/nuget/*.nupkg" --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate

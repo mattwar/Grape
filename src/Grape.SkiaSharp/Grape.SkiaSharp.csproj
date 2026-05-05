@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
-    <LangVersion>preview</LangVersion>
+    <!--
+      Grape.SkiaSharp is currently bundled into the Grape.Graphics NuGet
+      package rather than published on its own. Don't pack it separately.
+      In the future this will likely be split into its own package once
+      a slimmer 'Grape.Graphics.Core' package is introduced.
+    -->
+    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
