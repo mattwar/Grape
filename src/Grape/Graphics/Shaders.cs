@@ -75,7 +75,7 @@ public static class Shaders
         }
         """;
 
-    private const string TexturedQuadVertHlsl = 
+    private const string PositionTextureVertHlsl = 
         """
         struct Input
         {
@@ -98,7 +98,7 @@ public static class Shaders
         }
         """;
 
-    private const string TexturedQuadWithMatrixVertHlsl = 
+    private const string PositionTextureTransformVertHlsl = 
         """
         cbuffer UniformBlock : register(b0, space1)
         {
@@ -134,7 +134,7 @@ public static class Shaders
         }
         """;
 
-    private const string TexturedQuadFragHlsl = """
+    private const string PositionTextureFragHlsl = """
         Texture2D<float4> Texture : register(t0, space2);
         SamplerState      Sampler : register(s0, space2);
 
@@ -210,17 +210,17 @@ public static class Shaders
     private static readonly Shader PositionColorTransformVert =
         new(ShaderKind.Vertex, PositionColorTransformVertHlsl);
 
-    private static readonly Shader TexturedQuadVert =
-        new(ShaderKind.Vertex, TexturedQuadVertHlsl);
+    private static readonly Shader PositionTextureVert =
+        new(ShaderKind.Vertex, PositionTextureVertHlsl);
 
-    private static readonly Shader TexturedQuadWithMatrixVert =
-        new(ShaderKind.Vertex, TexturedQuadWithMatrixVertHlsl);
+    private static readonly Shader PositionTextureTransformVert =
+        new(ShaderKind.Vertex, PositionTextureTransformVertHlsl);
 
     private static readonly Shader SolidColorFrag =
         new(ShaderKind.Fragment, SolidColorFragHlsl);
 
-    private static readonly Shader TexturedQuadFrag =
-        new(ShaderKind.Fragment, TexturedQuadFragHlsl);
+    private static readonly Shader PositionTextureFrag =
+        new(ShaderKind.Fragment, PositionTextureFragHlsl);
 
     private static readonly Shader PositionVert =
         new(ShaderKind.Vertex, PositionVertHlsl);
@@ -294,14 +294,14 @@ public static class Shaders
     /// the vertex texture coordinate, with no transformation. Positions must
     /// already be in normalized device coordinates.
     /// </summary>
-    public static ShaderSet<TextureVertex3D> TexturedQuad { get; } =
-        new(TexturedQuadVert, TexturedQuadFrag, TextureVertex3D.ShaderVertexLayout);
+    public static ShaderSet<TextureVertex3D> PositionTexture { get; } =
+        new(PositionTextureVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout);
 
     /// <summary>
     /// Draws each vertex at its position transformed by a per-draw 4x4
     /// model-view-projection matrix, sampling the bound texture using the
     /// vertex texture coordinate.
     /// </summary>
-    public static ShaderSet<TextureVertex3D, Matrix4x4> TexturedQuadWithMatrix { get; } =
-        new(TexturedQuadWithMatrixVert, TexturedQuadFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+    public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureTransform { get; } =
+        new(PositionTextureTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
 }

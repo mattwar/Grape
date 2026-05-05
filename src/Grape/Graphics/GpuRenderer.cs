@@ -22,11 +22,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
-    // Maps caller-owned vertex arrays to the renderer-owned Mesh that wraps
-    // them. Lifetime is tied to the array reference: when the user drops
-    // their array, the mesh becomes collectible, the renderer's weak ref
-    // goes empty, and SweepCaches() disposes the GPU buffer.
-    private readonly ConditionalWeakTable<Array, Mesh> _arrayMeshCache = new();
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
@@ -36,6 +31,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     // frame would all reference the same backing buffer and render as
     // whichever string was queued last.
     private readonly List<TextureVertex3D[]> _debugTextVertexBuffers = new();
+    private readonly List<Mesh<TextureVertex3D>?> _debugTextMeshes = new();
     private int _debugTextVertexIndex;
     private long _frameNumber;
 
@@ -57,7 +53,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
-    /// <see cref="RenderTexturedMesh"/> when the caller does not supply one.
+    /// <see cref="RenderMesh"/> when the caller does not supply one.
     /// </summary>
     internal GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
     {
@@ -142,87 +138,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a mesh using the given shader, sourcing vertex data directly
-    /// from a caller-owned array. The renderer keeps a weak association
-    /// between the array reference and an internal <see cref="Mesh{TVertex}"/>;
-    /// passing the same array on later frames reuses the cached GPU buffer
-    /// and only re-uploads when the array's contents have changed.
-    /// </summary>
-    /// <remarks>
-    /// To "resize" the mesh, allocate a new array — that's a different
-    /// reference and gets a fresh GPU buffer. The previous array's GPU
-    /// resources are released once you stop using it (either when the array
-    /// is collected, or after a short idle period).
-    /// </remarks>
-    public override void RenderMesh<TVertex>(TVertex[] vertices, ShaderSet<TVertex> shader, int? vertexCount = null)
-    {
-        ArgumentNullException.ThrowIfNull(vertices);
-        ArgumentNullException.ThrowIfNull(shader);
-
-        var count = vertexCount ?? vertices.Length;
-        if ((uint)count > (uint)vertices.Length)
-            throw new ArgumentOutOfRangeException(nameof(vertexCount));
-
-        var mesh = GetOrCreateArrayMesh(vertices, count);
-        RenderMesh(mesh, shader);
-    }
-
-    /// <summary>
-    /// Array overload of <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
-    /// </summary>
-    public override void RenderMesh<TVertex, TArgs>(
-        TVertex[] vertices,
-        ShaderSet<TVertex, TArgs> shader,
-        in TArgs args,
-        int? vertexCount = null)
-    {
-        ArgumentNullException.ThrowIfNull(vertices);
-        ArgumentNullException.ThrowIfNull(shader);
-
-        var count = vertexCount ?? vertices.Length;
-        if ((uint)count > (uint)vertices.Length)
-            throw new ArgumentOutOfRangeException(nameof(vertexCount));
-
-        var mesh = GetOrCreateArrayMesh(vertices, count);
-        RenderMesh(mesh, shader, in args);
-    }
-
-    /// <summary>
-    /// Draws a mesh using the given shader, sourcing vertex data from an
-    /// <see cref="ImmutableArray{T}"/>. The renderer borrows the array's
-    /// backing storage zero-copy and keeps a weak association keyed on it;
-    /// passing the same <see cref="ImmutableArray{T}"/> (or any other built
-    /// over the same underlying array) on later frames reuses the cached
-    /// GPU buffer with no re-upload, since immutable arrays cannot change.
-    /// </summary>
-    public override void RenderMesh<TVertex>(ImmutableArray<TVertex> vertices, ShaderSet<TVertex> shader)
-    {
-        ArgumentNullException.ThrowIfNull(shader);
-        if (vertices.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
-
-        var mesh = GetOrCreateImmutableArrayMesh(vertices);
-        RenderMesh(mesh, shader);
-    }
-
-    /// <summary>
-    /// <see cref="ImmutableArray{T}"/> overload of
-    /// <see cref="RenderMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
-    /// </summary>
-    public override void RenderMesh<TVertex, TArgs>(
-        ImmutableArray<TVertex> vertices,
-        ShaderSet<TVertex, TArgs> shader,
-        in TArgs args)
-    {
-        ArgumentNullException.ThrowIfNull(shader);
-        if (vertices.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
-
-        var mesh = GetOrCreateImmutableArrayMesh(vertices);
-        RenderMesh(mesh, shader, in args);
-    }
-
-    /// <summary>
     /// Draws a textured mesh using the given shader and image as the source texture.
     /// </summary>
     /// <remarks>
@@ -232,10 +147,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// passing the same <see cref="Image"/> instance on later frames reuses
     /// the upload.
     /// </remarks>
-    public override void RenderTexturedMesh(
-        Mesh<TextureVertex3D> mesh,
-        ShaderSet<TextureVertex3D> shader,
-        Image texture)
+    public override void RenderMesh<TVertex>(
+        Mesh<TVertex> mesh,
+        Image texture,
+        ShaderSet<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -247,10 +162,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Draws a textured mesh using a shader that takes typed per-draw args.
     /// </summary>
-    public override void RenderTexturedMesh<TArgs>(
-        Mesh<TextureVertex3D> mesh,
-        ShaderSet<TextureVertex3D, TArgs> shader,
+    public override void RenderMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
         Image texture,
+        ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -267,69 +182,36 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using the given shader and image as the source
-    /// texture, sourcing vertex data directly from a caller-owned array.
+    /// Internal entry point for textured rendering with an explicit sampler.
+    /// Used by <see cref="RenderDebugText"/> to pin nearest-neighbour
+    /// filtering on the debug font atlas.
     /// </summary>
-    public override void RenderTexturedMesh(
-        TextureVertex3D[] vertices,
-        ShaderSet<TextureVertex3D> shader,
+    internal void RenderTexturedMeshCore<TVertex>(
+        Mesh<TVertex> mesh,
         Image texture,
-        int? vertexCount = null)
+        ShaderSet<TVertex> shader,
+        GpuSampler? sampler)
+        where TVertex : unmanaged
     {
-        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, vertexCount);
-    }
-
-    /// <summary>
-    /// Array overload of textured rendering with typed per-draw args.
-    /// </summary>
-    public override void RenderTexturedMesh<TArgs>(
-        TextureVertex3D[] vertices,
-        ShaderSet<TextureVertex3D, TArgs> shader,
-        Image texture,
-        in TArgs args,
-        int? vertexCount = null)
-    {
-        RenderTexturedMeshCore(vertices, shader, texture, sampler: null, in args, vertexCount);
-    }
-
-    internal void RenderTexturedMeshCore(
-        TextureVertex3D[] vertices,
-        ShaderSet<TextureVertex3D> shader,
-        Image texture,
-        GpuSampler? sampler,
-        int? vertexCount)
-    {
-        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
-
-        var count = vertexCount ?? vertices.Length;
-        if ((uint)count > (uint)vertices.Length)
-            throw new ArgumentOutOfRangeException(nameof(vertexCount));
-
-        var mesh = GetOrCreateArrayMesh(vertices, count);
 
         _commands.Add(new DrawCommand(mesh, shader, texture, sampler));
     }
 
-    internal void RenderTexturedMeshCore<TArgs>(
-        TextureVertex3D[] vertices,
-        ShaderSet<TextureVertex3D, TArgs> shader,
+    internal void RenderTexturedMeshCore<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
         Image texture,
+        ShaderSet<TVertex, TArgs> shader,
         GpuSampler? sampler,
-        in TArgs args,
-        int? vertexCount)
+        in TArgs args)
+        where TVertex : unmanaged
         where TArgs : unmanaged
     {
-        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
-
-        var count = vertexCount ?? vertices.Length;
-        if ((uint)count > (uint)vertices.Length)
-            throw new ArgumentOutOfRangeException(nameof(vertexCount));
-
-        var mesh = GetOrCreateArrayMesh(vertices, count);
 
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
@@ -338,42 +220,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             sampler,
             shader.ArgsLayout,
             args));
-    }
-
-    /// <summary>
-    /// Draws a textured mesh using the given shader and image, sourcing
-    /// vertex data from an <see cref="ImmutableArray{T}"/>.
-    /// </summary>
-    public override void RenderTexturedMesh(
-        ImmutableArray<TextureVertex3D> vertices,
-        ShaderSet<TextureVertex3D> shader,
-        Image texture)
-    {
-        ArgumentNullException.ThrowIfNull(shader);
-        ArgumentNullException.ThrowIfNull(texture);
-        if (vertices.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
-
-        var mesh = GetOrCreateImmutableArrayMesh(vertices);
-        RenderTexturedMesh(mesh, shader, texture);
-    }
-
-    /// <summary>
-    /// <see cref="ImmutableArray{T}"/> overload of textured rendering with typed per-draw args.
-    /// </summary>
-    public override void RenderTexturedMesh<TArgs>(
-        ImmutableArray<TextureVertex3D> vertices,
-        ShaderSet<TextureVertex3D, TArgs> shader,
-        Image texture,
-        in TArgs args)
-    {
-        ArgumentNullException.ThrowIfNull(shader);
-        ArgumentNullException.ThrowIfNull(texture);
-        if (vertices.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
-
-        var mesh = GetOrCreateImmutableArrayMesh(vertices);
-        RenderTexturedMesh(mesh, shader, texture, in args);
     }
 
     /// <summary>
@@ -395,7 +241,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// <param name="transform">World-space transform applied to the text
     /// mesh. The mesh occupies (0..text.Length) along X and (0..1) along Y
     /// in local model space; X advances one unit per character, Y goes up.</param>
-    public override void RenderDebugText(string text, Matrix4x4 transform)
+    public override void RenderDebugText(string text, in Matrix4x4 transform)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length == 0)
@@ -403,27 +249,32 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
         var atlas = GetDebugFontAtlas();
 
-        // Each call within a frame needs its own backing array so the
-        // array-keyed mesh cache produces a distinct Mesh per draw. We
-        // pool the arrays across frames so we still get one GPU vertex
-        // buffer per call site (assuming a stable per-frame call order).
+        // Each call within a frame needs its own backing mesh so multiple
+        // strings in the same frame don't stomp each other's vertex buffer.
+        // We pool both the vertex array and the Mesh<T> across frames so a
+        // stable per-frame call order reuses the same GPU buffer per slot.
         int needed = text.Length * 6;
         TextureVertex3D[] verts;
+        Mesh<TextureVertex3D>? mesh;
         if (_debugTextVertexIndex < _debugTextVertexBuffers.Count)
         {
             verts = _debugTextVertexBuffers[_debugTextVertexIndex];
+            mesh = _debugTextMeshes[_debugTextVertexIndex];
             if (verts.Length < needed)
             {
-                // Grow this slot in place; the new array becomes a different
-                // cache key, so the previous mesh's GPU buffer will idle-evict.
+                // Grow this slot. Drop the old mesh; its GPU buffer will
+                // idle-evict via _meshResources.
                 verts = new TextureVertex3D[needed];
                 _debugTextVertexBuffers[_debugTextVertexIndex] = verts;
+                mesh = null;
             }
         }
         else
         {
             verts = new TextureVertex3D[needed];
             _debugTextVertexBuffers.Add(verts);
+            _debugTextMeshes.Add(null);
+            mesh = null;
         }
         _debugTextVertexIndex++;
 
@@ -470,13 +321,23 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             AddressModeW = SDL.GPUSamplerAddressMode.ClampToEdge,
         });
 
+        var span = verts.AsSpan(0, needed);
+        if (mesh is null)
+        {
+            mesh = new Mesh<TextureVertex3D>(span, ReadOnlySpan<uint>.Empty);
+            _debugTextMeshes[_debugTextVertexIndex - 1] = mesh;
+        }
+        else
+        {
+            mesh.Reset(span, ReadOnlySpan<uint>.Empty);
+        }
+
         RenderTexturedMeshCore(
-            verts,
-            Shaders.TexturedQuadWithMatrix,
+            mesh,
             atlas,
+            Shaders.PositionTextureTransform,
             sampler,
-            in transform,
-            vertexCount: needed);
+            in transform);
     }
 
     private Image GetDebugFontAtlas()
@@ -528,58 +389,6 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
         _debugFontAtlas = atlas;
         return atlas;
-    }
-
-    private Mesh<TVertex> GetOrCreateArrayMesh<TVertex>(TVertex[] vertices, int count)
-        where TVertex : unmanaged
-    {
-        var span = vertices.AsSpan(0, count);
-
-        if (_arrayMeshCache.TryGetValue(vertices, out var existing))
-        {
-            if (existing is not Mesh<TVertex> typed)
-                throw new ArgumentException(
-                    $"Vertex array was previously used with vertex type " +
-                    $"'{existing!.GetType().GetGenericArguments().FirstOrDefault()?.Name ?? existing.GetType().Name}' " +
-                    $"and cannot be reused with '{typeof(TVertex).Name}'.",
-                    nameof(vertices));
-
-            // Re-stage the latest contents. Reset bumps the mesh's Version,
-            // and the upload loop only re-uploads when Version has changed.
-            typed.Reset(span, ReadOnlySpan<uint>.Empty);
-            return typed;
-        }
-
-        var mesh = new Mesh<TVertex>(span, ReadOnlySpan<uint>.Empty);
-        _arrayMeshCache.Add(vertices, mesh);
-        return mesh;
-    }
-
-    private Mesh<TVertex> GetOrCreateImmutableArrayMesh<TVertex>(ImmutableArray<TVertex> vertices)
-        where TVertex : unmanaged
-    {
-        // Key on the immutable array's underlying T[]. Two ImmutableArrays
-        // built over the same backing array hit the same cache entry, which
-        // is fine since neither can mutate.
-        var backing = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
-
-        if (_arrayMeshCache.TryGetValue(backing, out var existing))
-        {
-            if (existing is not Mesh<TVertex> typed)
-                throw new ArgumentException(
-                    $"Vertex array was previously used with vertex type " +
-                    $"'{existing!.GetType().GetGenericArguments().FirstOrDefault()?.Name ?? existing.GetType().Name}' " +
-                    $"and cannot be reused with '{typeof(TVertex).Name}'.",
-                    nameof(vertices));
-
-            // Immutable: contents can't have changed, so no Reset needed.
-            return typed;
-        }
-
-        // Borrow the backing array zero-copy via the ImmutableArray ctor.
-        var mesh = new Mesh<TVertex>(vertices, ImmutableArray<uint>.Empty);
-        _arrayMeshCache.Add(backing, mesh);
-        return mesh;
     }
 
     /// <summary>

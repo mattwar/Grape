@@ -137,6 +137,34 @@ public static class Keyboard
         _ = Application.Current;
         SDL.ResetKeyboard();
     }
+
+    /// <summary>
+    /// Asynchronously waits until the specified virtual <see cref="Key"/> is pressed.
+    /// </summary>
+    public static async Task WaitForKeyDownAsync(Key key, CancellationToken cancellationToken = default)
+    {
+        _ = Application.Current;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (IsDown(key))
+                return;
+            await Task.Yield();
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously waits until the specified <see cref="PhysicalKey"/> is pressed.
+    /// </summary>
+    public static async Task WaitForPhysicalKeyDownAsync(PhysicalKey physicalKey, CancellationToken cancellationToken = default)
+    {
+        _ = Application.Current;
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            if (IsDown(physicalKey))
+                return;
+            await Task.Yield();
+        }
+    }
 }
 
 /// <summary>

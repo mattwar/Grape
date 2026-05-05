@@ -54,8 +54,8 @@ window.RenderingFrame += (w, frame) =>
         float y0 = MathF.Sin(u0 * Frequency * MathF.Tau + t * Speed) * Amplitude;
         float y1 = MathF.Sin(u1 * Frequency * MathF.Tau + t * Speed) * Amplitude;
 
-        var c0 = HsvToColor(u0 + t * 0.1f, 1f, 1f);
-        var c1 = HsvToColor(u1 + t * 0.1f, 1f, 1f);
+        var c0 = Color.FromHsv(u0 + t * 0.1f, 1f, 1f);
+        var c1 = Color.FromHsv(u1 + t * 0.1f, 1f, 1f);
 
         var topLeft     = new ColorVertex3D(new Vertex3D(x0, y0 + Thickness, 0f), c0);
         var bottomLeft  = new ColorVertex3D(new Vertex3D(x0, y0 - Thickness, 0f), c0);
@@ -75,32 +75,9 @@ window.RenderingFrame += (w, frame) =>
     var aspect = (float)height / width;
     var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    frame.Renderer.RenderMesh(vertices, Shaders.PositionColorTransform, transform);
+    frame.Renderer.RenderMesh(vertices, transform);
 
     w.Invalidate(); // schedule the next frame
 };
 
 await window.WaitForDisposeAsync();
-
-static Color HsvToColor(float h, float s, float v)
-{
-    h -= MathF.Floor(h); // wrap to [0, 1)
-    float c = v * s;
-    float hh = h * 6f;
-    float x = c * (1f - MathF.Abs(hh % 2f - 1f));
-    float r, g, b;
-    switch ((int)hh)
-    {
-        case 0: r = c; g = x; b = 0; break;
-        case 1: r = x; g = c; b = 0; break;
-        case 2: r = 0; g = c; b = x; break;
-        case 3: r = 0; g = x; b = c; break;
-        case 4: r = x; g = 0; b = c; break;
-        default: r = c; g = 0; b = x; break;
-    }
-    float m = v - c;
-    return new Color(
-        (byte)((r + m) * 255f),
-        (byte)((g + m) * 255f),
-        (byte)((b + m) * 255f));
-}

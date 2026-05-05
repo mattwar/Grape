@@ -61,7 +61,7 @@ public readonly struct ColorVertex3D
 
 /// <summary>
 /// A vertex that carries a position and a texture coordinate. Matches the
-/// vertex input of the bundled <c>TexturedQuad</c> shaders.
+/// vertex input of the bundled <c>PositionTexture</c> shaders.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct TextureVertex3D

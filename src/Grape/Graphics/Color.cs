@@ -28,6 +28,38 @@ public readonly struct Color : IEquatable<Color>
     public static Color FromRgb(byte r, byte g, byte b) => new(r, g, b, 255);
     public static Color FromRgba(byte r, byte g, byte b, byte a) => new(r, g, b, a);
 
+    /// <summary>
+    /// Creates a color from HSV components. <paramref name="hue"/> wraps to
+    /// [0, 1); <paramref name="saturation"/> and <paramref name="value"/>
+    /// are clamped to [0, 1].
+    /// </summary>
+    public static Color FromHsv(float hue, float saturation, float value, byte alpha = 255)
+    {
+        hue -= MathF.Floor(hue);
+        saturation = Math.Clamp(saturation, 0f, 1f);
+        value = Math.Clamp(value, 0f, 1f);
+
+        float c = value * saturation;
+        float hh = hue * 6f;
+        float x = c * (1f - MathF.Abs(hh % 2f - 1f));
+        float r, g, b;
+        switch ((int)hh)
+        {
+            case 0: r = c; g = x; b = 0; break;
+            case 1: r = x; g = c; b = 0; break;
+            case 2: r = 0; g = c; b = x; break;
+            case 3: r = 0; g = x; b = c; break;
+            case 4: r = x; g = 0; b = c; break;
+            default: r = c; g = 0; b = x; break;
+        }
+        float m = value - c;
+        return new Color(
+            (byte)((r + m) * 255f),
+            (byte)((g + m) * 255f),
+            (byte)((b + m) * 255f),
+            alpha);
+    }
+
     public Color WithAlpha(byte alpha) => new(R, G, B, alpha);
 
     public void Deconstruct(out byte r, out byte g, out byte b, out byte a)

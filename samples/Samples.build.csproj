@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Verifies that every file-based sample in this folder still compiles
+    against the current Grape.Graphics package. Adding this project to the
+    solution makes `dotnet build src/Grape.sln` (and Visual Studio's
+    Build Solution) also build the samples.
+
+    How it works:
+      1. Builds Grape.Graphics via ProjectReference (no assembly is consumed).
+      2. Packs Grape.Graphics into artifacts/nuget with a fresh timestamped
+         version so the samples' `#:package Grape.Graphics@*-*` always
+         resolves to a build that contains the latest source.
+      3. Runs `dotnet build` on each .cs sample file.
+
+    The work is gated by a stamp file with Inputs/Outputs, so it's skipped
+    when neither the Grape sources nor the sample sources have changed.
+
+    To opt out for a single build:
+        dotnet build src/Grape.sln /p:VerifySamples=false
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <NoWarn>$(NoWarn);NU1503</NoWarn>
+    <VerifySamples Condition=" '$(VerifySamples)' == '' ">true</VerifySamples>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Ensure Grape.Graphics is built before we try to pack it. -->
+    <ProjectReference Include="..\src\Grape.Graphics\Grape.Graphics.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false"
+                      SkipGetTargetFrameworkProperties="true" />
+  </ItemGroup>
+
+  <Target Name="VerifySamples"
+          AfterTargets="Build"
+          Condition=" '$(VerifySamples)' == 'true' "
+          Inputs="@(Compile);$(MSBuildThisFileFullPath);..\src\Grape.Graphics\Grape.Graphics.csproj;@(SampleFile);@(GrapeSource)"
+          Outputs="$(IntermediateOutputPath)samples.verified.stamp">
+
+    <ItemGroup>
+      <SampleFile Include="$(MSBuildThisFileDirectory)*.cs" />
+      <GrapeSource Include="$(MSBuildThisFileDirectory)..\src\**\*.cs"
+                   Exclude="$(MSBuildThisFileDirectory)..\src\**\bin\**;$(MSBuildThisFileDirectory)..\src\**\obj\**" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <SamplesPackVersion>0.1.0-dev-samples-$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</SamplesPackVersion>
+      <SamplesNuGetOutDir>$(MSBuildThisFileDirectory)..\artifacts\nuget</SamplesNuGetOutDir>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Packing Grape.Graphics $(SamplesPackVersion) for samples verification..." />
+    <Exec Command="dotnet pack &quot;$(MSBuildThisFileDirectory)..\src\Grape.Graphics\Grape.Graphics.csproj&quot; -c $(Configuration) -o &quot;$(SamplesNuGetOutDir)&quot; /p:Version=$(SamplesPackVersion) --nologo -v quiet" />
+
+    <!--
+      Pass /force-style flags so NuGet re-evaluates the floating "any
+      prerelease" version. Without this the file-based runner's hashed
+      temp restore is sticky and can resolve to a stale cached version
+      of Grape.Graphics.
+    -->
+    <Message Importance="high" Text="Building sample %(SampleFile.Filename).cs..." />
+    <Exec Command="dotnet build &quot;%(SampleFile.Identity)&quot; -c $(Configuration) --force --nologo -v quiet"
+          WorkingDirectory="$(MSBuildThisFileDirectory)" />
+
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Touch Files="$(IntermediateOutputPath)samples.verified.stamp" AlwaysCreate="true" />
+  </Target>
+
+</Project>

@@ -51,10 +51,10 @@ window.RenderingFrame += (w, frame) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    frame.Renderer.RenderTexturedMesh(
+    frame.Renderer.RenderMesh(
         triangle,
-        Shaders.TexturedQuadWithMatrix,
         checker,
+        Shaders.PositionTextureTransform,
         transform);
 
     w.Invalidate(); // schedule the next frame
