@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -19,22 +19,17 @@ using Grape;
 // array-keyed mesh cache, sharing one GPU vertex buffer and one GPU font
 // atlas texture across all draws.
 
-var window = new Window3D(800, 600)
+var window = new Window3D
 {
     Title = "Debug Text",
     BackgroundColor = new Color(16, 0, 32),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape,
 };
 
 long frameCount = 0;
 
-window.KeyDown += (_, e) =>
-{
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-window.RenderingFrame += (w, frame) =>
+window.Rendering += (w, frame) =>
 {
     frameCount++;
     var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
@@ -73,4 +68,4 @@ window.RenderingFrame += (w, frame) =>
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();

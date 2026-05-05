@@ -70,22 +70,23 @@ public abstract class Window : IDisposable
     internal nint WindowId => _window;
 
     /// <summary>
-    /// True if this window has been disposed.
+    /// True if this window has been closed (disposed).
     /// </summary>
-    public bool IsDisposed => _window == 0;
+    public bool IsClosed => _window == 0;
 
     private void ThrowIfDisposed()
     {
-        if (IsDisposed)
-            throw new InvalidOperationException("Window Disposed");
+        if (IsClosed)
+            throw new InvalidOperationException("Window is closed");
     }
 
     /// <summary>
     /// Disposes this window, releasing its resources.
+    /// Automatically called by <see cref="Close"/>
     /// </summary>
     public void Dispose()
     {
-        if (!IsDisposed)
+        if (!IsClosed)
         {
             var id = Interlocked.Exchange(ref _window, 0);
             if (id != 0)
@@ -103,24 +104,29 @@ public abstract class Window : IDisposable
 
                 Application.Current?.RemoveWindow(this);
 
-                _disposedTcs.TrySetResult();
+                _closedTcs.TrySetResult();
             }
         }
     }
 
-    private readonly TaskCompletionSource _disposedTcs =
+    /// <summary>
+    /// Closes this window and disposes it.
+    /// </summary>
+    public void Close() => Dispose();
+
+    private readonly TaskCompletionSource _closedTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
-    /// A task that completes when this window is disposed.
+    /// A task that completes when this window is closed.
     /// </summary>
-    public Task DisposedTask => _disposedTcs.Task;
-
+    public Task ClosedTask => _closedTcs.Task;
+    
     /// <summary>
-    /// Asynchronously waits for this window to be disposed.
+    /// Asynchronously waits for this window to be closed.
     /// </summary>
-    public Task WaitForDisposeAsync(CancellationToken cancellationToken = default)
-        => _disposedTcs.Task.WaitAsync(cancellationToken);
+    public Task WaitForCloseAsync(CancellationToken cancellationToken = default)
+        => _closedTcs.Task.WaitAsync(cancellationToken);
 
     /// <summary>
     /// Override to perform custom disposal operations.
@@ -143,7 +149,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return Properties.Empty;
             if (_properties == null)
                 _properties = new Properties(SDL.GetWindowProperties(_window));
@@ -175,7 +181,7 @@ public abstract class Window : IDisposable
 
         set
         {
-            if (IsDisposed || value == null)
+            if (IsClosed || value == null)
                 return;
             _icon = value;
             SDL.SetWindowIcon(_window, value._imageId);
@@ -206,7 +212,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return WindowFlags.None;
             const ulong creationMask =
                 (ulong)WindowFlags.OpenGL
@@ -230,13 +236,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.NotFocusable) == 0;
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowFocusable(_window, value);
         }
@@ -249,14 +255,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0);
             SDL.GetWindowAspectRatio(_window, out float minAspect, out float maxAspect);
             return (minAspect, maxAspect);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowAspectRatio(_window, value.Min, value.Max);
         }
@@ -269,13 +275,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Borderless) == 0;
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowBordered(_window, value);
         }
@@ -286,13 +292,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Resizable) != 0;
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowResizable(_window, value);
         }
@@ -303,13 +309,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.AlwaysOnTop) != 0;
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowAlwaysOnTop(_window, value);
         }
@@ -320,13 +326,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return SDL.GetWindowMouseGrab(_window);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowMouseGrab(_window, value);
         }
@@ -337,13 +343,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return SDL.GetWindowKeyboardGrab(_window);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowKeyboardGrab(_window, value);
         }
@@ -354,13 +360,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return SDL.GetWindowRelativeMouseMode(_window);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowRelativeMouseMode(_window, value);
         }
@@ -371,13 +377,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Modal) != 0;
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowModal(_window, value);
         }
@@ -385,27 +391,27 @@ public abstract class Window : IDisposable
 
     /// <summary>True if the window is currently hidden.</summary>
     public bool IsHidden =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Hidden) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Hidden) != 0;
 
     /// <summary>True if the window is currently minimized.</summary>
     public bool IsMinimized =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Minimized) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Minimized) != 0;
 
     /// <summary>True if the window is currently maximized.</summary>
     public bool IsMaximized =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Maximized) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Maximized) != 0;
 
     /// <summary>True if the window is currently occluded.</summary>
     public bool IsOccluded =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Occluded) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Occluded) != 0;
 
     /// <summary>True if the window currently has keyboard input focus.</summary>
     public bool HasInputFocus =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.InputFocus) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.InputFocus) != 0;
 
     /// <summary>True if the window currently has mouse focus.</summary>
     public bool HasMouseFocus =>
-        !IsDisposed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.MouseFocus) != 0;
+        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.MouseFocus) != 0;
 
     /// <summary>
     /// The size of the window borders in pixels.
@@ -414,7 +420,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0, 0, 0);
             SDL.GetWindowBordersSize(_window, out int top, out int left, out int bottom, out int right);
             return (top, left, bottom, right);
@@ -428,7 +434,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return 1.0f;
             return SDL.GetWindowDisplayScale(_window);
         }
@@ -441,14 +447,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return false;
             return SDL.GetWindowFullscreenMode(_window) != null;
         }
 
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowFullscreen(_window, value);
         }
@@ -461,7 +467,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return default;
             return SDL.GetWindowFullscreenMode(_window) is { } mode
                 ? new DisplayMode(mode)
@@ -469,7 +475,7 @@ public abstract class Window : IDisposable
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowFullscreenMode(_window, value._mode);
         }
@@ -482,14 +488,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0);
             SDL.GetWindowMinimumSize(_window, out int width, out int height);
             return (width, height);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowMinimumSize(_window, value.Width, value.Height);
         }
@@ -502,14 +508,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0);
             SDL.GetWindowMaximumSize(_window, out int width, out int height);
             return (width, height);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowMaximumSize(_window, value.Width, value.Height);
         }
@@ -522,7 +528,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return 1;
             return SDL.GetWindowPixelDensity(_window);
         }
@@ -535,7 +541,7 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return PixelFormat.Unknown;
             return (PixelFormat)SDL.GetWindowPixelFormat(_window);
         }
@@ -548,14 +554,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0);
             SDL.GetWindowPosition(_window, out int x, out int y);
             return (x, y);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowPosition(_window, value.X, value.Y);
         }
@@ -568,14 +574,14 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return (0, 0);
             SDL.GetWindowSize(_window, out int width, out int height);
             return (width, height);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowSize(_window, value.Width, value.Height);
         }
@@ -588,13 +594,13 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return "";
             return SDL.GetWindowTitle(_window);
         }
         set
         {
-            if (IsDisposed)
+            if (IsClosed)
                 return;
             SDL.SetWindowTitle(_window, value);
         }
@@ -606,28 +612,28 @@ public abstract class Window : IDisposable
     /// <summary>Shows the window if it was hidden.</summary>
     public void Show()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.ShowWindow(_window);
     }
 
     /// <summary>Hides the window without destroying it.</summary>
     public void Hide()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.HideWindow(_window);
     }
 
     /// <summary>Minimizes the window to the taskbar/dock.</summary>
     public void Minimize()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.MinimizeWindow(_window);
     }
 
     /// <summary>Maximizes the window to fill its display.</summary>
     public void Maximize()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.MaximizeWindow(_window);
     }
 
@@ -637,14 +643,14 @@ public abstract class Window : IDisposable
     /// </summary>
     public void Restore()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.RestoreWindow(_window);
     }
 
     /// <summary>Brings the window above other windows and gives it focus.</summary>
     public void Raise()
     {
-        if (IsDisposed) return;
+        if (IsClosed) return;
         SDL.RaiseWindow(_window);
     }
 
@@ -702,7 +708,7 @@ public abstract class Window : IDisposable
 
             while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
             {
-                if (IsDisposed) 
+                if (IsClosed) 
                     break;
 
                 // If a newer loop has been started, abandon ours silently.
@@ -738,6 +744,14 @@ public abstract class Window : IDisposable
     /// </summary>
     public Color BackgroundColor { get; set; }
 
+    /// <summary>
+    /// If set to a value other than <see cref="Key.Unknown"/>, the window
+    /// disposes itself when this key is pressed. The <see cref="KeyDown"/>
+    /// event is still raised first, so handlers can observe the keypress
+    /// before the window goes away.
+    /// </summary>
+    public Key CloseKey { get; set; } = Key.Unknown;
+
     private enum RenderState
     {
         Idle = 0,
@@ -752,7 +766,7 @@ public abstract class Window : IDisposable
     /// </summary>
     public void Invalidate()
     {
-        if (IsDisposed)
+        if (IsClosed)
             return;
 
         // Idle -> Scheduled: queue a new render
@@ -778,25 +792,14 @@ public abstract class Window : IDisposable
     {
         // The window may have been disposed between Invalidate() posting this
         // callback and the application thread getting around to running it.
-        if (IsDisposed)
+        if (IsClosed)
             return;
 
         _renderState = RenderState.Rendering;
 
-        var nowTs = Stopwatch.GetTimestamp();
-        var elapsedSinceCreate    = Stopwatch.GetElapsedTime(_startTs, nowTs);
-        var elapsedSinceLastFrame = Stopwatch.GetElapsedTime(_lastFrameTs, nowTs);
-        _lastFrameTs = nowTs;
-
-        // Clamp implausibly large per-frame deltas. ElapsedSinceWindowCreated is
-        // intentionally NOT clamped — absolute time keeps advancing through pauses.
-        var maxDelta = MaxFrameDelta;
-        if (elapsedSinceLastFrame > maxDelta)
-            elapsedSinceLastFrame = maxDelta;
-
         try
         {
-            DoRenderFrame(elapsedSinceCreate, elapsedSinceLastFrame);
+            RaiseRenderingEvent();
         }
         finally
         {
@@ -805,29 +808,41 @@ public abstract class Window : IDisposable
             // (unless the window was disposed during the frame).
             if (Interlocked.CompareExchange(ref _renderState, RenderState.Idle, RenderState.Rendering)
                 != RenderState.Rendering
-                && !IsDisposed)
+                && !IsClosed)
             {
                 Application.Current.Post(_ => DoRenderInternal(), null);
             }
         }
     }
-    
+
     private readonly long _startTs = Stopwatch.GetTimestamp();
     private long _lastFrameTs = Stopwatch.GetTimestamp();
 
-     /// <summary>
-    /// Performs the per-frame rendering for this window. Implementations are
-    /// invoked on the application thread.
-    /// </summary>
-    protected abstract void DoRenderFrame(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame);
-
     /// <summary>
-    /// Render immediately.
+    /// Returns the time since this window was created and since the last
+    /// frame, advancing the internal frame clock. Subclasses call this
+    /// once per frame, on the app thread, just before invoking the user's
+    /// render action. The per-frame delta is clamped by
+    /// <see cref="MaxFrameDelta"/>.
     /// </summary>
-    public void Render()
+    protected (TimeSpan SinceCreated, TimeSpan SinceLastRender) ConsumeRenderTimings()
     {
-        Application.Current.Send(_ => DoRenderInternal(), null);
+        var nowTs = Stopwatch.GetTimestamp();
+        var sinceCreate = Stopwatch.GetElapsedTime(_startTs, nowTs);
+        var sinceLast   = Stopwatch.GetElapsedTime(_lastFrameTs, nowTs);
+        _lastFrameTs = nowTs;
+
+        // SinceCreated is intentionally NOT clamped — absolute time keeps
+        // advancing through pauses (minimize, debugger break, system sleep).
+        var maxDelta = MaxFrameDelta;
+        if (sinceLast > maxDelta) sinceLast = maxDelta;
+        return (sinceCreate, sinceLast);
     }
+
+     /// <summary>
+    /// Raise the rendering event.
+    /// </summary>
+    protected abstract void RaiseRenderingEvent();
 
     #endregion
 
@@ -945,7 +960,12 @@ public abstract class Window : IDisposable
 
     #region Keyboard/Text Events
     public event WindowEventHandler<KeyEventArgs>? KeyDown;
-    protected virtual void OnKeyDown(Window window, KeyEventArgs e) { this.KeyDown?.Invoke(window, e); }
+    protected virtual void OnKeyDown(Window window, KeyEventArgs e)
+    {
+        this.KeyDown?.Invoke(window, e);
+        if (this.CloseKey != Key.Unknown && e.Key == this.CloseKey && !this.IsClosed)
+            this.Close();
+    }
 
     public event WindowEventHandler<KeyEventArgs>? KeyUp;
     protected virtual void OnKeyUp(Window window, KeyEventArgs e) { this.KeyUp?.Invoke(window, e); }
@@ -1070,4 +1090,4 @@ public delegate void HeartBeatEventHandler(Window sender, HeartBeatEventArgs arg
 
 public record struct HeartBeatEventArgs(TimeSpan ElapsedSinceStart, TimeSpan ElapsedSinceLastBeat);
 
-public record struct WindowRenderEventArgs<TRenderer>(TimeSpan ElapsedSinceWindowCreated, TimeSpan ElapsedSinceLastFrame, TRenderer Renderer);
+public record struct WindowRenderEventArgs<TRenderer>(TimeSpan ElapsedSinceWindowCreated, TimeSpan ElapsedSinceLastRender, TRenderer Renderer);

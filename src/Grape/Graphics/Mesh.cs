@@ -23,6 +23,23 @@ public abstract class Mesh
     /// this to detect when its cached GPU vertex buffer needs to be re-uploaded.
     /// </summary>
     public int Version { get; private protected set; }
+
+    /// <summary>
+    /// Creates a <see cref="Mesh{TVertex}"/> by copying the provided vertices.
+    /// Convenient for collection expressions (e.g. <c>Mesh.Create([v0, v1, v2])</c>),
+    /// which would otherwise be ambiguous between the span and immutable-array
+    /// constructor overloads.
+    /// </summary>
+    public static Mesh<TVertex> Create<TVertex>(ReadOnlySpan<TVertex> vertices)
+        where TVertex : unmanaged =>
+        new Mesh<TVertex>(vertices);
+
+    /// <summary>
+    /// Creates a <see cref="Mesh{TVertex}"/> by copying the provided vertices and indices.
+    /// </summary>
+    public static Mesh<TVertex> Create<TVertex>(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+        where TVertex : unmanaged =>
+        new Mesh<TVertex>(vertices, indices);
 }
 
 /// <summary>
@@ -140,8 +157,6 @@ public class Mesh<TVertex> : Mesh
     {
         if (!_ownsVertices || _vertices.Length < count)
         {
-            // Either we're holding a borrowed (immutable) array we mustn't
-            // overwrite, or the owned array is too small. Allocate fresh.
             _vertices = count == 0 ? Array.Empty<TVertex>() : new TVertex[count];
             _ownsVertices = true;
         }

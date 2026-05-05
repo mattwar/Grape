@@ -47,7 +47,7 @@ public static class Shaders
         }
         """;
 
-    private const string PositionColorTransformVertHlsl = 
+    private const string PositionColorWithTransformVertHlsl = 
         """
         cbuffer UBO : register(b0, space1)
         {
@@ -98,7 +98,7 @@ public static class Shaders
         }
         """;
 
-    private const string PositionTextureTransformVertHlsl = 
+    private const string PositionTextureWithTransformVertHlsl = 
         """
         cbuffer UniformBlock : register(b0, space1)
         {
@@ -158,7 +158,7 @@ public static class Shaders
         """;
 
     // Position-only vertex shader with a per-draw 4x4 transform matrix.
-    private const string PositionTransformVertHlsl = """
+    private const string PositionWithTransformVertHlsl = """
         cbuffer UBO : register(b0, space1)
         {
             float4x4 transform : packoffset(c0);
@@ -207,14 +207,14 @@ public static class Shaders
     private static readonly Shader PositionColorVert =
         new(ShaderKind.Vertex, PositionColorVertHlsl);
 
-    private static readonly Shader PositionColorTransformVert =
-        new(ShaderKind.Vertex, PositionColorTransformVertHlsl);
+    private static readonly Shader PositionColorWithTransformVert =
+        new(ShaderKind.Vertex, PositionColorWithTransformVertHlsl);
 
     private static readonly Shader PositionTextureVert =
         new(ShaderKind.Vertex, PositionTextureVertHlsl);
 
-    private static readonly Shader PositionTextureTransformVert =
-        new(ShaderKind.Vertex, PositionTextureTransformVertHlsl);
+    private static readonly Shader PositionTextureWithTransformVert =
+        new(ShaderKind.Vertex, PositionTextureWithTransformVertHlsl);
 
     private static readonly Shader SolidColorFrag =
         new(ShaderKind.Fragment, SolidColorFragHlsl);
@@ -225,8 +225,8 @@ public static class Shaders
     private static readonly Shader PositionVert =
         new(ShaderKind.Vertex, PositionVertHlsl);
 
-    private static readonly Shader PositionTransformVert =
-        new(ShaderKind.Vertex, PositionTransformVertHlsl);
+    private static readonly Shader PositionWithTransformVert =
+        new(ShaderKind.Vertex, PositionWithTransformVertHlsl);
 
     private static readonly Shader SolidColorUniformFrag =
         new(ShaderKind.Fragment, SolidColorUniformFragHlsl);
@@ -245,7 +245,7 @@ public static class Shaders
     /// <summary>
     /// Two-element layout: a vertex-stage 4x4 transform at slot 0 plus a
     /// fragment-stage <c>float4</c> color at slot 0. Pairs with
-    /// <see cref="PositionTransformColorArgs"/>.
+    /// <see cref="TransformAndColorArgs"/>.
     /// </summary>
     private static readonly ShaderArgsLayout TransformAndColorLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex,   0, ShaderArgKind.Matrix4x4),
@@ -262,16 +262,16 @@ public static class Shaders
     /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
     /// opaque white.
     /// </summary>
-    public static ShaderSet<Vertex3D, Matrix4x4> PositionTransform { get; } =
-        new(PositionTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
+    public static ShaderSet<Vertex3D, Matrix4x4> PositionWithTransform { get; } =
+        new(PositionWithTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix, with a
     /// per-draw fragment color. Pair with
-    /// <see cref="PositionTransformColorArgs"/>.
+    /// <see cref="TransformAndColorArgs"/>.
     /// </summary>
-    public static ShaderSet<Vertex3D, PositionTransformColorArgs> PositionTransformColor { get; } =
-        new(PositionTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
+    public static ShaderSet<Vertex3D, TransformAndColorArgs> PositionWithTransformAndColor { get; } =
+        new(PositionWithTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
 
     /// <summary>
     /// Draws each vertex at its position with its baked color, with no
@@ -286,8 +286,8 @@ public static class Shaders
     /// Draws each vertex at its position with its color, transforming the
     /// position by a per-draw 4x4 model-view-projection matrix.
     /// </summary>
-    public static ShaderSet<ColorVertex3D, Matrix4x4> PositionColorTransform { get; } =
-        new(PositionColorTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
+    public static ShaderSet<ColorVertex3D, Matrix4x4> PositionColorWithTransform { get; } =
+        new(PositionColorWithTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
     /// Draws each vertex at its position, sampling the bound texture using
@@ -302,6 +302,6 @@ public static class Shaders
     /// model-view-projection matrix, sampling the bound texture using the
     /// vertex texture coordinate.
     /// </summary>
-    public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureTransform { get; } =
-        new(PositionTextureTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+    public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureWithTransform { get; } =
+        new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
 }

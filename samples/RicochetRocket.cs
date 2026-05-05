@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -17,11 +17,12 @@
 using Grape;
 using Grape.Jelly;
 
-var window = new Window2D(800, 600)
+var window = new Window2D
 {
     Title = "Ricochet Rocket",
     BackgroundColor = new Color(0, 20, 0, 0),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape,
 };
 
 var icon = Image.LoadImage("grape.bmp");
@@ -54,18 +55,15 @@ window.KeyDown += (_, e) =>
         case Key.Down:
             rocket.Speed = Math.Max(rocket.Speed - 50f, 0f);
             break;
-        case Key.Escape:
-            window.Dispose();
-            break;
     }
 };
 
-window.RenderingFrame += (w, frame) =>
+window.Rendering += (w, e) =>
 {
     var updateContext = new UpdateContext
     {
-        ElapsedSinceStart = frame.ElapsedSinceWindowCreated,
-        ElaspsedSinceLastUpdate = frame.ElapsedSinceLastFrame,
+        ElapsedSinceStart = e.ElapsedSinceWindowCreated,
+        ElaspsedSinceLastUpdate = e.ElapsedSinceLastRender,
         Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height)
     };
 
@@ -107,10 +105,10 @@ window.RenderingFrame += (w, frame) =>
         }
     }
 
-    rocket.Render(frame.Renderer);
+    rocket.Render(e.Renderer);
 
-    frame.Renderer.DrawColor = new Color(255, 255, 255);
-    frame.Renderer.RenderDebugText(
+    e.Renderer.DrawColor = new Color(255, 255, 255);
+    e.Renderer.RenderDebugText(
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}",
         scale: 4f);
@@ -118,4 +116,4 @@ window.RenderingFrame += (w, frame) =>
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();

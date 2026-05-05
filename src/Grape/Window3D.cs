@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices.Marshalling;
+
 namespace Grape;
 
 /// <summary>
@@ -13,12 +16,14 @@ public class Window3D : Window
         : base(width, height, flags)
     {
         _device = device;
+        Init();
     }
 
     internal Window3D(GpuDevice device, WindowFlags flags = WindowFlags.None)
         : base(flags)
     {
         _device = device;
+        Init();
     }
 
     public Window3D(int width, int height, WindowFlags flags = WindowFlags.None)
@@ -31,6 +36,22 @@ public class Window3D : Window
     {
     }
 
+    private void Init()
+    {
+        Application.Current.Send(_ =>
+        {
+            if (!SDL.ClaimWindowForGPUDevice(_device.GpuDeviceID, this.WindowId))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to claim window for GPU device " +
+                    $"(driver={_device.Driver}, shaderFormat={_device.ShaderFormat}, windowId={this.WindowId}): " +
+                    SDL.GetError());
+            }
+            _claimed = true;
+        });
+        _renderer = new GpuRenderer(_device);
+    }
+
     protected override void OnDispose()
     {
         if (_claimed)
@@ -40,17 +61,17 @@ public class Window3D : Window
         }
     }
 
-    /// <summary>
-    /// Occurs when the window is rendering a frame using the GPU pipeline.
-    /// </summary>
     private event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? _renderingFrame;
 
-    public event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? RenderingFrame
+    /// <summary>
+    /// Raised when the window is rendering a frame.
+    /// </summary>
+    public event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? Rendering
     {
         add
         {
             _renderingFrame += value;
-            if (!IsDisposed) Invalidate();   // ensure a frame fires after subscription
+            if (!IsClosed) Invalidate();   // ensure a frame fires after subscription
         }
         remove
         {
@@ -58,42 +79,46 @@ public class Window3D : Window
         }
     }
 
-    public virtual void OnRenderingFrame(WindowRenderEventArgs<Renderer3D> args)
+    /// <summary>
+    /// Called when the window is rendering a frame
+    /// </summary>
+    public virtual void OnRendering(WindowRenderEventArgs<Renderer3D> args)
     {
         _renderingFrame?.Invoke(this, args);
     }
 
-    protected override void DoRenderFrame(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame)
+    protected override void RaiseRenderingEvent()
     {
-        RenderFrame_AppThread(elapsedSinceWindowCreated, elapsedSinceLastFrame, r => OnRenderingFrame(r));
+        if (TryGetRenderer(out var renderer))
+        {
+            var (elapsedSinceWindowCreated, elapsedSinceLastFrame) = ConsumeRenderTimings();
+            renderer.BeginFrame(this);
+            OnRendering(new WindowRenderEventArgs<Renderer3D>(elapsedSinceWindowCreated, elapsedSinceLastFrame, renderer));
+            renderer.Present();
+        }
     }
 
-
     /// <summary>
-    /// Renders an entire frame using the specified action (assumes the thread is the app thread).
+    /// Renders a frame manually using the provided render action.
+    /// This is an alternative to subscribing to the <see cref="Rendering"/> event.
     /// </summary>
-    private void RenderFrame_AppThread(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame, Action<WindowRenderEventArgs<Renderer3D>> renderAction)
+    public void Render(Action<WindowRenderEventArgs<Renderer3D>> renderAction)
     {
-        // Lazily create the renderer and claim the window for the GPU on
-        // first render. We can't do this in OnWindowCreated because the
-        // base ctor invokes that hook before the Window3D ctor body runs,
-        // so _device hasn't been assigned yet at that point.
-        if (_renderer is null)
+        Application.Current.Send(_ =>
         {
-            _renderer = new GpuRenderer(_device);
-            _claimed = SDL.ClaimWindowForGPUDevice(_device.GpuDeviceID, this.WindowId);
-            if (!_claimed)
-                throw new InvalidOperationException(
-                    $"Failed to claim window for GPU device " +
-                    $"(driver={_device.Driver}, shaderFormat={_device.ShaderFormat}, windowId={this.WindowId}): " +
-                    SDL.GetError());
-        }
+            if (TryGetRenderer(out var renderer))
+            {
+                var (sinceCreate, sinceLast) = ConsumeRenderTimings();
+                renderer.BeginFrame(this);
+                renderAction(new WindowRenderEventArgs<Renderer3D>(sinceCreate, sinceLast, renderer));
+                renderer.Present();
+            }
+        });
+    }
 
-        if (_claimed)
-        {
-            _renderer.BeginFrame(this);
-            renderAction(new WindowRenderEventArgs<Renderer3D>(elapsedSinceWindowCreated, elapsedSinceLastFrame, _renderer));
-            _renderer.Present();
-        }
+    private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer? renderer)
+    {
+        renderer = _renderer;
+        return renderer is not null && _claimed && !this.IsClosed;
     }
 }

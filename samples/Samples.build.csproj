@@ -7,11 +7,11 @@
     Build Solution) also build the samples.
 
     How it works:
-      1. Builds Grape.Graphics via ProjectReference (no assembly is consumed).
-      2. Packs Grape.Graphics into artifacts/nuget with a fresh timestamped
-         version so the samples' `#:package Grape.Graphics@*-*` always
-         resolves to a build that contains the latest source.
-      3. Runs `dotnet build` on each .cs sample file.
+      1. The ProjectReference on Grape.Graphics builds it; Grape.Graphics has
+         GeneratePackageOnBuild=true, so a fresh .nupkg appears in
+         artifacts/nuget automatically.
+      2. Runs `dotnet build` on each .cs sample file. The samples'
+         `#:package Grape.Graphics@*-*` resolves to the just-packed version.
 
     The work is gated by a stamp file with Inputs/Outputs, so it's skipped
     when neither the Grape sources nor the sample sources have changed.
@@ -49,14 +49,6 @@
       <GrapeSource Include="$(MSBuildThisFileDirectory)..\src\**\*.cs"
                    Exclude="$(MSBuildThisFileDirectory)..\src\**\bin\**;$(MSBuildThisFileDirectory)..\src\**\obj\**" />
     </ItemGroup>
-
-    <PropertyGroup>
-      <SamplesPackVersion>0.1.0-dev-samples-$([System.DateTime]::UtcNow.ToString('yyyyMMddHHmmss'))</SamplesPackVersion>
-      <SamplesNuGetOutDir>$(MSBuildThisFileDirectory)..\artifacts\nuget</SamplesNuGetOutDir>
-    </PropertyGroup>
-
-    <Message Importance="high" Text="Packing Grape.Graphics $(SamplesPackVersion) for samples verification..." />
-    <Exec Command="dotnet pack &quot;$(MSBuildThisFileDirectory)..\src\Grape.Graphics\Grape.Graphics.csproj&quot; -c $(Configuration) -o &quot;$(SamplesNuGetOutDir)&quot; /p:Version=$(SamplesPackVersion) --nologo -v quiet" />
 
     <!--
       Pass /force-style flags so NuGet re-evaluates the floating "any

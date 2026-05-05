@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -23,22 +23,17 @@ var triangle = ImmutableArray.Create(
     new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
     new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
 
-var window = new Window3D(800, 600)
+var window = new Window3D
 {
     Title = "Triangle Swarm",
     BackgroundColor = new Color(8, 0, 24),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape,
 };
 
-window.KeyDown += (_, e) =>
+window.Rendering += (w, e) =>
 {
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-window.RenderingFrame += (w, frame) =>
-{
-    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var aspectScale = Matrix4x4.CreateScale(aspect, 1f, 1f);
@@ -61,11 +56,11 @@ window.RenderingFrame += (w, frame) =>
             Matrix4x4.CreateTranslation(cx, cy, 0f) *
             aspectScale;
 
-        frame.Renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
+        e.Renderer.RenderMesh(triangle, Shaders.PositionColorWithTransform, transform);
     }
 
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 

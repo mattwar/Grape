@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -26,22 +26,17 @@ const float Speed = 2f;          // travel speed
 // Two triangles per segment, six vertices each.
 var vertices = new ColorVertex3D[Segments * 6];
 
-var window = new Window3D(800, 600)
+var window = new Window3D
 {
     Title = "Animated Sine Ribbon",
     BackgroundColor = new Color(0, 0, 32),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape
 };
 
-window.KeyDown += (_, e) =>
+window.Rendering += (w, e) =>
 {
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-window.RenderingFrame += (w, frame) =>
-{
-    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
 
     for (int i = 0; i < Segments; i++)
     {
@@ -75,9 +70,9 @@ window.RenderingFrame += (w, frame) =>
     var aspect = (float)height / width;
     var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    frame.Renderer.RenderMesh(vertices, transform);
+    e.Renderer.RenderMesh(vertices, transform);
 
-    w.Invalidate(); // schedule the next frame
+    w.Invalidate(); // schedule the next render
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();

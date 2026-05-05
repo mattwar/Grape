@@ -1,0 +1,48 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "pack-grape-graphics",
+            "type": "shell",
+            "command": "dotnet",
+            "args": [
+                "build",
+                "${workspaceFolder}/src/Grape.Graphics/Grape.Graphics.csproj",
+                "-c",
+                "Debug",
+                "--nologo"
+            ],
+            "options": { "cwd": "${workspaceFolder}" },
+            "problemMatcher": "$msCompile",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": true
+            }
+        },
+        {
+            "label": "build-current-sample",
+            "type": "shell",
+            "command": "powershell",
+            "args": [
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                "${workspaceFolder}/.vscode/build-sample.ps1",
+                "-File",
+                "${file}"
+            ],
+            "options": { "cwd": "${workspaceFolder}" },
+            "dependsOn": "pack-grape-graphics",
+            "dependsOrder": "sequence",
+            "problemMatcher": "$msCompile",
+            "group": { "kind": "build", "isDefault": true },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "clear": false
+            }
+        }
+    ]
+}

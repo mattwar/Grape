@@ -22,49 +22,58 @@ public class Window2D : Window
         _renderer = Renderer.Create(this);
     }
 
-    /// <summary>
-    /// Occurs when the window is rendering a frame, providing access to the
-    /// current rendering context.
-    /// </summary>
-    private WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? _renderingFrame;
+    private WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? _renderingHandler;
 
-    public event WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? RenderingFrame
+    /// <summary>
+    /// Occurs when the window is rendering a frame.
+    /// </summary>
+    public event WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? Rendering
     {
         add
         {
-            _renderingFrame += value;
-            if (!IsDisposed) Invalidate();   // ensure a frame fires after subscription
+            _renderingHandler += value;
+            if (!IsClosed) Invalidate();   // ensure a frame fires after subscription
         }
         remove
         {
-            _renderingFrame -= value;
+            _renderingHandler -= value;
         }
     }
 
-    public virtual void OnRenderingFrame(WindowRenderEventArgs<Renderer2D> args)
+    protected override void RaiseRenderingEvent()
     {
-        _renderingFrame?.Invoke(this, args);
-    }
-
-    protected override void DoRenderFrame(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame)
-    {
-        // DoRender is called on the render thread
-        RenderFrame_AppThread(elapsedSinceWindowCreated, elapsedSinceLastFrame, args => OnRenderingFrame(args));
+        var renderer = _renderer;
+        var handler = _renderingHandler;
+        if (renderer != null && handler != null)
+        {
+            var (sinceCreate, sinceLast) = ConsumeRenderTimings();
+            renderer.DrawColor = this.BackgroundColor;
+            renderer.Clear();
+            handler.Invoke(this, new WindowRenderEventArgs<Renderer2D>(sinceCreate, sinceLast, renderer));
+            renderer.Present();
+        }
     }
 
     /// <summary>
-    /// Renders an entire frame (assumes the thread is the app thread)
+    /// Renders now using the provided render action. 
+    /// This is an alternative to subscribing to the <see cref="Rendering"/> event.
     /// </summary>
-    private void RenderFrame_AppThread(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame, Action<WindowRenderEventArgs<Renderer2D>> renderAction)
+    public void Render(Action<WindowRenderEventArgs<Renderer2D>> renderAction)
     {
-        var renderer = _renderer;
-        if (renderer != null)
+        Application.Current.Send(_ =>
         {
+            if (this.IsClosed)
+                return;
+            var renderer = _renderer;
+            if (renderer is null)
+                return;
+
+            var (sinceCreate, sinceLast) = ConsumeRenderTimings();
             renderer.DrawColor = this.BackgroundColor;
             renderer.Clear();
-            renderAction(new WindowRenderEventArgs<Renderer2D>(elapsedSinceWindowCreated, elapsedSinceLastFrame, renderer));
+            renderAction(new WindowRenderEventArgs<Renderer2D>(sinceCreate, sinceLast, renderer));
             renderer.Present();
-        }
+        });
     }
 
     /// <summary>

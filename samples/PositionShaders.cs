@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -16,46 +16,41 @@ using System.Numerics;
 using Grape;
 
 // Exercises every position-only built-in shader in `Shaders`:
-//   - Shaders.Position                (white, no transform)
-//   - Shaders.PositionTransform       (white, transformed)
-//   - Shaders.PositionTransformColor  (per-draw fragment color, transformed)
+//   - Shaders.Position                       (white, no transform)
+//   - Shaders.PositionWithTransform          (white, transformed)
+//   - Shaders.PositionWithTransformAndColor  (per-draw fragment color, transformed)
 // All three draw the same triangle mesh in different quadrants of the window
 // so the visual result tells you at a glance whether each shader pipeline
 // survives the runtime HLSL -> shadercross path.
 
 // Position-only triangle, ~1 unit tall, centered at origin.
 var triangle = new Mesh<Vertex3D>(
-    vertices: ImmutableArray.Create(
+    vertices: [
         new Vertex3D( 0.0f,  0.5f, 0f),
         new Vertex3D( 0.5f, -0.5f, 0f),
-        new Vertex3D(-0.5f, -0.5f, 0f)),
+        new Vertex3D(-0.5f, -0.5f, 0f)
+        ],
     indices: ImmutableArray<uint>.Empty);
 
 // A static triangle whose positions are already in NDC inside the top-left
 // quadrant. Used to exercise Shaders.Position, which takes no transform.
-var staticTopLeft = new Mesh<Vertex3D>(
-    vertices: ImmutableArray.Create(
-        new Vertex3D(-0.5f,  0.7f, 0f),
-        new Vertex3D(-0.3f,  0.3f, 0f),
-        new Vertex3D(-0.7f,  0.3f, 0f)),
-    indices: ImmutableArray<uint>.Empty);
+var staticTopLeft = Mesh.Create([
+    new Vertex3D(-0.5f,  0.7f, 0f),
+    new Vertex3D(-0.3f,  0.3f, 0f),
+    new Vertex3D(-0.7f,  0.3f, 0f)
+    ]);
 
-var window = new Window3D(800, 600)
+var window = new Window3D
 {
     Title = "Position Shaders",
     BackgroundColor = new Color(0, 0, 32),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape,
 };
 
-window.KeyDown += (_, e) =>
+window.Rendering += (w, e) =>
 {
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-window.RenderingFrame += (w, frame) =>
-{
-    var seconds = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var seconds = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
 
@@ -63,26 +58,27 @@ window.RenderingFrame += (w, frame) =>
     var spin = Matrix4x4.CreateRotationZ(seconds);
 
     // Top-left: Shaders.Position (no transform).
-    frame.Renderer.RenderMesh(staticTopLeft, Shaders.Position);
+    e.Renderer.RenderMesh(staticTopLeft, Shaders.Position);
 
-    // Top-right: Shaders.PositionTransform (white, spinning, translated).
+    // Top-right: Shaders.PositionWithTransform (white, spinning, translated).
     var topRight = spin * fit * Matrix4x4.CreateTranslation(0.5f, 0.5f, 0f);
-    frame.Renderer.RenderMesh(triangle, Shaders.PositionTransform, topRight);
+    e.Renderer.RenderMesh(triangle, Shaders.PositionWithTransform, topRight);
 
-    // Bottom-left: Shaders.PositionTransformColor with red.
+    // Bottom-left: Shaders.PositionWithTransformAndColor with red.
     var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
-    frame.Renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
+    e.Renderer.RenderMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
     {
         Mvp = bottomLeft,
         Color = new Vector4(1f, 0.2f, 0.2f, 1f),
     });
 
-    // Bottom-right: Shaders.PositionTransformColor with hue-cycling color
+    // Bottom-right: Shaders.PositionWithTransformAndColor with hue-cycling color
     // and counter-rotation.
     var bottomRight =
         Matrix4x4.CreateRotationZ(-seconds) * fit *
         Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
-    frame.Renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
+
+    e.Renderer.RenderMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
     {
         Mvp = bottomRight,
         Color = HueToRgb(seconds * 0.25f),
@@ -91,7 +87,7 @@ window.RenderingFrame += (w, frame) =>
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 
 static Vector4 HueToRgb(float hue)
 {

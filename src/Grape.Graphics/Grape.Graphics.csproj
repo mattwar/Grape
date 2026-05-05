@@ -30,8 +30,51 @@
     <PackageTags>graphics;sdl3;sdl;gamedev;rendering;skiasharp</PackageTags>
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <!-- Repack on every build so file-based samples (`#:package Grape.Graphics@*-*`)
+         pick up source changes without a separate pack step. The version is bumped
+         per build via a timestamp suffix in Debug so the NuGet global cache
+         invalidates; Release/CI builds override Version via /p:Version=... -->
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageOutputPath>$(MSBuildThisFileDirectory)..\..\artifacts\nuget</PackageOutputPath>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug' and '$(Version)' == '0.1.0-dev'">
+    <Version>0.1.0-dev-local-$([System.DateTime]::UtcNow.ToString(yyyyMMddHHmmss))</Version>
+  </PropertyGroup>
+
+  <!--
+    Trim accumulated timestamped local builds in artifacts/nuget after each
+    pack so the folder doesn't grow unbounded. Keeps the 10 most recent
+    .nupkg/.snupkg files; never touches non-timestamped versions (e.g.
+    explicit /p:Version=... releases).
+  -->
+  <Target Name="TrimLocalNuGetArtifacts"
+          AfterTargets="Pack"
+          Condition="Exists('$(PackageOutputPath)')">
+    <Exec Command="powershell -NoProfile -Command &quot;Get-ChildItem '$(PackageOutputPath)\Grape.Graphics.0.1.0-dev-local-*.nupkg','$(PackageOutputPath)\Grape.Graphics.0.1.0-dev-local-*.snupkg' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -Skip 10 | Remove-Item -Force&quot;"
+          IgnoreExitCode="true" />
+  </Target>
+
+  <!--
+    After a local Debug pack, purge stale copies from the NuGet global cache
+    and the file-based-app runfile cache. Without this:
+      * `~/.nuget/packages/grape.graphics/<old-version>` lingers, and any
+        sample that already restored against it will keep using the cached
+        bits even though a newer .nupkg now exists in artifacts/nuget.
+      * `%LOCALAPPDATA%\Temp\dotnet\runfile\<sample>-<hash>\obj` pins the
+        previously-resolved version via project.assets.json.
+    Both make the C# language server in VS Code keep showing errors against
+    the old API even after a successful repack.
+
+    Only runs on Debug local-timestamped builds; release/CI builds (which
+    override Version) leave the global cache untouched.
+  -->
+  <Target Name="PurgeStaleGrapeGraphicsCaches"
+          AfterTargets="Pack"
+          Condition="'$(Configuration)' == 'Debug' and $(Version.StartsWith('0.1.0-dev-local-'))">
+    <Exec Command="powershell -NoProfile -Command &quot;Remove-Item -Recurse -Force '$(USERPROFILE)\.nuget\packages\grape.graphics' -ErrorAction SilentlyContinue; Remove-Item -Recurse -Force '$(LOCALAPPDATA)\Temp\dotnet\runfile\*' -ErrorAction SilentlyContinue&quot;"
+          IgnoreExitCode="true" />
+  </Target>
 
   <!-- Files at the package root -->
   <ItemGroup>

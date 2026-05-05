@@ -335,7 +335,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         RenderTexturedMeshCore(
             mesh,
             atlas,
-            Shaders.PositionTextureTransform,
+            Shaders.PositionTextureWithTransform,
             sampler,
             in transform);
     }

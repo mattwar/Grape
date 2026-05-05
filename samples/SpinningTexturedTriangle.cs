@@ -6,7 +6,7 @@
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
-//     ./pack-local.ps1
+//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
 //
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
@@ -28,22 +28,17 @@ var triangle = new Mesh<TextureVertex3D>(
 // mistake is visually obvious.
 var checker = CreateCheckerboardImage(256, 256, cellSize: 32);
 
-var window = new Window3D(800, 600)
+var window = new Window3D
 {
     Title = "Spinning Textured Triangle",
     BackgroundColor = new Color(0, 0, 32),
-    FullScreen = true
+    FullScreen = true,
+    CloseKey = Key.Escape,
 };
 
-window.KeyDown += (_, e) =>
+window.Rendering += (w, e) =>
 {
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-window.RenderingFrame += (w, frame) =>
-{
-    var seconds = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var seconds = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var transform =
@@ -51,16 +46,16 @@ window.RenderingFrame += (w, frame) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    frame.Renderer.RenderMesh(
+    e.Renderer.RenderMesh(
         triangle,
         checker,
-        Shaders.PositionTextureTransform,
+        Shaders.PositionTextureWithTransform,
         transform);
 
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 
 static Image CreateCheckerboardImage(int width, int height, int cellSize)
 {

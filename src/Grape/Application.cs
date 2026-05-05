@@ -42,30 +42,38 @@ public class Application : IDisposable
     public Thread Thread { get; }
 
     /// <summary>
-    /// True if the application has been disposed.
+    /// True if the application has been shut down (disposed).
     /// </summary>
-    public bool IsDisposed => _disposed;
+    public bool IsShutdown => _disposed;
 
-    private readonly TaskCompletionSource _disposedTcs =
+    private readonly TaskCompletionSource _shutdownTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
-    /// A task that completes when this application is disposed.
+    /// A task that completes when this application has shut down.
     /// </summary>
-    public Task DisposedTask => _disposedTcs.Task;
+    public Task ShutdownTask => _shutdownTcs.Task;
 
     /// <summary>
-    /// Asynchronously waits for this application to be disposed.
+    /// Asynchronously waits for this application to shut down.
     /// </summary>
-    public Task WaitForDisposeAsync(CancellationToken cancellationToken = default)
-        => _disposedTcs.Task.WaitAsync(cancellationToken);
+    public Task WaitForShutdownAsync(CancellationToken cancellationToken = default)
+        => _shutdownTcs.Task.WaitAsync(cancellationToken);
 
     /// <summary>
-    /// Disposes the application and any related resources.
+    /// Shuts down the application, closing all open windows
+    /// and automatically disposing it and all its resources.
+    /// </summary>
+    public void Shutdown() => Dispose();
+
+    /// <summary>
+    /// Disposes the application and any related resources. Equivalent
+    /// to <see cref="Shutdown"/>; prefer <see cref="Shutdown"/> for
+    /// user-facing shutdown logic.
     /// </summary>
     public void Dispose()
     {
-        if (IsDisposed)
+        if (IsShutdown)
             return;
 
         if (Interlocked.CompareExchange(ref _disposed, true, false) == false)
@@ -88,7 +96,7 @@ public class Application : IDisposable
 
             SDL.Quit();
 
-            _disposedTcs.TrySetResult();
+            _shutdownTcs.TrySetResult();
         }
     }
 
@@ -202,7 +210,7 @@ public class Application : IDisposable
 
     private async Task RunEventLoopAsync()
     {
-        while (!IsDisposed && !_quitRequested)
+        while (!IsShutdown && !_quitRequested)
         {
             while (SDL.PollEvent(out var e))
             {
