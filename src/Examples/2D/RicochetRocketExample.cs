@@ -1,3 +1,4 @@
+using System.Security.Principal;
 using Grape;
 using Grape.Vine;
 
@@ -46,27 +47,12 @@ internal static class RicochetRocketExample
             }
         };
 
-        window.RenderingFrame += (window, renderer) =>
+        window.RenderingFrame += (window, args) =>
         {
-            rocket.Render(renderer);
-#if DEBUG
-            // render debug text on screen
-            renderer.DrawColor = new Color(255, 255, 255);
-            renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
-#endif
-        };
-
-        // game loop
-        var startTime = DateTime.UtcNow;
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(4));
-
-        while (!window.IsDisposed)
-        {
-            await timer.WaitForNextTickAsync();
-
             var updateContext = new UpdateContext
             {
-                Time = DateTime.UtcNow - startTime,
+                ElapsedSinceStart = args.ElapsedSinceWindowCreated,
+                ElaspsedSinceLastUpdate = args.ElapsedSinceLastFrame,
                 Bounds = new Rect(0, 0, window.Size.Width, window.Size.Height)
             };
 
@@ -101,15 +87,24 @@ internal static class RicochetRocketExample
                 // make the rocket point in the direction it's moving
                 rocket.Rotation = rocket.Heading;
 
-                window.Invalidate();
-
                 if (bounce)
                 {
                     rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f; // add a little randomness to the bounce
                     _ = Audio.Play(sound, volume: .2f);
                 }
             }
-        }
+
+            rocket.Render(args.Renderer);
+#if DEBUG
+            // render debug text on screen
+            args.Renderer.DrawColor = new Color(255, 255, 255);
+            args.Renderer.RenderDebugText(0, 10, $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} heading: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}", scale: 4f);
+#endif
+
+            window.Invalidate(); // trigger next frame
+        };
+
+        await window.WaitForDisposeAsync();
 
         Console.WriteLine("Done");
     }

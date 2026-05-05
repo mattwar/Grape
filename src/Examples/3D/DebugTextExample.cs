@@ -26,10 +26,10 @@ internal static class DebugTextExample
                 Application.Current.Dispose();
         };
 
-        window.RenderingFrame += (_, renderer) =>
+        window.RenderingFrame += (_, args) =>
         {
             frame++;
-            var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;
+            var t = (float)args.ElapsedSinceWindowCreated.TotalSeconds;
             var (w, h) = window.Size;
             var aspect = (float)h / w;
 
@@ -49,7 +49,7 @@ internal static class DebugTextExample
                     Matrix4x4.CreateRotationZ(roll) *
                     Matrix4x4.CreateTranslation(swing, 0.4f + bob, 0f) *
                     Matrix4x4.CreateScale(aspect, 1f, 1f);
-                renderer.RenderDebugText(banner, transform);
+                args.Renderer.RenderDebugText(banner, transform);
             }
 
             // Bottom line: live readout that grows/shrinks character count.
@@ -61,15 +61,12 @@ internal static class DebugTextExample
                     Matrix4x4.CreateScale(scale) *
                     Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.5f, 0f) *
                     Matrix4x4.CreateScale(aspect, 1f, 1f);
-                renderer.RenderDebugText(live, transform);
+                args.Renderer.RenderDebugText(live, transform);
             }
+
+            window.Invalidate(); // trigger next frame
         };
 
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-        while (!window.IsDisposed)
-        {
-            await timer.WaitForNextTickAsync();
-            window.Invalidate();
-        }
+        await window.WaitForDisposeAsync();
     }
 }

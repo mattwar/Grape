@@ -43,23 +43,36 @@ public class Window3D : Window
     /// <summary>
     /// Occurs when the window is rendering a frame using the GPU pipeline.
     /// </summary>
-    public event WindowEventHandler<Renderer3D>? RenderingFrame;
+    private event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? _renderingFrame;
 
-    public virtual void OnRenderingFrame(Renderer3D renderer)
+    public event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? RenderingFrame
     {
-        this.RenderingFrame?.Invoke(this, renderer);
+        add
+        {
+            _renderingFrame += value;
+            if (!IsDisposed) Invalidate();   // ensure a frame fires after subscription
+        }
+        remove
+        {
+            _renderingFrame -= value;
+        }
     }
 
-    protected override void DoRenderFrame()
+    public virtual void OnRenderingFrame(WindowRenderEventArgs<Renderer3D> args)
     {
-        RenderFrame_AppThread(r => OnRenderingFrame(r));
+        _renderingFrame?.Invoke(this, args);
+    }
+
+    protected override void DoRenderFrame(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame)
+    {
+        RenderFrame_AppThread(elapsedSinceWindowCreated, elapsedSinceLastFrame, r => OnRenderingFrame(r));
     }
 
 
     /// <summary>
     /// Renders an entire frame using the specified action (assumes the thread is the app thread).
     /// </summary>
-    private void RenderFrame_AppThread(Action<Renderer3D> renderAction)
+    private void RenderFrame_AppThread(TimeSpan elapsedSinceWindowCreated, TimeSpan elapsedSinceLastFrame, Action<WindowRenderEventArgs<Renderer3D>> renderAction)
     {
         // Lazily create the renderer and claim the window for the GPU on
         // first render. We can't do this in OnWindowCreated because the
@@ -79,17 +92,8 @@ public class Window3D : Window
         if (_claimed)
         {
             _renderer.BeginFrame(this);
-            renderAction(_renderer);
+            renderAction(new WindowRenderEventArgs<Renderer3D>(elapsedSinceWindowCreated, elapsedSinceLastFrame, _renderer));
             _renderer.Present();
         }
-    }
-
-    /// <summary>
-    /// Renders an entire frame using the specified action (action runs on app thread).
-    /// </summary>
-    public void RenderFrame(Action<Renderer3D> renderAction)
-    {
-        // send render action to application main thread
-        Application.Current.Send(_ => RenderFrame_AppThread(renderAction));
     }
 }

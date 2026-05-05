@@ -33,9 +33,9 @@ internal static class SpinningTexturedTriangleExample
                 Application.Current.Dispose();
         };
 
-        window.RenderingFrame += (_, renderer) =>
+        window.RenderingFrame += (_, args) =>
         {
-            var seconds = (float)(DateTime.UtcNow - startTime).TotalSeconds;
+            var seconds = (float)args.ElapsedSinceWindowCreated.TotalSeconds;
             var (w, h) = window.Size;
             var aspect = (float)h / w;
             var transform =
@@ -43,19 +43,16 @@ internal static class SpinningTexturedTriangleExample
                 Matrix4x4.CreateScale(0.8f) *
                 Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-            renderer.RenderTexturedMesh(
+            args.Renderer.RenderTexturedMesh(
                 triangle,
                 Shaders.TexturedQuadWithMatrix,
                 checker,
                 transform);
+            
+            window.Invalidate(); // trigger next frame
         };
 
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-        while (!window.IsDisposed)
-        {
-            await timer.WaitForNextTickAsync();
-            window.Invalidate();
-        }
+        await window.WaitForDisposeAsync();
     }
 
     private static Grape.Image CreateCheckerboardImage(int width, int height, int cellSize)

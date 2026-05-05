@@ -139,7 +139,7 @@ public class StackPanel : Prop
         {
             var panelContext = new UpdateContext
             {
-                Time = context.Time,
+                ElapsedSinceStart = context.ElapsedSinceStart,
                 Bounds = panel.Bounds
             };
 

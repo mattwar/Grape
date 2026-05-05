@@ -54,8 +54,6 @@ public class Sprite : Prop
     /// </summary>
     public FlipMode Flipped = FlipMode.None;
 
-    private TimeSpan _lastUpdate = TimeSpan.Zero;
-
     public Sprite()
     {
     }
@@ -70,17 +68,7 @@ public class Sprite : Prop
 
     public override bool Update(in UpdateContext context)
     {
-        double sec = context.Time.TotalSeconds;
-
-        var timeDelta = context.Time - _lastUpdate;
-        if (_lastUpdate != TimeSpan.Zero
-            && timeDelta.TotalMilliseconds < 10)
-        {
-            // too soon to update
-            return false;
-        }
-
-        _lastUpdate = context.Time;
+        var timeDelta = context.ElaspsedSinceLastUpdate;
 
         float newRotation = this.Rotation;
         if (this.RotationSpeed != 0f)
@@ -106,9 +94,9 @@ public class Sprite : Prop
         var changed = newRotation != this.Rotation
             || newCenterX != this.CenterX
             || newCenterY != this.CenterY
-            || _lastUpdate == TimeSpan.Zero; // always update the first time
+            || context.ElaspsedSinceLastUpdate == TimeSpan.Zero; // consider it changed if this is the first update (elapsed time is zero) to ensure it renders at the initial position
 
-        if (changed || _lastUpdate == TimeSpan.Zero)
+        if (changed || context.ElaspsedSinceLastUpdate == TimeSpan.Zero)
         {
             this.Rotation = newRotation;
             this.CenterX = newCenterX;

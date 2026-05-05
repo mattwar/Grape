@@ -34,9 +34,9 @@ internal static class AnimatedSineRibbonExample
                 Application.Current.Dispose();
         };
 
-        window.RenderingFrame += (_, renderer) =>
+        window.RenderingFrame += (_, args) =>
         {
-            var t = (float)(DateTime.UtcNow - startTime).TotalSeconds;
+            var t = (float)args.ElapsedSinceWindowCreated.TotalSeconds;
 
             for (int i = 0; i < Segments; i++)
             {
@@ -71,15 +71,12 @@ internal static class AnimatedSineRibbonExample
             var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
             // reuse same array with different vertex data each frame
-            renderer.RenderMesh(vertices, Shaders.PositionColorTransform, transform);
+            args.Renderer.RenderMesh(vertices, Shaders.PositionColorTransform, transform);
+
+            window.Invalidate(); // trigger next frame
         };
 
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-        while (!window.IsDisposed)
-        {
-            await timer.WaitForNextTickAsync();
-            window.Invalidate();
-        }
+        await window.WaitForDisposeAsync();
     }
 
     private static Color HsvToColor(float h, float s, float v)

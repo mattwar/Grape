@@ -40,9 +40,9 @@ internal static class PositionShadersExample
                 Application.Current.Dispose();
         };
 
-        window.RenderingFrame += (_, renderer) =>
+        window.RenderingFrame += (_, args) =>
         {
-            var seconds = (float)(DateTime.UtcNow - startTime).TotalSeconds;
+            var seconds = (float)args.ElapsedSinceWindowCreated.TotalSeconds;
             var (w, h) = window.Size;
             var aspect = (float)h / w;
 
@@ -60,15 +60,15 @@ internal static class PositionShadersExample
             // To keep the example simple we draw a separate static triangle
             // here whose model-space coordinates are already where we want
             // them on screen.
-            renderer.RenderMesh(StaticTopLeft, Shaders.Position);
+            args.Renderer.RenderMesh(StaticTopLeft, Shaders.Position);
 
             // Top-right: PositionTransform (white, spinning, translated).
             var topRight = spin * fit * Matrix4x4.CreateTranslation( 0.5f,  0.5f, 0f);
-            renderer.RenderMesh(triangle, Shaders.PositionTransform, topRight);
+            args.Renderer.RenderMesh(triangle, Shaders.PositionTransform, topRight);
 
             // Bottom-left: PositionTransformColor with red.
             var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
-            renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
+            args.Renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
             {
                 Mvp = bottomLeft,
                 Color = new Vector4(1f, 0.2f, 0.2f, 1f),
@@ -80,19 +80,16 @@ internal static class PositionShadersExample
             var bottomRight =
                 Matrix4x4.CreateRotationZ(-seconds) * fit *
                 Matrix4x4.CreateTranslation( 0.5f, -0.5f, 0f);
-            renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
+            args.Renderer.RenderMesh(triangle, Shaders.PositionTransformColor, new PositionTransformColorArgs
             {
                 Mvp = bottomRight,
                 Color = HueToRgb(seconds * 0.25f),
             });
+
+            window.Invalidate(); // trigger next frame
         };
 
-        var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-        while (!window.IsDisposed)
-        {
-            await timer.WaitForNextTickAsync();
-            window.Invalidate();
-        }
+        await window.WaitForDisposeAsync();
     }
 
     /// <summary>
