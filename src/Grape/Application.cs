@@ -116,7 +116,16 @@ public class Application : IDisposable
     {
         ImmutableInterlocked.Update(ref _windows, list => list.Remove(window));
         RemoveResource(window);
+
+        // When the last window closes, ask the event loop to exit so the
+        // foreground app thread can terminate and the process can shut down.
+        // Callers that want a headless application should create the
+        // Application explicitly and call Dispose() themselves.
+        if (_windows.IsEmpty)
+            _quitRequested = true;
     }
+
+    private volatile bool _quitRequested;
 
     /// <summary>
     /// Gets the window with the specified ID.
@@ -193,7 +202,7 @@ public class Application : IDisposable
 
     private async Task RunEventLoopAsync()
     {
-        while (!IsDisposed)
+        while (!IsDisposed && !_quitRequested)
         {
             while (SDL.PollEvent(out var e))
             {

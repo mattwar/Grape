@@ -20,8 +20,11 @@
 
   <PropertyGroup>
     <PackageId>Grape.Graphics</PackageId>
-    <Version>0.1.0</Version>
-    <Description>Grape - Graphics Programming Extensions. Class wrappers around SDL3 for graphics, input, audio, and more. Bundles the core Grape library together with SkiaSharp-powered image loading and Skia rendering helpers.</Description>
+    <!-- Default Version uses a prerelease tag so local `dotnet pack` never produces
+         a stable version that could collide with future published packages or pollute
+         the NuGet global cache. CI/release builds override this via /p:Version=... -->
+    <Version>0.1.0-dev</Version>
+    <Description>Grape - Graphics Programming Extensions. Class wrappers around SDL3 for graphics, input, audio, and more. Bundles the core Grape library, SkiaSharp-powered image loading and Skia rendering helpers, and the Grape.Jelly scene/sprite layer.</Description>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
     <PackageIcon>grape.png</PackageIcon>
     <PackageTags>graphics;sdl3;sdl;gamedev;rendering;skiasharp</PackageTags>
@@ -50,6 +53,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Grape\Grape.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Grape.Jelly\Grape.Jelly.csproj" PrivateAssets="all" />
   </ItemGroup>
 
   <!--
@@ -79,6 +83,10 @@
     <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.dll"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
     <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.pdb"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Grape.Jelly\bin\$(Configuration)\net9.0\Grape.Jelly.dll"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Grape.Jelly\bin\$(Configuration)\net9.0\Grape.Jelly.pdb"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
   </ItemGroup>
 

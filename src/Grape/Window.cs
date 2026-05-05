@@ -101,6 +101,8 @@ public abstract class Window : IDisposable
 
                 _resources.Clear();
 
+                Application.Current?.RemoveWindow(this);
+
                 _disposedTcs.TrySetResult();
             }
         }

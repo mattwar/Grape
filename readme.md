@@ -121,7 +121,7 @@ window.RenderingFrame += (w, frame) =>
 await window.WaitForDisposeAsync();
 ```
 
-See [src/Examples/2D/RicochetRocketExample.cs](src/Examples/2D/RicochetRocketExample.cs) for the full version.
+See [samples/RicochetRocket.cs](samples/RicochetRocket.cs) for the full version.
 
 ## A 3D Triangle Swarm
 
@@ -148,7 +148,7 @@ window.RenderingFrame += (w, frame) =>
 await window.WaitForDisposeAsync();
 ```
 
-More examples live in [src/Examples](src/Examples).
+More examples live in [samples/](samples/) — each is a single `.cs` file you can run directly with `dotnet run samples/<name>.cs` (.NET 10+).
 
 ## Project Layout
 
@@ -156,17 +156,16 @@ More examples live in [src/Examples](src/Examples).
 | --- | --- |
 | `Grape` | Core library: windows, rendering (BMP), input, audio. |
 | `Grape.SkiaSharp` | SkiaSharp integration: PNG/JPEG/etc. image loading, Skia canvas drawing into Grape images. |
-| `Grape.Graphics` | Packaging project — bundles `Grape` + `Grape.SkiaSharp` into a single NuGet package. |
+| `Grape.Graphics` | Packaging project — bundles `Grape`, `Grape.SkiaSharp`, and `Grape.Jelly` into a single NuGet package. |
 | `Grape.Jelly` | Scene-graph helpers (sprites, scenes, panels) on top of `Grape`. |
-| `Examples` | Runnable 2D and 3D sample programs. |
 
 ## Building from Source
 
 ```sh
 git clone https://github.com/mattwar/Grape.git
-cd Grape/src
-dotnet build Grape.sln
-dotnet run --project Examples
+cd Grape
+dotnet build src/Grape.sln
+dotnet run samples/TriangleSwarm.cs
 ```
 
 To produce a NuGet package locally:
