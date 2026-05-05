@@ -1,9 +1,7 @@
 
 using System.Collections.Immutable;
-using SDL3;
-using Grape;
 
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 public class Scene //: IDisposable
 {
@@ -60,7 +58,7 @@ public class Scene //: IDisposable
         //var context = new UpdateContext
         //{
         //    Time = time,
-        //    Bounds = new SDL.Rect { X = 0, Y = 0, W = size.Width, H = size.Height }
+        //    Bounds = new Rect(0, 0, size.Width, size.Height)
         //};
 
         foreach (var prop in _props)

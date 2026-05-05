@@ -1,8 +1,6 @@
 using System.Collections.Immutable;
-using SDL3;
-using Grape;
 
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 public class Panel
 {
@@ -17,7 +15,7 @@ public class Panel
     /// <summary>
     /// The computed bounds of the panel within the window.
     /// </summary>
-    internal SDL.Rect Bounds { get; set; }
+    internal Rect Bounds { get; set; }
 
     /// <summary>
     /// The measure type for Width.
@@ -72,11 +70,11 @@ public class StackPanel : Prop
 
     public bool IsVertical { get; set; } = true;
 
-    private void ComputeLayout(in SDL.Rect bounds)
+    private void ComputeLayout(in Rect bounds)
     {
         if (this.IsVertical)
         {
-            var parentHeight = bounds.H;
+            var parentHeight = (int)bounds.Height;
             int fixedHeight = _panels.Where(p => p.HeightMeasure == Measure.Pixels).Sum(p => (int)p.Height);
             int remainingHeight = parentHeight - fixedHeight;
             float totalProportion = _panels.Where(p => p.HeightMeasure == Measure.Proportion).Sum(p => p.Height);
@@ -90,19 +88,13 @@ public class StackPanel : Prop
                     Measure.Proportion => (int)(remainingHeight * panel.Height / totalProportion),
                     _ => 0
                 };
-                panel.Bounds = new SDL.Rect
-                {
-                    X = bounds.X,
-                    Y = top,
-                    W = bounds.W,
-                    H = height
-                };
+                panel.Bounds = new Rect(bounds.X, top, bounds.Width, height);
                 top += height;
             }
         }
         else
         {
-            var parentWidth = bounds.W;
+            var parentWidth = (int)bounds.Width;
             int fixedWidth = _panels.Where(p => p.WidthMeasure == Measure.Pixels).Sum(p => (int)p.Width);
             int remainingWidth = parentWidth - fixedWidth;
             float totalProportion = _panels.Where(p => p.WidthMeasure == Measure.Proportion).Sum(p => p.Width);
@@ -116,13 +108,7 @@ public class StackPanel : Prop
                     Measure.Proportion => (int)(remainingWidth * panel.Height / totalProportion),
                     _ => 0
                 };
-                panel.Bounds = new SDL.Rect
-                {
-                    X = left,
-                    Y = bounds.Y,
-                    W = width,
-                    H = bounds.H
-                };
+                panel.Bounds = new Rect(left, bounds.Y, width, bounds.Height);
                 left += width;
             }
         }

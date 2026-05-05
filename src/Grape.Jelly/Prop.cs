@@ -1,7 +1,4 @@
-using SDL3;
-using Grape;
-
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 public abstract class Prop
 {

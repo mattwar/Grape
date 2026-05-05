@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36408.4
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape.Vine", "Grape.Vine\Grape.Vine.csproj", "{DDE832AE-2BFD-483D-A5B3-FB512AE35C91}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape.Jelly", "Grape.Jelly\Grape.Jelly.csproj", "{DDE832AE-2BFD-483D-A5B3-FB512AE35C91}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Grape", "Grape\Grape.csproj", "{8AA1863C-6450-4E7A-BED5-09BCCF4E8DCF}"
 EndProject

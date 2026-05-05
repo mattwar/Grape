@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Grape.Vine\Grape.Vine.csproj" />
+    <ProjectReference Include="..\Grape.Jelly\Grape.Jelly.csproj" />
     <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" />
     <ProjectReference Include="..\Grape\Grape.csproj" />
   </ItemGroup>

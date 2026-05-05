@@ -30,7 +30,7 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 - **Input** — keyboard, mouse, gamepad, and touch via simple events
 - **Audio** — load and play WAV data
 - **Images** — load PNG, JPEG, BMP, and more (via SkiaSharp); manipulate pixels; set color keys; draw with the SkiaSharp canvas API.
-- **`Grape.Vine`** — a tiny scene-graph layer (sprites, props, panels, scenes) on top of `Window2D`. This is really experimental and may get removed.
+- **`Grape.Jelly`** — a tiny scene-graph layer (sprites, props, panels, scenes) on top of `Window2D`. This is really experimental and may get removed.
 
 ## Installation
 
@@ -70,11 +70,11 @@ while (!window.IsDisposed)
 }
 ```
 
-## A 2D Sprite (using Grape.Vine)
+## A 2D Sprite (using Grape.Jelly)
 
 ```csharp
 using Grape;
-using Grape.Vine;
+using Grape.Jelly;
 
 var window = new Window2D(800, 600) { Title = "Rocket" };
 
@@ -129,7 +129,7 @@ More examples live in [src/Examples](src/Examples).
 | `Grape` | Core library: windows, rendering (BMP), input, audio. |
 | `Grape.SkiaSharp` | SkiaSharp integration: PNG/JPEG/etc. image loading, Skia canvas drawing into Grape images. |
 | `Grape.Graphics` | Packaging project — bundles `Grape` + `Grape.SkiaSharp` into a single NuGet package. |
-| `Grape.Vine` | Scene-graph helpers (sprites, scenes, panels) on top of `Grape`. |
+| `Grape.Jelly` | Scene-graph helpers (sprites, scenes, panels) on top of `Grape`. |
 | `Examples` | Runnable 2D and 3D sample programs. |
 
 ## Building from Source

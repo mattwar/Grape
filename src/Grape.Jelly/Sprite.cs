@@ -1,8 +1,6 @@
-using SDL3;
-using Grape;
 using System.Numerics;
 
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 /// <summary>
 /// A prop that moves itself.

@@ -1,8 +1,6 @@
 using System.Collections.Immutable;
-using SDL3;
-using Grape;
 
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 public abstract class Container : Prop
 {

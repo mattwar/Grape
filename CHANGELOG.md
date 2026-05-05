@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   shaders, meshes, vertices, and image loading.
 - Input: keyboard, mouse, gamepad, touch.
 - Audio: WAV loading and playback.
-- Companion `Grape.Vine` scene-graph helpers and `Grape.SkiaSharp` integration
+- Companion `Grape.Jelly` scene-graph helpers and `Grape.SkiaSharp` integration
   (not yet packaged).
 - GitHub Actions workflows for CI and release-on-tag publishing.
 - Third-party attribution in `THIRD-PARTY-NOTICES.md`.

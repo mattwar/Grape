@@ -1,6 +1,4 @@
-using SDL3;
-
-namespace Grape.Vine;
+namespace Grape.Jelly;
 
 public struct UpdateContext
 {
@@ -8,5 +6,5 @@ public struct UpdateContext
 
     public TimeSpan ElaspsedSinceLastUpdate { get; init; }
 
-    public SDL.Rect Bounds { get; init; }
+    public Rect Bounds { get; init; }
 }

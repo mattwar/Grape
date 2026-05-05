@@ -1,6 +1,6 @@
 using System.Security.Principal;
 using Grape;
-using Grape.Vine;
+using Grape.Jelly;
 
 internal static class RicochetRocketExample
 {
