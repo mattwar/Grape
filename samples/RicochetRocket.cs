@@ -24,11 +24,11 @@ var window = new Window2D(800, 600)
     FullScreen = true
 };
 
-var icon = Image.LoadImage("samples/grape.bmp");
+var icon = Image.LoadImage("grape.bmp");
 icon.SetAlpha(0, icon.GetPixel(0, 0));
 window.Icon = icon;
 
-var rocketImage = Image.LoadImage("samples/rocket.png");
+var rocketImage = Image.LoadImage("rocket.png");
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f)
 {
@@ -36,7 +36,7 @@ var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height /
     Heading = 45f,
 };
 
-var sound = AudioData.LoadWAV("samples/szwoopy.wav");
+var sound = AudioData.LoadWAV("szwoopy.wav");
 
 window.KeyDown += (_, e) =>
 {

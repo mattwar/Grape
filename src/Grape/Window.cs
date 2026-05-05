@@ -752,6 +752,9 @@ public abstract class Window : IDisposable
     /// </summary>
     public void Invalidate()
     {
+        if (IsDisposed)
+            return;
+
         // Idle -> Scheduled: queue a new render
         if (Interlocked.CompareExchange(ref _renderState, RenderState.Scheduled, RenderState.Idle) == RenderState.Idle)
         {
@@ -773,6 +776,11 @@ public abstract class Window : IDisposable
 
     private void DoRenderInternal()
     {
+        // The window may have been disposed between Invalidate() posting this
+        // callback and the application thread getting around to running it.
+        if (IsDisposed)
+            return;
+
         _renderState = RenderState.Rendering;
 
         var nowTs = Stopwatch.GetTimestamp();
@@ -793,9 +801,11 @@ public abstract class Window : IDisposable
         finally
         {
             // Rendering -> Idle if no one re-invalidated during the frame.
-            // If state is Scheduled instead, the user called Invalidate(); post another.
+            // If state is Scheduled instead, the user called Invalidate(); post another
+            // (unless the window was disposed during the frame).
             if (Interlocked.CompareExchange(ref _renderState, RenderState.Idle, RenderState.Rendering)
-                != RenderState.Rendering)
+                != RenderState.Rendering
+                && !IsDisposed)
             {
                 Application.Current.Post(_ => DoRenderInternal(), null);
             }

@@ -30,6 +30,7 @@ var window = new Window3D(800, 600)
 {
     Title = "Animated Sine Ribbon",
     BackgroundColor = new Color(0, 0, 32),
+    FullScreen = true
 };
 
 window.KeyDown += (_, e) =>

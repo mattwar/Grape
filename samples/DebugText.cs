@@ -23,6 +23,7 @@ var window = new Window3D(800, 600)
 {
     Title = "Debug Text",
     BackgroundColor = new Color(16, 0, 32),
+    FullScreen = true
 };
 
 long frameCount = 0;
