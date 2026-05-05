@@ -58,17 +58,35 @@ var window = new Window2D(800, 600)
 window.KeyDown += (_, e) =>
 {
     if (e.Key == Key.Escape)
-        Application.Current.Dispose();
+        window.Dispose();
 };
 
-// Drive redraws at ~60Hz until the window closes.
-var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-while (!window.IsDisposed)
-{
-    await timer.WaitForNextTickAsync();
-    window.Invalidate();
-}
+await window.WaitForDisposeAsync();
 ```
+
+## Animating with `RenderingFrame`
+
+Grape drives animation through the `RenderingFrame` event. Call `Invalidate()` from your handler to schedule the next frame; subscribing to the event also kicks off the first frame for you.
+
+```csharp
+using Grape;
+
+var window = new Window2D(800, 600) { Title = "Animation" };
+
+window.RenderingFrame += (w, frame) =>
+{
+    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var dt = (float)frame.ElapsedSinceLastFrame.TotalSeconds;
+
+    // ...update simulation using dt, draw using frame.Renderer...
+
+    w.Invalidate(); // schedule the next frame
+};
+
+await window.WaitForDisposeAsync();
+```
+
+`frame.ElapsedSinceWindowCreated` is a monotonic absolute clock (great for time-based animations like `sin(t)`); `frame.ElapsedSinceLastFrame` is the per-frame delta you integrate against. The framework clamps `ElapsedSinceLastFrame` (default 250 ms) so a long pause won't teleport your simulation.
 
 ## A 2D Sprite (using Grape.Jelly)
 
@@ -87,7 +105,20 @@ var rocket = new Sprite(image, 400, 300, 0.2f)
     Heading = 45f
 };
 
-// ...attach to a scene, hook up input, drive the loop with PeriodicTimer + Invalidate.
+window.RenderingFrame += (w, frame) =>
+{
+    var ctx = new UpdateContext
+    {
+        ElapsedSinceStart = frame.ElapsedSinceWindowCreated,
+        ElaspsedSinceLastUpdate = frame.ElapsedSinceLastFrame,
+        Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height),
+    };
+    rocket.Update(ctx);
+    rocket.Render(frame.Renderer);
+    w.Invalidate();
+};
+
+await window.WaitForDisposeAsync();
 ```
 
 See [src/Examples/2D/RicochetRocketExample.cs](src/Examples/2D/RicochetRocketExample.cs) for the full version.
@@ -106,18 +137,15 @@ var triangle = ImmutableArray.Create(
 
 var window = new Window3D(800, 600) { Title = "Triangle Swarm" };
 
-window.RenderingFrame += (_, renderer) =>
+window.RenderingFrame += (w, frame) =>
 {
-    var transform = Matrix4x4.CreateRotationZ((float)Environment.TickCount / 1000f);
-    renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
+    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var transform = Matrix4x4.CreateRotationZ(t);
+    frame.Renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
+    w.Invalidate();
 };
 
-var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(16));
-while (!window.IsDisposed)
-{
-    await timer.WaitForNextTickAsync();
-    window.Invalidate();
-}
+await window.WaitForDisposeAsync();
 ```
 
 More examples live in [src/Examples](src/Examples).
