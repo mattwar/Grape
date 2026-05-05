@@ -83,7 +83,7 @@ public abstract class Window : IDisposable
     /// <summary>
     /// Disposes this window, releasing its resources.
     /// </summary>
-    public async void Dispose()
+    public void Dispose()
     {
         if (!IsDisposed)
         {
@@ -101,18 +101,24 @@ public abstract class Window : IDisposable
 
                 _resources.Clear();
 
-                _disposeTcs.SetResult();
+                _disposedTcs.TrySetResult();
             }
         }
     }
 
-    private readonly TaskCompletionSource _disposeTcs =
-        new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _disposedTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     /// <summary>
-    /// The returned task completes once the window has been fully disposed and all resources have been released.
+    /// A task that completes when this window is disposed.
     /// </summary>
-    public Task WaitForDisposeAsync() => _disposeTcs.Task;
+    public Task DisposedTask => _disposedTcs.Task;
+
+    /// <summary>
+    /// Asynchronously waits for this window to be disposed.
+    /// </summary>
+    public Task WaitForDisposeAsync(CancellationToken cancellationToken = default)
+        => _disposedTcs.Task.WaitAsync(cancellationToken);
 
     /// <summary>
     /// Override to perform custom disposal operations.

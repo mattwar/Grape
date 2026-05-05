@@ -46,6 +46,20 @@ public class Application : IDisposable
     /// </summary>
     public bool IsDisposed => _disposed;
 
+    private readonly TaskCompletionSource _disposedTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// A task that completes when this application is disposed.
+    /// </summary>
+    public Task DisposedTask => _disposedTcs.Task;
+
+    /// <summary>
+    /// Asynchronously waits for this application to be disposed.
+    /// </summary>
+    public Task WaitForDisposeAsync(CancellationToken cancellationToken = default)
+        => _disposedTcs.Task.WaitAsync(cancellationToken);
+
     /// <summary>
     /// Disposes the application and any related resources.
     /// </summary>
@@ -73,6 +87,8 @@ public class Application : IDisposable
                 _current = null;
 
             SDL.Quit();
+
+            _disposedTcs.TrySetResult();
         }
     }
 
