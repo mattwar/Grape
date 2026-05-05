@@ -50,6 +50,21 @@ jobs:
       - name: Build
         run: dotnet build src/Grape.sln -c Release --no-restore /p:Version=${{ steps.version.outputs.version }}
 
+      - name: Test
+        shell: pwsh
+        run: |
+          $testProjects = Get-ChildItem -Path src,tests -Recurse -Filter *.csproj -ErrorAction SilentlyContinue |
+            Where-Object { Select-String -Path $_.FullName -Pattern '<IsTestProject>\s*true\s*</IsTestProject>|Microsoft\.NET\.Test\.Sdk' -Quiet }
+          if ($testProjects.Count -eq 0) {
+            Write-Error "No test projects found."
+            exit 1
+          }
+          foreach ($p in $testProjects) {
+            Write-Host "Running tests for $($p.FullName)"
+            dotnet test $p.FullName -c Release --no-build --verbosity normal
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
       - name: Pack
         run: dotnet pack src/Grape.Graphics/Grape.Graphics.csproj -c Release --no-build -o artifacts/nuget /p:Version=${{ steps.version.outputs.version }}
 
