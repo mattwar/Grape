@@ -52,76 +52,57 @@ using Grape;
 var window = new Window2D(800, 600)
 {
     Title = "Hello, Grape",
-    BackgroundColor = new Color(20, 20, 40)
+    BackgroundColor = new Color(20, 20, 40),
+    CloseKey = Key.Esc
 };
 
-window.KeyDown += (_, e) =>
-{
-    if (e.Key == Key.Escape)
-        window.Dispose();
-};
-
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 ```
 
-## Animating with `RenderingFrame`
+## Animating with `Rendering` event
 
-Grape drives animation through the `RenderingFrame` event. Call `Invalidate()` from your handler to schedule the next frame; subscribing to the event also kicks off the first frame for you.
+Grape allows you to drive animation through the `Rendering` event. Call `Invalidate()` from your handler to schedule the next frame.
 
 ```csharp
 using Grape;
 
-var window = new Window2D(800, 600) { Title = "Animation" };
+var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
 
-window.RenderingFrame += (w, frame) =>
+window.Rendering += (w, frame) =>
 {
-    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
-    var dt = (float)frame.ElapsedSinceLastFrame.TotalSeconds;
-
-    // ...update simulation using dt, draw using frame.Renderer...
-
+    // update similution and use frame.Renderer to draw
+    ...
     w.Invalidate(); // schedule the next frame
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 ```
 
-`frame.ElapsedSinceWindowCreated` is a monotonic absolute clock (great for time-based animations like `sin(t)`); `frame.ElapsedSinceLastFrame` is the per-frame delta you integrate against. The framework clamps `ElapsedSinceLastFrame` (default 250 ms) so a long pause won't teleport your simulation.
+## Animating with a manual rendering loop
 
-## A 2D Sprite (using Grape.Jelly)
+Grape also allows you to take control of everything and do it your own way.
 
 ```csharp
 using Grape;
-using Grape.Jelly;
 
-var window = new Window2D(800, 600) { Title = "Rocket" };
+var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
 
-var image = Image.LoadImage("rocket.png");
-image.SetAlpha(0, image.GetPixel(0, 0)); // color-key the background
+// use periodic timer to avoid 100% CPU, and have even intervals between frames
+var timer = new AsyncPeriodicTimer(TimeSpan.FromSeconds(1.0 / 60));
 
-var rocket = new Sprite(image, 400, 300, 0.2f)
+while (!window.IsClosed)
 {
-    Speed = 600f,
-    Heading = 45f
-};
+    // update simulation
+    ...
 
-window.RenderingFrame += (w, frame) =>
-{
-    var ctx = new UpdateContext
+    window.Render(frame =>
     {
-        ElapsedSinceStart = frame.ElapsedSinceWindowCreated,
-        ElaspsedSinceLastUpdate = frame.ElapsedSinceLastFrame,
-        Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height),
-    };
-    rocket.Update(ctx);
-    rocket.Render(frame.Renderer);
-    w.Invalidate();
+        // draw using frame.Renderer
+    });
+
+    await timer.NextPeriod();
 };
-
-await window.WaitForDisposeAsync();
 ```
-
-See [samples/RicochetRocket.cs](samples/RicochetRocket.cs) for the full version.
 
 ## A 3D Triangle Swarm
 
@@ -135,18 +116,59 @@ var triangle = ImmutableArray.Create(
     new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
     new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
 
-var window = new Window3D(800, 600) { Title = "Triangle Swarm" };
+var window = new Window3D(800, 600) { Title = "Triangle Swarm", CloseKey = Key.Esc };
 
 window.RenderingFrame += (w, frame) =>
 {
     var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
     var transform = Matrix4x4.CreateRotationZ(t);
-    frame.Renderer.RenderMesh(triangle, Shaders.PositionColorTransform, transform);
+    frame.Renderer.RenderMesh(triangle, transform);
     w.Invalidate();
 };
 
-await window.WaitForDisposeAsync();
+await window.WaitForCloseAsync();
 ```
+
+## A 2D Sprite (using Grape.Jelly)
+
+Grape.Jelly defines some higher level concepts like sprites, panels and scenes 
+that let you compose and layer graphic elements together.
+
+The sprite implements it own update and rending logic and moves itself across frames.
+
+```csharp
+using Grape;
+using Grape.Jelly;
+
+var window = new Window2D(800, 600) { Title = "Rocket", CloseKey = Key.Esc };
+
+var image = Image.LoadImage("rocket.png");
+image.SetAlpha(0, image.GetPixel(0, 0)); // color-key the background
+
+var rocket = new Sprite(image, 400, 300, 0.2f)
+{
+    Speed = 600f,
+    Heading = 45f
+};
+
+window.Rendering += (w, frame) =>
+{
+    var ctx = new UpdateContext
+    {
+        ElapsedSinceStart = frame.ElapsedSinceWindowCreated,
+        ElaspsedSinceLastUpdate = frame.ElapsedSinceLastFrame,
+        Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height),
+    };
+    rocket.Update(ctx);
+    rocket.Render(frame.Renderer);
+    w.Invalidate();
+};
+
+await window.WaitForCloseAsync();
+```
+
+See [samples/RicochetRocket.cs](samples/RicochetRocket.cs) for the full version.
+
 
 More examples live in [samples/](samples/) — each is a single `.cs` file you can run directly with `dotnet run samples/<name>.cs` (.NET 10+).
 
