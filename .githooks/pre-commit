@@ -1,0 +1,18 @@
+#!/usr/bin/env sh
+# Refuses commits made directly on the protected branch.
+# Bypass (emergencies only): git commit --no-verify
+
+protected_branch="main"
+current_branch=$(git symbolic-ref --short -q HEAD)
+
+if [ "$current_branch" = "$protected_branch" ]; then
+    echo
+    echo "ERROR: Direct commits to '$protected_branch' are blocked." >&2
+    echo "       Create a feature branch and open a PR:" >&2
+    echo "         git switch -c my-change" >&2
+    echo "         git commit ..." >&2
+    echo "         git push -u origin my-change" >&2
+    echo
+    echo "       To bypass for an emergency: git commit --no-verify" >&2
+    exit 1
+fi

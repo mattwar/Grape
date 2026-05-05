@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+# Refuses pushes that update the protected branch on the remote.
+# Bypass (emergencies only): git push --no-verify
+
+protected_branch="main"
+protected_ref="refs/heads/$protected_branch"
+zero="0000000000000000000000000000000000000000"
+
+while read local_ref local_sha remote_ref remote_sha; do
+    if [ "$remote_ref" = "$protected_ref" ] && [ "$local_sha" != "$zero" ]; then
+        echo
+        echo "ERROR: Direct pushes to '$protected_branch' are blocked." >&2
+        echo "       Push your branch and open a PR instead:" >&2
+        echo "         git push -u origin <your-branch>" >&2
+        echo
+        echo "       To bypass for an emergency: git push --no-verify" >&2
+        exit 1
+    fi
+done
+
+exit 0
