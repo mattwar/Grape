@@ -30,16 +30,16 @@ jobs:
       - name: Test
         shell: pwsh
         run: |
-          $testProjects = Get-ChildItem -Path src -Recurse -Filter *.csproj |
+          $testProjects = Get-ChildItem -Path src,tests -Recurse -Filter *.csproj -ErrorAction SilentlyContinue |
             Where-Object { Select-String -Path $_.FullName -Pattern '<IsTestProject>\s*true\s*</IsTestProject>|Microsoft\.NET\.Test\.Sdk' -Quiet }
           if ($testProjects.Count -eq 0) {
-            Write-Host "No test projects found; skipping tests."
-          } else {
-            foreach ($p in $testProjects) {
-              Write-Host "Running tests for $($p.FullName)"
-              dotnet test $p.FullName -c Release --no-build --verbosity normal
-              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-            }
+            Write-Error "No test projects found."
+            exit 1
+          }
+          foreach ($p in $testProjects) {
+            Write-Host "Running tests for $($p.FullName)"
+            dotnet test $p.FullName -c Release --no-build --verbosity normal
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
       - name: Pack
