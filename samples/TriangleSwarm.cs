@@ -33,7 +33,7 @@ var window = new Window3D
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var aspectScale = Matrix4x4.CreateScale(aspect, 1f, 1f);
@@ -56,7 +56,7 @@ window.Rendering += (w, e) =>
             Matrix4x4.CreateTranslation(cx, cy, 0f) *
             aspectScale;
 
-        e.Renderer.RenderMesh(triangle, Shaders.PositionColorWithTransform, transform);
+        e.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
     }
 
     w.Invalidate(); // schedule the next frame

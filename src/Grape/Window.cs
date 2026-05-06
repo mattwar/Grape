@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Grape.Utilities;
 
 namespace Grape;
 
@@ -683,7 +684,7 @@ public abstract class Window : IDisposable
     {
         lock (_heartBeatGate)
         {
-            // Cancel any in-flight loop. We don't wait — old loops self-terminate.
+            // Cancel any in-flight loop. We don't wait â€” old loops self-terminate.
             _heartBeatCancellation?.Cancel();
             _heartBeatCancellation?.Dispose();
             _heartBeatCancellation = null;
@@ -741,8 +742,9 @@ public abstract class Window : IDisposable
     #region Rendering
     /// <summary>
     /// The background color used to clear the window before rendering.
+    /// Subclasses forward changes to their renderer.
     /// </summary>
-    public Color BackgroundColor { get; set; }
+    public virtual Color BackgroundColor { get; set; }
 
     /// <summary>
     /// If set to a value other than <see cref="Key.Unknown"/>, the window
@@ -752,92 +754,110 @@ public abstract class Window : IDisposable
     /// </summary>
     public Key CloseKey { get; set; } = Key.Unknown;
 
-    private enum RenderState
+    /// <summary>
+    /// Minimum time between renders. The window polls for invalidations
+    /// at this rate; multiple <see cref="Invalidate"/> calls within one
+    /// interval coalesce into a single render. Defaults to ~16.67 ms
+    /// (60 renders per second). Set to <see cref="TimeSpan.Zero"/> to
+    /// remove the cap and render as fast as possible.
+    /// </summary>
+    public TimeSpan MinRenderInterval
     {
-        Idle = 0,
-        Scheduled,
-        Rendering
+        get => _frameTimer.Period;
+        set
+        {
+            if (value < TimeSpan.Zero)
+                value = TimeSpan.Zero;
+            _frameTimer.Period = value;
+            // Wake the loop so it picks up the new period on the next tick.
+            _frameTickWake?.Cancel();
+        }
     }
 
-    private RenderState _renderState;
+    private readonly AsyncPeriodicTimer _frameTimer = new(TimeSpan.FromSeconds(1.0 / 60));
+    private int _invalidationRequested;
+    private bool _renderLoopRunning;
+    private CancellationTokenSource? _frameTickWake;
 
     /// <summary>
-    /// Invalidates the window, scheduling a new render operation.
+    /// Invalidates the window, requesting a new render. The render runs
+    /// on the next frame tick (see <see cref="MaxFrameRate"/>); multiple
+    /// invalidations between ticks coalesce into a single render.
     /// </summary>
     public void Invalidate()
     {
         if (IsClosed)
             return;
 
-        // Idle -> Scheduled: queue a new render
-        if (Interlocked.CompareExchange(ref _renderState, RenderState.Scheduled, RenderState.Idle) == RenderState.Idle)
-        {
-            Application.Current.Post(_ => DoRenderInternal(), null);
-            return;
-        }
-        // Rendering -> Scheduled: ask the in-flight render to queue a follow-up frame
-        Interlocked.CompareExchange(ref _renderState, RenderState.Scheduled, RenderState.Rendering);
-        // Scheduled -> Scheduled: already coalesced, nothing to do
+        Interlocked.Exchange(ref _invalidationRequested, 1);
+        EnsureRenderLoopStarted();
     }
 
-    /// <summary>
-    /// Upper bound on the per-frame elapsed time reported to <see cref="RenderingFrame"/>
-    /// handlers. Long pauses (window minimized, debugger break, system sleep) would
-    /// otherwise produce a single huge delta that teleports time-integrated state.
-    /// Set to <see cref="TimeSpan.MaxValue"/> to disable clamping.
-    /// </summary>
-    public TimeSpan MaxFrameDelta { get; set; } = TimeSpan.FromMilliseconds(250);
-
-    private void DoRenderInternal()
+    private void EnsureRenderLoopStarted()
     {
-        // The window may have been disposed between Invalidate() posting this
-        // callback and the application thread getting around to running it.
-        if (IsClosed)
+        // Start the render loop on first invalidation. The loop runs on
+        // the application thread and uses the periodic timer between
+        // ticks, so it costs essentially nothing while idle.
+        if (_renderLoopRunning)
             return;
+        _renderLoopRunning = true;
+        Application.Current.Post(_ => _ = RunRenderLoopAsync(), null);
+    }
 
-        _renderState = RenderState.Rendering;
-
+    private async Task RunRenderLoopAsync()
+    {
         try
         {
-            RaiseRenderingEvent();
+            while (!IsClosed)
+            {
+                if (Interlocked.Exchange(ref _invalidationRequested, 0) == 1)
+                {
+                    try
+                    {
+                        RaiseRenderingEvent();
+                    }
+                    catch
+                    {
+                        // Swallow handler exceptions so they don't tear down
+                        // the render loop. Specific failures should be
+                        // diagnosed by the handlers themselves.
+                    }
+                }
+
+                _frameTickWake = new CancellationTokenSource();
+                try
+                {
+                    await _frameTimer.NextPeriod(_frameTickWake.Token).ConfigureAwait(true);
+                }
+                catch (TaskCanceledException)
+                {
+                    // MaxFrameRate changed; recompute on next loop iteration.
+                }
+                finally
+                {
+                    _frameTickWake.Dispose();
+                    _frameTickWake = null;
+                }
+            }
         }
         finally
         {
-            // Rendering -> Idle if no one re-invalidated during the frame.
-            // If state is Scheduled instead, the user called Invalidate(); post another
-            // (unless the window was disposed during the frame).
-            if (Interlocked.CompareExchange(ref _renderState, RenderState.Idle, RenderState.Rendering)
-                != RenderState.Rendering
-                && !IsClosed)
-            {
-                Application.Current.Post(_ => DoRenderInternal(), null);
-            }
+            _renderLoopRunning = false;
         }
     }
 
-    private readonly long _startTs = Stopwatch.GetTimestamp();
-    private long _lastFrameTs = Stopwatch.GetTimestamp();
-
     /// <summary>
-    /// Returns the time since this window was created and since the last
-    /// frame, advancing the internal frame clock. Subclasses call this
-    /// once per frame, on the app thread, just before invoking the user's
-    /// render action. The per-frame delta is clamped by
-    /// <see cref="MaxFrameDelta"/>.
+    /// Awaits the start of the next frame tick, paced by
+    /// <see cref="MinRenderInterval"/>. Use this in manual render loops
+    /// to avoid spinning the CPU and to match the cadence the
+    /// event-driven path would use.
     /// </summary>
-    protected (TimeSpan SinceCreated, TimeSpan SinceLastRender) ConsumeRenderTimings()
-    {
-        var nowTs = Stopwatch.GetTimestamp();
-        var sinceCreate = Stopwatch.GetElapsedTime(_startTs, nowTs);
-        var sinceLast   = Stopwatch.GetElapsedTime(_lastFrameTs, nowTs);
-        _lastFrameTs = nowTs;
-
-        // SinceCreated is intentionally NOT clamped — absolute time keeps
-        // advancing through pauses (minimize, debugger break, system sleep).
-        var maxDelta = MaxFrameDelta;
-        if (sinceLast > maxDelta) sinceLast = maxDelta;
-        return (sinceCreate, sinceLast);
-    }
+    /// <remarks>
+    /// Successive calls align to absolute period boundaries, so the
+    /// cadence stays steady even when individual frames overrun.
+    /// </remarks>
+    public Task NextFrameAsync(CancellationToken cancellationToken = default)
+        => _frameTimer.NextPeriod(cancellationToken);
 
      /// <summary>
     /// Raise the rendering event.
@@ -1089,5 +1109,3 @@ public abstract class Window : IDisposable
 public delegate void HeartBeatEventHandler(Window sender, HeartBeatEventArgs args);
 
 public record struct HeartBeatEventArgs(TimeSpan ElapsedSinceStart, TimeSpan ElapsedSinceLastBeat);
-
-public record struct WindowRenderEventArgs<TRenderer>(TimeSpan ElapsedSinceWindowCreated, TimeSpan ElapsedSinceLastRender, TRenderer Renderer);

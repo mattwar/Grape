@@ -80,7 +80,7 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -99,32 +99,32 @@ window.Rendering += (w, e) =>
     // everything else. When the right quad's back face is culled, the
     // missing pixels reveal this gradient.
     var modelBackdrop = Matrix4x4.CreateTranslation(0f, 0f, -1f);
-    e.Renderer.RenderMesh(backdrop, Shaders.PositionColorWithTransform, modelBackdrop * viewProjection);
+    e.DrawMesh(backdrop, Shaders.PositionColorWithTransform, modelBackdrop * viewProjection);
 
     // Left: CullMode.None. Both faces drawn, quad always visible.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.CullMode = CullMode.None;
-        e.Renderer.RenderMesh(quadLeft, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        e.CullMode = CullMode.None;
+        e.DrawMesh(quadLeft, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right: CullMode.Back. Front face only; the quad disappears when
     // its CCW-wound side rotates away from the camera.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.CullMode = CullMode.Back;
-        e.Renderer.RenderMesh(quadRight, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        e.CullMode = CullMode.Back;
+        e.DrawMesh(quadRight, Shaders.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels. Debug text uses textured quads, so we draw them as
     // overlays so they aren't culled or occluded by the spinning quads.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.DepthMode = DepthMode.Overlay;
-        e.Renderer.CullMode = CullMode.None;
+        e.DepthMode = DepthMode.Overlay;
+        e.CullMode = CullMode.None;
 
-        DrawLabel(e.Renderer, "CullMode.None", offsetX: -1.5f, viewProjection);
-        DrawLabel(e.Renderer, "CullMode.Back", offsetX:  1.5f, viewProjection);
+        DrawLabel(e, "CullMode.None", offsetX: -1.5f, viewProjection);
+        DrawLabel(e, "CullMode.Back", offsetX:  1.5f, viewProjection);
     }
 
     w.Invalidate();
@@ -138,7 +138,7 @@ static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4
         Matrix4x4.CreateScale(scale) *
         Matrix4x4.CreateTranslation(offsetX, -1.2f, 0f) *
         viewProjection;
-    renderer.RenderDebugText(text, transform);
+    renderer.DrawDebugText(text, transform);
 }
 
 await window.WaitForCloseAsync();

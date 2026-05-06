@@ -65,7 +65,7 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -78,10 +78,10 @@ window.Rendering += (w, e) =>
 
     // Left cube: solid. CullMode.Back is safe because the cube is a
     // closed solid -- back faces are always hidden inside.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.CullMode = CullMode.Back;
-        e.Renderer.RenderMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        e.CullMode = CullMode.Back;
+        e.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right cube: wireframe. The renderer builds a deduped edge index
@@ -90,19 +90,19 @@ window.Rendering += (w, e) =>
     //
     // CullMode is left at None for wireframe -- there are no faces to
     // cull, just lines, and lines have no facing.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.Wireframe = true;
-        e.Renderer.RenderMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        e.Wireframe = true;
+        e.DrawMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.DepthMode = DepthMode.Overlay;
+        e.DepthMode = DepthMode.Overlay;
 
-        DrawLabel(e.Renderer, "Solid",     offsetX: -1.8f, viewProjection);
-        DrawLabel(e.Renderer, "Wireframe", offsetX:  1.8f, viewProjection);
+        DrawLabel(e, "Solid",     offsetX: -1.8f, viewProjection);
+        DrawLabel(e, "Wireframe", offsetX:  1.8f, viewProjection);
     }
 
     w.Invalidate();
@@ -116,7 +116,7 @@ static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4
         Matrix4x4.CreateScale(scale) *
         Matrix4x4.CreateTranslation(offsetX, -1.7f, 0f) *
         viewProjection;
-    renderer.RenderDebugText(text, transform);
+    renderer.DrawDebugText(text, transform);
 }
 
 await window.WaitForCloseAsync();

@@ -301,26 +301,58 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
 
     #region Rendering
 
+    private bool _needsClear = true;
+
+    /// <summary>
+    /// If <see cref="Renderer2D.AutoClear"/> is on and the back buffer
+    /// hasn't been cleared since the last present, clear it to
+    /// <see cref="Renderer2D.BackgroundColor"/>. Called at the top of
+    /// every <c>Draw*</c> override so the user never sees an
+    /// undefined-content buffer.
+    /// </summary>
+    private void EnsureCleared()
+    {
+        if (!AutoClear || !_needsClear)
+            return;
+        // Save and restore DrawColor so the user's next call sees the
+        // value they set (or, if they set nothing, BackgroundColor as a
+        // sensible default).
+        var saved = this.DrawColor;
+        this.DrawColor = BackgroundColor;
+        SDL.RenderClear(_rendererId);
+        this.DrawColor = saved;
+        _needsClear = false;
+    }
+
     public override void Clear()
     {
         if (IsDisposed)
             return;
         SDL.RenderClear(_rendererId);
+        _needsClear = false;
     }
 
     /// <summary>
-    /// Updates the rendering target to display the most recently rendered content.
+    /// Presents the queued draws to the screen.
     /// </summary>
-    public void Present()
+    protected override void RenderOnApplicationThread()
     {
         ThrowIfDisposed();
+        // Snapshot the frame clock at the START of the render so the next
+        // handler's ElapsedSinceLastRender reflects the full frame interval
+        // (including this render's own work), not just the gap between
+        // present and the next handler invocation.
+        AdvanceFrameClock();
+        EnsureCleared();
         SDL.RenderPresent(_rendererId);
+        _needsClear = true;
     }
 
-    public override bool RenderDebugText(int x, int y, string text, float scale = 0f)
+    public override bool DrawDebugText(int x, int y, string text, float scale = 0f)
     {
         if (IsDisposed)
             return false;
+        EnsureCleared();
 
         if (scale > 0f)
         {
@@ -336,33 +368,37 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool RenderImage(Image image, Rect source, Rect destination)
+    public override bool DrawImage(Image image, Rect source, Rect destination)
     {
         if (IsDisposed)
             return false;
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
+        EnsureCleared();
         return SDL.RenderTexture(_rendererId, texture.Id, source, destination);
     }
 
-    public override bool RenderImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
+    public override bool DrawImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
         if (!TryGetOrCreateTexture(image, out var texture))
             return false;
+        EnsureCleared();
         var sdlCenter = new SDL.FPoint { X = center.X, Y = center.Y };
         return SDL.RenderTextureRotated(_rendererId, texture.Id, source, destination, angle, sdlCenter, (SDL.FlipMode)flip);
     }
 
-    public override bool RenderFillRect(Rect rect)
+    public override bool DrawFillRect(Rect rect)
     {
+        EnsureCleared();
         SDL.FRect r = rect;
         return SDL.RenderFillRect(_rendererId, r);
     }
 
-    public override bool RenderFillRects(ReadOnlySpan<Rect> rects)
+    public override bool DrawFillRects(ReadOnlySpan<Rect> rects)
     {
+        EnsureCleared();
         unsafe
         {
             fixed (Rect* p = rects)
@@ -370,12 +406,13 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool RenderGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Image? image = null)
+    public override bool DrawGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Image? image = null)
     {
         var texture = image == null ? null
             : TryGetOrCreateTexture(image!, out var txt) ? txt
             : null;
 
+        EnsureCleared();
         unsafe
         {
             fixed (Vertex2D* pVertices = vertices)
@@ -390,13 +427,15 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool RenderLine(float x1, float y1, float x2, float y2)
+    public override bool DrawLine(float x1, float y1, float x2, float y2)
     {
+        EnsureCleared();
         return SDL.RenderLine(_rendererId, x1, y1, x2, y2);
     }
 
-    public override bool RenderLines(ReadOnlySpan<Vector2> points)
+    public override bool DrawLines(ReadOnlySpan<Vector2> points)
     {
+        EnsureCleared();
         unsafe
         {
             fixed (Vector2* p = points)
@@ -404,13 +443,15 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool RenderPoint(float x, float y)
+    public override bool DrawPoint(float x, float y)
     {
+        EnsureCleared();
         return SDL.RenderPoint(_rendererId, x, y);
     }
 
-    public override bool RenderPoints(ReadOnlySpan<Vector2> points)
+    public override bool DrawPoints(ReadOnlySpan<Vector2> points)
     {
+        EnsureCleared();
         unsafe
         {
             fixed (Vector2* p = points)

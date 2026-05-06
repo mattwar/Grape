@@ -13,7 +13,6 @@
 
 using System.Numerics;
 using Grape;
-using Grape.Utilities;
 
 var triangle = Mesh.Create([
     new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
@@ -26,28 +25,24 @@ var window = new Window3D
     Title = "Manual Render Loop",
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
+    MinRenderInterval = TimeSpan.FromSeconds(1.0 / 60),
 };
-
-// use periodic timer so we don't spin the CPU at 100%
-// but also have even intervals between frames (vs. Task.Delay which can be uneven)
-var timer = new AsyncPeriodicTimer(TimeSpan.FromSeconds(1.0 / 60));
 
 while (!window.IsClosed && !Keyboard.IsDown(Key.Escape))
 {
-    window.Render(frame =>
-    {
-        var seconds = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
-        var (width, height) = window.Size;
-        var aspect = (float)height / width;
-        var transform =
-            Matrix4x4.CreateRotationZ(seconds) *
-            Matrix4x4.CreateScale(0.8f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var frame = window.Renderer;
+    var seconds = (float)frame.ElapsedSinceStart.TotalSeconds;
+    var (width, height) = window.Size;
+    var aspect = (float)height / width;
+    var transform =
+        Matrix4x4.CreateRotationZ(seconds) *
+        Matrix4x4.CreateScale(0.8f) *
+        Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-        frame.Renderer.RenderMesh(triangle, transform);
-    });
+    frame.DrawMesh(triangle, transform);
+    frame.Render();
 
-    await timer.NextPeriod();
+    await window.NextFrameAsync();
 }
 
 window.Close();

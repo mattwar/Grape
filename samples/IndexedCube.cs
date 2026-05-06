@@ -80,7 +80,7 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -91,19 +91,19 @@ window.Rendering += (w, e) =>
     // Closed solid -> back faces are always hidden by front faces, so
     // culling them costs nothing visually and saves the rasteriser
     // half the triangles.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.CullMode = CullMode.Back;
-        e.Renderer.RenderMesh(cube, Shaders.PositionColorWithTransform, model * viewProjection);
+        e.CullMode = CullMode.Back;
+        e.DrawMesh(cube, Shaders.PositionColorWithTransform, model * viewProjection);
     }
 
     // Caption sits in front of everything regardless of depth.
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.DepthMode = DepthMode.Overlay;
-        e.Renderer.CullMode = CullMode.None;
+        e.DepthMode = DepthMode.Overlay;
+        e.CullMode = CullMode.None;
 
-        DrawLabel(e.Renderer, "8 vertices, 36 indices (vs 36 vertices unindexed)",
+        DrawLabel(e, "8 vertices, 36 indices (vs 36 vertices unindexed)",
             yOffset: -1.6f, viewProjection);
     }
 
@@ -118,7 +118,7 @@ static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4
         Matrix4x4.CreateScale(scale) *
         Matrix4x4.CreateTranslation(0f, yOffset, 0f) *
         viewProjection;
-    renderer.RenderDebugText(text, transform);
+    renderer.DrawDebugText(text, transform);
 }
 
 await window.WaitForCloseAsync();

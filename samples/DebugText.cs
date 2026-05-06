@@ -32,7 +32,7 @@ long frameCount = 0;
 window.Rendering += (w, frame) =>
 {
     frameCount++;
-    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)frame.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
 
@@ -50,7 +50,7 @@ window.Rendering += (w, frame) =>
             Matrix4x4.CreateRotationZ(roll) *
             Matrix4x4.CreateTranslation(swing, 0.4f + bob, 0f) *
             Matrix4x4.CreateScale(aspect, 1f, 1f);
-        frame.Renderer.RenderDebugText(banner, transform);
+        frame.DrawDebugText(banner, transform);
     }
 
     // Bottom line: live readout that grows/shrinks character count.
@@ -62,7 +62,7 @@ window.Rendering += (w, frame) =>
             Matrix4x4.CreateScale(scale) *
             Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.5f, 0f) *
             Matrix4x4.CreateScale(aspect, 1f, 1f);
-        frame.Renderer.RenderDebugText(live, transform);
+        frame.DrawDebugText(live, transform);
     }
 
     w.Invalidate(); // schedule the next frame

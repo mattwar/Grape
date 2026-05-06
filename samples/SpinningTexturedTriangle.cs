@@ -38,7 +38,7 @@ var window = new Window3D
 
 window.Rendering += (w, e) =>
 {
-    var seconds = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var seconds = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var transform =
@@ -46,7 +46,7 @@ window.Rendering += (w, e) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    e.Renderer.RenderMesh(
+    e.DrawMesh(
         triangle,
         checker,
         Shaders.PositionTextureWithTransform,

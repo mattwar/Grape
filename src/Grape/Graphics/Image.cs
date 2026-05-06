@@ -68,7 +68,7 @@ public sealed class Image : IDisposable
         ThrowIfDisposed();
         using var renderer = Renderer.Create(this);
         renderAction(renderer);
-        renderer.Present();
+        renderer.Render();
         Invalidate();
     }
 

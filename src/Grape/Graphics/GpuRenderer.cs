@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Numerics;
 
@@ -17,6 +16,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private const int IdleEvictionFrames = 120;
 
     private readonly GpuDevice _device;
+    private readonly Window3D _window;
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
@@ -34,7 +34,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private uint _depthWidth;
     private uint _depthHeight;
     private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
-    // One vertex buffer per RenderDebugText call within a frame. Each draw
+    // One vertex buffer per DrawDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
     // frame would all reference the same backing buffer and render as
@@ -44,15 +44,16 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private int _debugTextVertexIndex;
     private long _frameNumber;
 
-    // Per-frame state. Non-null between BeginFrame and Present.
+    // Per-frame state. Non-null between BeginFrame and Render.
     private GpuRenderFrame? _renderFrame;
     private GpuTexture? _colorTarget;
     private SDL.GPUTextureFormat _colorFormat;
     private SDL.FColor _clearColor;
 
-    internal GpuRenderer(GpuDevice device)
+    internal GpuRenderer(GpuDevice device, Window3D window)
     {
         _device = device;
+        _window = window;
     }
 
     /// <summary>
@@ -62,7 +63,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
-    /// <see cref="RenderMesh"/> when the caller does not supply one.
+    /// <see cref="DrawMesh"/> when the caller does not supply one.
     /// </summary>
     internal GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
     {
@@ -74,17 +75,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         AddressModeW = SDL.GPUSamplerAddressMode.Repeat,
     });
 
-    internal void BeginFrame(Window3D window)
+    /// <summary>
+    /// Acquires the swapchain image for the next frame and stages
+    /// per-frame state. Called at the top of <see cref="Render"/>.
+    /// </summary>
+    private void BeginFrame()
     {
-        if (_renderFrame is not null)
-            throw new InvalidOperationException("A frame is already in progress.");
-
-        _frameNumber++;
-        SweepCaches();
-        _commands.Clear();
-        _debugTextVertexIndex = 0;
-
-        var bg = window.BackgroundColor;
+        var bg = BackgroundColor;
         _clearColor = new SDL.FColor
         {
             R = bg.R / 255f,
@@ -93,13 +90,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             A = bg.A / 255f,
         };
 
-        _colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, window.WindowId);
+        _colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, _window.WindowId);
 
         _renderFrame = _device.BeginFrame();
 
         if (SDL.WaitAndAcquireGPUSwapchainTexture(
                 _renderFrame.CommandBuffer.CommandBufferId,
-                window.WindowId,
+                _window.WindowId,
                 out var swapchainTextureId,
                 out var swapchainWidth,
                 out var swapchainHeight) && swapchainTextureId != 0)
@@ -140,9 +137,9 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a mesh using the given shader.
+    /// Queues a mesh for drawing using the given shader.
     /// </summary>
-    public override void RenderMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
+    public override void DrawMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -152,12 +149,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a mesh using a shader that takes a typed per-draw arguments
+    /// Queues a mesh for drawing using a shader that takes a typed per-draw arguments
     /// value. The bytes of <paramref name="args"/> are split across
     /// stage/slot pairs as described by
     /// <see cref="ShaderSet{TVertex,TArgs}.ArgsLayout"/>.
     /// </summary>
-    public override void RenderMesh<TVertex, TArgs>(
+    public override void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
@@ -180,7 +177,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using the given shader and image as the source texture.
+    /// Queues a textured mesh for drawing using the given shader and image as the source texture.
     /// </summary>
     /// <remarks>
     /// The mesh and shader must both use <see cref="TextureVertex3D"/> and
@@ -189,7 +186,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// passing the same <see cref="Image"/> instance on later frames reuses
     /// the upload.
     /// </remarks>
-    public override void RenderMesh<TVertex>(
+    public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex> shader)
@@ -203,9 +200,9 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Draws a textured mesh using a shader that takes typed per-draw args.
+    /// Queues a textured mesh for drawing using a shader that takes typed per-draw args.
     /// </summary>
-    public override void RenderMesh<TVertex, TArgs>(
+    public override void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex, TArgs> shader,
@@ -231,10 +228,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// Internal entry point for textured rendering with an explicit sampler.
-    /// Used by <see cref="RenderDebugText"/> to pin nearest-neighbour
+    /// Used by <see cref="DrawDebugText"/> to pin nearest-neighbour
     /// filtering on the debug font atlas.
     /// </summary>
-    internal void RenderTexturedMeshCore<TVertex>(
+    internal void DrawTexturedMeshCore<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex> shader,
@@ -249,7 +246,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe));
     }
 
-    internal void RenderTexturedMeshCore<TVertex, TArgs>(
+    internal void DrawTexturedMeshCore<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex, TArgs> shader,
@@ -308,7 +305,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     /// <param name="transform">World-space transform applied to the text
     /// mesh. The mesh occupies (0..text.Length) along X and (0..1) along Y
     /// in local model space; X advances one unit per character, Y goes up.</param>
-    public override void RenderDebugText(string text, in Matrix4x4 transform)
+    public override void DrawDebugText(string text, in Matrix4x4 transform)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length == 0)
@@ -399,7 +396,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             mesh.Reset(span, ReadOnlySpan<uint>.Empty);
         }
 
-        RenderTexturedMeshCore(
+        DrawTexturedMeshCore(
             mesh,
             atlas,
             Shaders.PositionTextureWithTransform,
@@ -459,10 +456,17 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Completes the current frame and presents it.
+    /// Completes the current frame: encodes all queued draws and presents the result.
     /// </summary>
-    public void Present()
+    protected override void RenderOnApplicationThread()
     {
+        // Snapshot the frame clock at the START of the render so the next
+        // handler's ElapsedSinceLastRender reflects the full frame interval
+        // (including this render's own work), not just the gap between
+        // present and the next handler invocation.
+        AdvanceFrameClock();
+        BeginFrame();
+
         if (_renderFrame is null)
             return;
 
@@ -600,7 +604,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             {
                 Texture = _colorTarget,
                 ClearColor = _clearColor,
-                LoadOp = SDL.GPULoadOp.Clear,
+                LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
                 StoreOp = SDL.GPUStoreOp.Store,
             });
 
@@ -695,12 +699,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             _renderFrame = null;
             _colorTarget = null;
             _commands.Clear();
+            _debugTextVertexIndex = 0;
+            _frameNumber++;
+            SweepCaches();
         }
     }
 
     public void Dispose()
     {
-        Present();
+        Render();
     }
 
     private MeshResources GetOrCreateMeshResources(Mesh mesh)

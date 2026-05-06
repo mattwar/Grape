@@ -52,6 +52,19 @@ public class Sprite : Prop
     /// </summary>
     public FlipMode Flipped = FlipMode.None;
 
+    /// <summary>
+    /// Minimum time that must accumulate between successful
+    /// <see cref="Update"/> calls. Updates with smaller deltas
+    /// are buffered and applied later. Prevents motion from
+    /// being lost to per-frame float rounding when the host
+    /// loop runs at very high frame rates.
+    /// </summary>
+    public TimeSpan MinUpdateInterval { get; set; } = TimeSpan.FromMilliseconds(1);
+
+    // Accumulated time from Update calls that did not meet
+    // MinUpdateInterval; carried forward to the next Update.
+    private TimeSpan _pendingDelta;
+
     public Sprite()
     {
     }
@@ -66,7 +79,18 @@ public class Sprite : Prop
 
     public override bool Update(in UpdateContext context)
     {
-        var timeDelta = context.ElaspsedSinceLastUpdate;
+        // First call: nothing has happened yet, so just confirm initial state.
+        if (context.ElaspsedSinceLastUpdate == TimeSpan.Zero)
+            return true;
+
+        // Buffer small deltas so motion isn't lost to float rounding when
+        // the host renders far faster than physics needs.
+        _pendingDelta += context.ElaspsedSinceLastUpdate;
+        if (_pendingDelta < MinUpdateInterval)
+            return false;
+
+        var timeDelta = _pendingDelta;
+        _pendingDelta = TimeSpan.Zero;
 
         float newRotation = this.Rotation;
         if (this.RotationSpeed != 0f)
@@ -91,10 +115,9 @@ public class Sprite : Prop
 
         var changed = newRotation != this.Rotation
             || newCenterX != this.CenterX
-            || newCenterY != this.CenterY
-            || context.ElaspsedSinceLastUpdate == TimeSpan.Zero; // consider it changed if this is the first update (elapsed time is zero) to ensure it renders at the initial position
+            || newCenterY != this.CenterY;
 
-        if (changed || context.ElaspsedSinceLastUpdate == TimeSpan.Zero)
+        if (changed)
         {
             this.Rotation = newRotation;
             this.CenterX = newCenterX;
@@ -156,11 +179,11 @@ public class Sprite : Prop
 
             if (this.Rotation != 0f || this.Flipped != FlipMode.None)
             {
-                renderer.RenderImageRotated(image, source, dest, this.Rotation, center, this.Flipped);
+                renderer.DrawImageRotated(image, source, dest, this.Rotation, center, this.Flipped);
             }
             else
             {
-                renderer.RenderImage(image, source, dest);
+                renderer.DrawImage(image, source, dest);
             }
         }
     }
