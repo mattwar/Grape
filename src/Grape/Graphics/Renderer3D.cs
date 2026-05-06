@@ -7,6 +7,36 @@ namespace Grape;
 /// </summary>
 public abstract class Renderer3D
 {
+    // Snapshots pushed by PushState() and popped on scope dispose. The
+    // stack is allocated once per renderer and grown lazily, so push/pop
+    // is allocation-free in steady state.
+    private readonly Stack<RendererState> _stateStack = new();
+
+    /// <summary>
+    /// How the next draw interacts with the depth buffer. Snapshotted
+    /// into each <c>RenderMesh</c> call at the time of the call, so
+    /// changing this value after a draw is queued has no effect on it.
+    /// </summary>
+    public DepthMode DepthMode { get; set; } = DepthMode.Default;
+
+    /// <summary>
+    /// Saves the current renderer state and returns a scope whose
+    /// disposal restores it. Intended for use with a <c>using</c>
+    /// statement so callers can change state for a sub-region of drawing
+    /// without having to remember and reset every property by hand.
+    /// </summary>
+    public StateScope PushState()
+    {
+        _stateStack.Push(new RendererState(DepthMode));
+        return new StateScope(this);
+    }
+
+    private void PopState()
+    {
+        var s = _stateStack.Pop();
+        DepthMode = s.DepthMode;
+    }
+
     /// <summary>
     /// Renders a mesh using a compatible <see cref="ShaderSet{TVertex}"/>.
     /// </summary>
@@ -41,4 +71,35 @@ public abstract class Renderer3D
 
     /// <summary>Renders ASCII debug text at the given world-space transform.</summary>
     public abstract void RenderDebugText(string text, in Matrix4x4 transform);
+
+    // Snapshot of every property a PushState/PopState cycle has to save
+    // and restore. Add a field here whenever a new mutable knob is added
+    // to Renderer3D so existing callers that already use PushState don't
+    // have to change.
+    private readonly record struct RendererState(DepthMode DepthMode);
+
+    /// <summary>
+    /// A disposable scope returned from <see cref="PushState"/>. Disposing
+    /// it restores the renderer state captured at the matching push. As a
+    /// <c>ref struct</c> it cannot be stored in fields, captured by
+    /// closures, or moved across <c>await</c> boundaries -- the only valid
+    /// use is in a <c>using</c> statement on the same call frame as the
+    /// push.
+    /// </summary>
+    public ref struct StateScope
+    {
+        private Renderer3D? _renderer;
+
+        internal StateScope(Renderer3D renderer)
+        {
+            _renderer = renderer;
+        }
+
+        public void Dispose()
+        {
+            var r = _renderer;
+            _renderer = null;
+            r?.PopState();
+        }
+    }
 }

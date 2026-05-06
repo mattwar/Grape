@@ -25,6 +25,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
+
+    // Depth target. Sized to match the swapchain image and recreated when
+    // the window resizes. Used purely as scratch state during a frame so
+    // overlapping triangles are resolved by camera distance rather than
+    // submission order; never sampled or read by the user.
+    private GpuTexture? _depthTexture;
+    private uint _depthWidth;
+    private uint _depthHeight;
+    private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
     // One vertex buffer per RenderDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -92,15 +101,42 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 _renderFrame.CommandBuffer.CommandBufferId,
                 window.WindowId,
                 out var swapchainTextureId,
-                out _,
-                out _) && swapchainTextureId != 0)
+                out var swapchainWidth,
+                out var swapchainHeight) && swapchainTextureId != 0)
         {
             _colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
+            EnsureDepthTexture(swapchainWidth, swapchainHeight);
         }
         else
         {
             _colorTarget = null;
         }
+    }
+
+    /// <summary>
+    /// (Re)allocates the depth texture so its size matches the current
+    /// swapchain image. Disposes any previous texture when the window has
+    /// been resized.
+    /// </summary>
+    private void EnsureDepthTexture(uint width, uint height)
+    {
+        if (_depthTexture is { IsDisposed: false } && width == _depthWidth && height == _depthHeight)
+            return;
+
+        _depthTexture?.Dispose();
+        _depthTexture = _device.CreateTexture(new GpuTextureCreateInfo
+        {
+            Type = SDL.GPUTextureType.Texturetype2D,
+            Format = DepthFormat,
+            Usage = SDL.GPUTextureUsageFlags.DepthStencilTarget,
+            Width = width,
+            Height = height,
+            LayerCountOrDepth = 1,
+            NumLevels = 1,
+            SampleCount = SDL.GPUSampleCount.SampleCount1,
+        });
+        _depthWidth = width;
+        _depthHeight = height;
     }
 
     /// <summary>
@@ -111,7 +147,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode));
     }
 
     /// <summary>
@@ -133,6 +169,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             Texture: null,
             Sampler: null,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -156,7 +193,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode));
     }
 
     /// <summary>
@@ -177,6 +214,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             texture,
             Sampler: null,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -197,7 +235,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode));
     }
 
     internal void RenderTexturedMeshCore<TVertex, TArgs>(
@@ -218,6 +256,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             texture,
             sampler,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -477,9 +516,22 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 StoreOp = SDL.GPUStoreOp.Store,
             });
 
+            // Clear depth to 1.0 (the far plane in normalized device
+            // coordinates) at the start of every frame and discard the
+            // contents at the end -- nothing reads them after the frame.
+            var depthTarget = new GpuDepthStencilTargetInfo
+            {
+                Texture = _depthTexture,
+                ClearDepth = 1f,
+                LoadOp = SDL.GPULoadOp.Clear,
+                StoreOp = SDL.GPUStoreOp.DontCare,
+                StencilLoadOp = SDL.GPULoadOp.DontCare,
+                StencilStoreOp = SDL.GPUStoreOp.DontCare,
+            };
+
             if (!_renderFrame.TryBeginRenderPass(
                 colorTargets,
-                new GpuDepthStencilTargetInfo(),
+                depthTarget,
                 out var renderPass))
             {
                 return;
@@ -496,7 +548,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         vsGpu,
                         fsGpu,
                         _colorFormat,
-                        shader.VertexLayout);
+                        shader.VertexLayout,
+                        command.Command.DepthMode);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
                     command.Command.PushArgs(renderPass);
@@ -700,12 +753,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        ShaderVertexLayout layout)
+        ShaderVertexLayout layout,
+        DepthMode depthMode)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode);
             _pipelines[key] = pipeline;
         }
 
@@ -764,7 +818,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        ShaderVertexLayout layout)
+        ShaderVertexLayout layout,
+        DepthMode depthMode)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
@@ -805,6 +860,27 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             },
         });
 
+        // Map the user-facing DepthMode to the two GPU switches it
+        // controls. Default = standard 3D occlusion. Transparent reads
+        // the depth buffer (so solid geometry occludes us) but doesn't
+        // write to it (so other transparent draws still see what's
+        // behind us). Overlay ignores depth entirely -- always draws,
+        // never occludes, never gets occluded.
+        var (enableTest, enableWrite) = depthMode switch
+        {
+            DepthMode.Default     => ((byte)1, (byte)1),
+            DepthMode.Transparent => ((byte)1, (byte)0),
+            DepthMode.Overlay     => ((byte)0, (byte)0),
+            _ => throw new ArgumentOutOfRangeException(nameof(depthMode), depthMode, null),
+        };
+
+        var depthState = new SDL.GPUDepthStencilState
+        {
+            CompareOp = SDL.GPUCompareOp.Less,
+            EnableDepthTest = enableTest,
+            EnableDepthWrite = enableWrite,
+        };
+
         return _device.CreateGraphicsPipeline(new GpuPipelineCreateInfo
         {
             VertexShader = vertexShader,
@@ -815,9 +891,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 Attributes = attributes.ToImmutable(),
             },
             PrimitiveType = SDL.GPUPrimitiveType.TriangleList,
+            DepthStencilState = depthState,
             TargetInfo = new GpuPipelineTargetInfo
             {
                 ColorTargetDescriptions = colorTargets,
+                DepthStencilFormat = DepthFormat,
+                HasDepthStencilTarget = true,
             },
         });
     }
@@ -834,13 +913,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader VertexShader,
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
-        ShaderVertexLayout Layout);
+        ShaderVertexLayout Layout,
+        DepthMode DepthMode);
 
     private record DrawCommand(
         Mesh Mesh,
         ShaderSet Shader,
         Image? Texture,
-        GpuSampler? Sampler)
+        GpuSampler? Sampler,
+        DepthMode DepthMode)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -856,9 +937,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ShaderSet Shader,
         Image? Texture,
         GpuSampler? Sampler,
+        DepthMode DepthMode,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)
