@@ -105,7 +105,7 @@ window.Rendering += (w, e) =>
         }
     }
 
-    rocket.Render(e);
+    rocket.Draw(e);
 
     e.DrawColor = new Color(255, 255, 255);
     e.DrawDebugText(

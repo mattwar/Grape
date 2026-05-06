@@ -136,7 +136,7 @@ public class StackPanel : Prop
         return changed;
     }
 
-    public override void Render(Renderer2D renderer)
+    public override void Draw(Renderer2D renderer)
     {
         var originalClip = renderer.ClipRect;
 
@@ -144,7 +144,7 @@ public class StackPanel : Prop
         foreach (var panel in panels)
         {
             renderer.ClipRect = panel.Bounds;
-            panel.Prop.Render(renderer);
+            panel.Prop.Draw(renderer);
         }
     }
 }
@@ -187,13 +187,13 @@ public class OverlayPanel : Prop
         return changed;
     }
 
-    public override void Render(Renderer2D renderer)
+    public override void Draw(Renderer2D renderer)
     {
         var originalClip = renderer.ClipRect;
         var panels = _layers;
         foreach (var panel in panels)
         {
-            panel.Render(renderer);
+            panel.Draw(renderer);
         }
     }
 }
