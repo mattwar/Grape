@@ -147,7 +147,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode));
     }
 
     /// <summary>
@@ -169,6 +169,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             Texture: null,
             Sampler: null,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -192,7 +193,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode));
     }
 
     /// <summary>
@@ -213,6 +214,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             texture,
             Sampler: null,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -233,7 +235,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode));
     }
 
     internal void RenderTexturedMeshCore<TVertex, TArgs>(
@@ -254,6 +256,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             shader,
             texture,
             sampler,
+            DepthMode,
             shader.ArgsLayout,
             args));
     }
@@ -545,7 +548,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         vsGpu,
                         fsGpu,
                         _colorFormat,
-                        shader.VertexLayout);
+                        shader.VertexLayout,
+                        command.Command.DepthMode);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
                     command.Command.PushArgs(renderPass);
@@ -749,12 +753,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        ShaderVertexLayout layout)
+        ShaderVertexLayout layout,
+        DepthMode depthMode)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode);
             _pipelines[key] = pipeline;
         }
 
@@ -813,7 +818,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
-        ShaderVertexLayout layout)
+        ShaderVertexLayout layout,
+        DepthMode depthMode)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
@@ -854,15 +860,25 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             },
         });
 
-        // Standard 3D depth state: write closer pixels and reject farther
-        // ones. With ClearDepth=1.0 at the start of each frame this means
-        // "first thing drawn at a pixel wins" only until something closer
-        // shows up, regardless of submission order.
+        // Map the user-facing DepthMode to the two GPU switches it
+        // controls. Default = standard 3D occlusion. Transparent reads
+        // the depth buffer (so solid geometry occludes us) but doesn't
+        // write to it (so other transparent draws still see what's
+        // behind us). Overlay ignores depth entirely -- always draws,
+        // never occludes, never gets occluded.
+        var (enableTest, enableWrite) = depthMode switch
+        {
+            DepthMode.Default     => ((byte)1, (byte)1),
+            DepthMode.Transparent => ((byte)1, (byte)0),
+            DepthMode.Overlay     => ((byte)0, (byte)0),
+            _ => throw new ArgumentOutOfRangeException(nameof(depthMode), depthMode, null),
+        };
+
         var depthState = new SDL.GPUDepthStencilState
         {
             CompareOp = SDL.GPUCompareOp.Less,
-            EnableDepthTest = 1,
-            EnableDepthWrite = 1,
+            EnableDepthTest = enableTest,
+            EnableDepthWrite = enableWrite,
         };
 
         return _device.CreateGraphicsPipeline(new GpuPipelineCreateInfo
@@ -897,13 +913,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader VertexShader,
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
-        ShaderVertexLayout Layout);
+        ShaderVertexLayout Layout,
+        DepthMode DepthMode);
 
     private record DrawCommand(
         Mesh Mesh,
         ShaderSet Shader,
         Image? Texture,
-        GpuSampler? Sampler)
+        GpuSampler? Sampler,
+        DepthMode DepthMode)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -919,9 +937,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ShaderSet Shader,
         Image? Texture,
         GpuSampler? Sampler,
+        DepthMode DepthMode,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)
