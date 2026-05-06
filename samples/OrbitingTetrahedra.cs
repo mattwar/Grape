@@ -69,26 +69,18 @@ const float OrbitSpeed = 0.6f;     // radians/sec
 const float SpinSpeed = 1.5f;      // self-rotation, radians/sec
 const float TetraScale = 0.7f;
 
+// Camera at +Z looking toward the origin. With System.Numerics's
+// right-handed perspective, larger Z = closer to the camera.
+var camera = new PerspectiveCamera
+{
+    Position = new Vector3(0f, 0.6f, 5f),
+};
+
 window.Rendering += (w, e) =>
 {
     var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
-    var aspect = (float)width / height;
-
-    // Camera at +Z looking toward the origin. With System.Numerics's
-    // right-handed perspective, larger Z = closer to the camera.
-    var view = Matrix4x4.CreateLookAt(
-        cameraPosition: new Vector3(0f, 0.6f, 5f),
-        cameraTarget:   Vector3.Zero,
-        cameraUpVector: Vector3.UnitY);
-
-    var projection = Matrix4x4.CreatePerspectiveFieldOfView(
-        fieldOfView: MathF.PI / 4f,   // 45 degrees
-        aspectRatio: aspect,
-        nearPlaneDistance: 0.1f,
-        farPlaneDistance: 100f);
-
-    var viewProjection = view * projection;
+    var viewProjection = camera.GetViewProjection((float)width / height);
 
     // Tetra A and B sit on opposite sides of the orbit; as `t` advances
     // they swap places in Z, and pass through each other near the centre.
