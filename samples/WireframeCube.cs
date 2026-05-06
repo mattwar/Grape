@@ -48,7 +48,7 @@ var indices = new uint[]
     0, 1, 5,   0, 5, 4,    // -Y bottom
 };
 
-var cube = Mesh.Create<ColorVertex3D>(vertices, indices);
+var cube = Mesh.Create(vertices, indices);
 
 var window = new Window3D
 {

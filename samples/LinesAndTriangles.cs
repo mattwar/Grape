@@ -59,7 +59,7 @@ const int PlotPoints = 96;
 const float PlotWidth = 3.0f;
 var plotVertices = new ColorVertex3D[PlotPoints];
 
-var plot = Mesh.Create<ColorVertex3D>(plotVertices, topology: Topology.LineStrip);
+var plot = Mesh.Create(plotVertices, Topology.LineStrip);
 
 var window = new Window3D
 {
