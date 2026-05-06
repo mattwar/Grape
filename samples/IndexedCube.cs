@@ -73,17 +73,16 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
+var camera = new PerspectiveCamera
+{
+    Position = new Vector3(0f, 1.5f, 5f),
+};
+
 window.Rendering += (w, e) =>
 {
     var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
-    var aspect = (float)width / height;
-
-    var view = Matrix4x4.CreateLookAt(
-        new Vector3(0f, 1.5f, 5f), Vector3.Zero, Vector3.UnitY);
-    var projection = Matrix4x4.CreatePerspectiveFieldOfView(
-        MathF.PI / 4f, aspect, 0.1f, 100f);
-    var viewProjection = view * projection;
+    var viewProjection = camera.GetViewProjection((float)width / height);
 
     var model =
         Matrix4x4.CreateRotationY(t * 0.7f) *

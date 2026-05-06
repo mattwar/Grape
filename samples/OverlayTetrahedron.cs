@@ -66,21 +66,16 @@ const float SpinSpeed = 1.5f;
 const float TetraScale = 0.7f;
 const float IndicatorScale = 0.35f;
 
+var camera = new PerspectiveCamera
+{
+    Position = new Vector3(0f, 0.6f, 5f),
+};
+
 window.Rendering += (w, e) =>
 {
     var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
     var (width, height) = w.Size;
-    var aspect = (float)width / height;
-
-    var view = Matrix4x4.CreateLookAt(
-        new Vector3(0f, 0.6f, 5f),
-        Vector3.Zero,
-        Vector3.UnitY);
-
-    var projection = Matrix4x4.CreatePerspectiveFieldOfView(
-        MathF.PI / 4f, aspect, 0.1f, 100f);
-
-    var viewProjection = view * projection;
+    var viewProjection = camera.GetViewProjection((float)width / height);
 
     // Two solid orbiting tetras -- same as the OrbitingTetrahedra sample.
     var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
