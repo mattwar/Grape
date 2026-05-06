@@ -29,6 +29,15 @@ public abstract class Renderer3D
     public CullMode CullMode { get; set; } = CullMode.None;
 
     /// <summary>
+    /// When true, triangle-based meshes draw as their unique edges
+    /// instead of filled triangles. The renderer derives a deduped edge
+    /// index buffer from the mesh's triangles once per change and
+    /// caches it. Non-triangle meshes (lines, points) draw normally.
+    /// Snapshotted per draw, like <see cref="DepthMode"/>.
+    /// </summary>
+    public bool Wireframe { get; set; } = false;
+
+    /// <summary>
     /// Saves the current renderer state and returns a scope whose
     /// disposal restores it. Intended for use with a <c>using</c>
     /// statement so callers can change state for a sub-region of drawing
@@ -36,7 +45,7 @@ public abstract class Renderer3D
     /// </summary>
     public StateScope PushState()
     {
-        _stateStack.Push(new RendererState(DepthMode, CullMode));
+        _stateStack.Push(new RendererState(DepthMode, CullMode, Wireframe));
         return new StateScope(this);
     }
 
@@ -45,6 +54,7 @@ public abstract class Renderer3D
         var s = _stateStack.Pop();
         DepthMode = s.DepthMode;
         CullMode = s.CullMode;
+        Wireframe = s.Wireframe;
     }
 
     /// <summary>
@@ -86,7 +96,7 @@ public abstract class Renderer3D
     // and restore. Add a field here whenever a new mutable knob is added
     // to Renderer3D so existing callers that already use PushState don't
     // have to change.
-    private readonly record struct RendererState(DepthMode DepthMode, CullMode CullMode);
+    private readonly record struct RendererState(DepthMode DepthMode, CullMode CullMode, bool Wireframe);
 
     /// <summary>
     /// A disposable scope returned from <see cref="PushState"/>. Disposing

@@ -147,7 +147,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, mesh.Topology));
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, topology, wireframe));
     }
 
     /// <summary>
@@ -164,6 +165,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
             shader,
@@ -171,7 +173,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Sampler: null,
             DepthMode,
             CullMode,
-            mesh.Topology,
+            topology,
+            wireframe,
             shader.ArgsLayout,
             args));
     }
@@ -195,7 +198,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, mesh.Topology));
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, topology, wireframe));
     }
 
     /// <summary>
@@ -211,6 +215,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
             shader,
@@ -218,7 +223,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Sampler: null,
             DepthMode,
             CullMode,
-            mesh.Topology,
+            topology,
+            wireframe,
             shader.ArgsLayout,
             args));
     }
@@ -239,7 +245,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, mesh.Topology));
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe));
     }
 
     internal void RenderTexturedMeshCore<TVertex, TArgs>(
@@ -255,6 +262,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         _commands.Add(new DrawCommand<TArgs>(
             mesh,
             shader,
@@ -262,9 +270,23 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             sampler,
             DepthMode,
             CullMode,
-            mesh.Topology,
+            topology,
+            wireframe,
             shader.ArgsLayout,
             args));
+    }
+
+    // Combines the mesh's declared topology with the renderer's
+    // current Wireframe flag. When wireframe is on AND the mesh is
+    // triangle-based, the effective topology becomes LineList (drawn
+    // through a derived edge-index buffer, see Present's copy pass).
+    // For non-triangle meshes the flag is silently ignored -- they're
+    // already line/point shaped and don't need conversion.
+    private (Topology Topology, bool Wireframe) ResolveDrawState(Topology meshTopology)
+    {
+        if (Wireframe && (meshTopology == Topology.TriangleList || meshTopology == Topology.TriangleStrip))
+            return (Topology.LineList, true);
+        return (meshTopology, false);
     }
 
     /// <summary>
@@ -535,6 +557,40 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         }
                     }
 
+                    // Wireframe edge-index buffer: derived from the
+                    // mesh's triangle indices (or vertex order if
+                    // unindexed). Built once per mesh.Version change
+                    // and reused across frames. Cost is paid only for
+                    // meshes that are actually drawn in wireframe.
+                    if (command.Command.Wireframe &&
+                        resources.LastWireframeUploadedVersion != mesh.Version)
+                    {
+                        var edges = BuildWireframeIndices(
+                            mesh.GetIndices(),
+                            mesh.VertexCount,
+                            mesh.Topology);
+                        var edgeBytes = MemoryMarshal.AsBytes(edges.AsSpan());
+
+                        if (resources.WireframeIndexBuffer is null ||
+                            resources.WireframeIndexBufferCapacityBytes < edgeBytes.Length)
+                        {
+                            resources.WireframeIndexBuffer?.Dispose();
+                            resources.WireframeIndexUploadBuffer?.Dispose();
+
+                            resources.WireframeIndexBuffer = _device.CreateIndexBuffer((uint)edgeBytes.Length);
+                            resources.WireframeIndexUploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)edgeBytes.Length);
+                            resources.WireframeIndexBufferCapacityBytes = edgeBytes.Length;
+                        }
+
+                        copyPass!.Upload(
+                            resources.WireframeIndexUploadBuffer!,
+                            resources.WireframeIndexBuffer!,
+                            edgeBytes);
+                        resources.WireframeIndexBufferBytes = edgeBytes.Length;
+                        resources.WireframeIndexCount = edges.Length;
+                        resources.LastWireframeUploadedVersion = mesh.Version;
+                    }
+
                     if (command.Command.Texture is { } image)
                         EnsureTextureUploaded(copyPass!, image);
                 }
@@ -597,23 +653,36 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
 
-                    // Indexed vs unindexed draw: indexed lets the GPU
-                    // reuse vertex-shader results across triangles that
-                    // share a vertex, and lets the mesh data store each
-                    // unique vertex only once. Mesh<T> with an empty
-                    // index span falls through to the original
-                    // DrawPrimitives path.
-                    var indexCount = command.Command.Mesh.IndexCount;
-                    if (indexCount > 0)
+                    // Wireframe takes precedence over the mesh's native
+                    // index/unindexed paths: it always draws indexed,
+                    // through the derived edge buffer above.
+                    if (command.Command.Wireframe)
                     {
                         renderPass.BindIndexBuffer(
-                            command.Resources.IndexBuffer!,
+                            command.Resources.WireframeIndexBuffer!,
                             SDL.GPUIndexElementSize.IndexElementSize32Bit);
-                        renderPass.DrawIndexedPrimitives((uint)indexCount);
+                        renderPass.DrawIndexedPrimitives((uint)command.Resources.WireframeIndexCount);
                     }
                     else
                     {
-                        renderPass.DrawPrimitives((uint)command.Command.Mesh.VertexCount);
+                        // Indexed vs unindexed draw: indexed lets the GPU
+                        // reuse vertex-shader results across triangles that
+                        // share a vertex, and lets the mesh data store each
+                        // unique vertex only once. Mesh<T> with an empty
+                        // index span falls through to the original
+                        // DrawPrimitives path.
+                        var indexCount = command.Command.Mesh.IndexCount;
+                        if (indexCount > 0)
+                        {
+                            renderPass.BindIndexBuffer(
+                                command.Resources.IndexBuffer!,
+                                SDL.GPUIndexElementSize.IndexElementSize32Bit);
+                            renderPass.DrawIndexedPrimitives((uint)indexCount);
+                        }
+                        else
+                        {
+                            renderPass.DrawPrimitives((uint)command.Command.Mesh.VertexCount);
+                        }
                     }
                 }
             }
@@ -684,6 +753,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 entry.Resources.UploadBuffer?.Dispose();
                 entry.Resources.IndexBuffer?.Dispose();
                 entry.Resources.IndexUploadBuffer?.Dispose();
+                entry.Resources.WireframeIndexBuffer?.Dispose();
+                entry.Resources.WireframeIndexUploadBuffer?.Dispose();
                 _meshResources.RemoveAt(i);
             }
         }
@@ -992,6 +1063,63 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
+    /// <summary>
+    /// Builds a deduped LineList index buffer enumerating every unique
+    /// edge of the mesh's triangles. Works for both <see cref="Topology.TriangleList"/>
+    /// (step 3) and <see cref="Topology.TriangleStrip"/> (step 1) by
+    /// adjusting the stride between successive triangles. Indices may
+    /// be empty: in that case the triangle corners are taken from the
+    /// vertex buffer in order. Edges are sorted as (min, max) before
+    /// deduping so that triangle winding -- which alternates in strips
+    /// anyway -- is irrelevant.
+    /// </summary>
+    private static uint[] BuildWireframeIndices(
+        ReadOnlySpan<uint> sourceIndices,
+        int vertexCount,
+        Topology meshTopology)
+    {
+        int step = meshTopology switch
+        {
+            Topology.TriangleList  => 3,
+            Topology.TriangleStrip => 1,
+            _ => 0,
+        };
+
+        if (step == 0)
+            return Array.Empty<uint>();
+
+        var edges = new HashSet<(uint, uint)>();
+        bool indexed = sourceIndices.Length > 0;
+        int triCornerCount = indexed ? sourceIndices.Length : vertexCount;
+
+        for (int i = 0; i + 2 < triCornerCount; i += step)
+        {
+            uint a = indexed ? sourceIndices[i]     : (uint)i;
+            uint b = indexed ? sourceIndices[i + 1] : (uint)(i + 1);
+            uint c = indexed ? sourceIndices[i + 2] : (uint)(i + 2);
+
+            // Skip degenerate triangles (any two corners equal).
+            // Strips often emit these intentionally as "restarts."
+            if (a == b || b == c || a == c) continue;
+
+            AddEdge(edges, a, b);
+            AddEdge(edges, b, c);
+            AddEdge(edges, a, c);
+        }
+
+        var result = new uint[edges.Count * 2];
+        int j = 0;
+        foreach (var (lo, hi) in edges)
+        {
+            result[j++] = lo;
+            result[j++] = hi;
+        }
+        return result;
+
+        static void AddEdge(HashSet<(uint, uint)> set, uint x, uint y) =>
+            set.Add(x < y ? (x, y) : (y, x));
+    }
+
     private readonly record struct PipelineKey(
         GpuShader VertexShader,
         GpuShader FragmentShader,
@@ -1008,7 +1136,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuSampler? Sampler,
         DepthMode DepthMode,
         CullMode CullMode,
-        Topology Topology)
+        Topology Topology,
+        bool Wireframe)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -1027,9 +1156,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         DepthMode DepthMode,
         CullMode CullMode,
         Topology Topology,
+        bool Wireframe,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology, Wireframe)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)
@@ -1082,6 +1212,18 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         public GpuUploadBuffer? IndexUploadBuffer { get; set; }
         public int IndexBufferBytes { get; set; }
         public int IndexBufferCapacityBytes { get; set; }
+
+        // Wireframe edge-index buffer + staging buffer, derived from the
+        // mesh's triangle indices (or vertex order, when unindexed). Only
+        // allocated when the mesh has actually been drawn at least once
+        // with Renderer3D.Wireframe = true; meshes never drawn in
+        // wireframe pay no cost.
+        public GpuIndexBuffer? WireframeIndexBuffer { get; set; }
+        public GpuUploadBuffer? WireframeIndexUploadBuffer { get; set; }
+        public int WireframeIndexBufferBytes { get; set; }
+        public int WireframeIndexBufferCapacityBytes { get; set; }
+        public int WireframeIndexCount { get; set; }
+        public int LastWireframeUploadedVersion { get; set; }
 
         public int LastUploadedVersion { get; set; }
     }
