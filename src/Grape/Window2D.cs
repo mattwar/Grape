@@ -35,7 +35,7 @@ public class Window2D : Window
         }
     }
 
-    private WindowEventHandler<Renderer2D>? _renderingHandler;
+    private WindowRenderingEventHandler<Window2D, Renderer2D>? _renderingHandler;
 
     /// <summary>
     /// Occurs when the window is rendering a frame. The handler receives
@@ -43,7 +43,7 @@ public class Window2D : Window
     /// <see cref="Renderer2D.ElapsedSinceStart"/> and
     /// <see cref="Renderer2D.ElapsedSinceLastRender"/>.
     /// </summary>
-    public event WindowEventHandler<Renderer2D>? Rendering
+    public event WindowRenderingEventHandler<Window2D, Renderer2D>? Rendering
     {
         add
         {

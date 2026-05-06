@@ -74,7 +74,7 @@ public class Window3D : Window
         }
     }
 
-    private event WindowEventHandler<Renderer3D>? _renderingFrame;
+    private event WindowRenderingEventHandler<Window3D, Renderer3D>? _renderingFrame;
 
     /// <summary>
     /// Raised when the window is rendering a frame. The handler receives
@@ -82,7 +82,7 @@ public class Window3D : Window
     /// <see cref="Renderer3D.ElapsedSinceStart"/> and
     /// <see cref="Renderer3D.ElapsedSinceLastRender"/>.
     /// </summary>
-    public event WindowEventHandler<Renderer3D>? Rendering
+    public event WindowRenderingEventHandler<Window3D, Renderer3D>? Rendering
     {
         add
         {
