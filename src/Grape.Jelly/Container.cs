@@ -27,13 +27,13 @@ public abstract class Container : Prop
         return changed;
     }
 
-    public override void Render(Renderer2D renderer)
+    public override void Draw(Renderer2D renderer)
     {
         var props = _props;
 
         foreach (var prop in props)
         {
-            prop.Render(renderer);
+            prop.Draw(renderer);
         }
     }
 

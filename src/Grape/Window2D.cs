@@ -5,7 +5,7 @@ namespace Grape;
 /// </summary>
 public class Window2D : Window
 {
-    private Renderer _renderer = null!;
+    private Window2DRenderer _renderer = null!;
 
     public Window2D(int width, int height, WindowFlags flags = WindowFlags.None)
         : base(width, height, flags)
@@ -19,15 +19,31 @@ public class Window2D : Window
 
     protected override void OnWindowCreated()
     {
-        _renderer = Renderer.Create(this);
+        _renderer = Window2DRenderer.Create(this);
+        _renderer.BackgroundColor = base.BackgroundColor;
     }
 
-    private WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? _renderingHandler;
+    /// <inheritdoc/>
+    public override Color BackgroundColor
+    {
+        get => _renderer is null ? base.BackgroundColor : _renderer.BackgroundColor;
+        set
+        {
+            base.BackgroundColor = value;
+            if (_renderer is not null)
+                _renderer.BackgroundColor = value;
+        }
+    }
+
+    private WindowRenderingEventHandler<Window2D, Renderer2D>? _renderingHandler;
 
     /// <summary>
-    /// Occurs when the window is rendering a frame.
+    /// Occurs when the window is rendering a frame. The handler receives
+    /// the renderer; frame timings are available via
+    /// <see cref="Renderer2D.ElapsedSinceStart"/> and
+    /// <see cref="Renderer2D.ElapsedSinceLastRender"/>.
     /// </summary>
-    public event WindowEventHandler<WindowRenderEventArgs<Renderer2D>>? Rendering
+    public event WindowRenderingEventHandler<Window2D, Renderer2D>? Rendering
     {
         add
         {
@@ -46,44 +62,38 @@ public class Window2D : Window
         var handler = _renderingHandler;
         if (renderer != null && handler != null)
         {
-            var (sinceCreate, sinceLast) = ConsumeRenderTimings();
-            renderer.DrawColor = this.BackgroundColor;
-            renderer.Clear();
-            handler.Invoke(this, new WindowRenderEventArgs<Renderer2D>(sinceCreate, sinceLast, renderer));
-            renderer.Present();
+            // The window owns the single per-frame Render() flush in the
+            // event-driven path. Stray Render() calls from inside the
+            // handler are suppressed so they don't double-present.
+            var prev = renderer.RenderSuppressed;
+            renderer.RenderSuppressed = true;
+            try
+            {
+                handler.Invoke(this, renderer);
+            }
+            finally
+            {
+                renderer.RenderSuppressed = prev;
+            }
+            renderer.Render();
         }
     }
 
     /// <summary>
-    /// Renders now using the provided render action. 
-    /// This is an alternative to subscribing to the <see cref="Rendering"/> event.
+    /// The 2D renderer that draws into this window. Use it to queue draw
+    /// calls and call <see cref="Renderer2D.Render"/> to present.
     /// </summary>
-    public void Render(Action<WindowRenderEventArgs<Renderer2D>> renderAction)
-    {
-        Application.Current.Send(_ =>
-        {
-            if (this.IsClosed)
-                return;
-            var renderer = _renderer;
-            if (renderer is null)
-                return;
-
-            var (sinceCreate, sinceLast) = ConsumeRenderTimings();
-            renderer.DrawColor = this.BackgroundColor;
-            renderer.Clear();
-            renderAction(new WindowRenderEventArgs<Renderer2D>(sinceCreate, sinceLast, renderer));
-            renderer.Present();
-        });
-    }
+    public Renderer2D Renderer => _renderer
+        ?? throw new InvalidOperationException("Renderer is not yet available.");
 
     /// <summary>
     /// A 2D renderer that draws into a <see cref="Window2D"/>'s swapchain.
     /// </summary>
-    private sealed class Renderer : BitmapRenderer2D
+    private sealed class Window2DRenderer : BitmapRenderer2D
     {
         private readonly Window2D _window;
 
-        private Renderer(Window2D window, nint rendererId)
+        private Window2DRenderer(Window2D window, nint rendererId)
             : base(rendererId)
         {
             _window = window;
@@ -94,19 +104,19 @@ public class Window2D : Window
         /// Creates a renderer for this window.
         /// The window already has a default renderer created when the window is created.
         /// </summary>
-        internal static Renderer Create(Window2D window, string? name = null)
+        internal static Window2DRenderer Create(Window2D window, string? name = null)
         {
             var rendererId = SDL.CreateRenderer(window.WindowId, name);
-            return new Renderer(window, rendererId);
+            return new Window2DRenderer(window, rendererId);
         }
 
         /// <summary>
         /// Creates a window gpu renderer with the specified shader format.
         /// </summary>
-        internal static Renderer Create(Window2D window, SDL.GPUShaderFormat format)
+        internal static Window2DRenderer Create(Window2D window, SDL.GPUShaderFormat format)
         {
             var rendererId = SDL.CreateGPURenderer(window.WindowId, format, out var gpuDeviceId);
-            return new Renderer(window, rendererId);
+            return new Window2DRenderer(window, rendererId);
         }
 
         /// <summary>The <see cref="Grape.Window"/> this renderer draws into.</summary>

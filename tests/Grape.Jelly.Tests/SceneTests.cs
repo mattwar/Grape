@@ -14,7 +14,7 @@ public class SceneTests
             return ShouldReportChanged;
         }
 
-        public override void Render(Renderer2D renderer)
+        public override void Draw(Renderer2D renderer)
         {
             RenderCount++;
         }

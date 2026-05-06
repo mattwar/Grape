@@ -49,7 +49,20 @@ public class Window3D : Window
             }
             _claimed = true;
         });
-        _renderer = new GpuRenderer(_device);
+        _renderer = new GpuRenderer(_device, this);
+        _renderer.BackgroundColor = base.BackgroundColor;
+    }
+
+    /// <inheritdoc/>
+    public override Color BackgroundColor
+    {
+        get => _renderer is null ? base.BackgroundColor : _renderer.BackgroundColor;
+        set
+        {
+            base.BackgroundColor = value;
+            if (_renderer is not null)
+                _renderer.BackgroundColor = value;
+        }
     }
 
     protected override void OnDispose()
@@ -61,12 +74,15 @@ public class Window3D : Window
         }
     }
 
-    private event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? _renderingFrame;
+    private event WindowRenderingEventHandler<Window3D, Renderer3D>? _renderingFrame;
 
     /// <summary>
-    /// Raised when the window is rendering a frame.
+    /// Raised when the window is rendering a frame. The handler receives
+    /// the renderer; frame timings are available via
+    /// <see cref="Renderer3D.ElapsedSinceStart"/> and
+    /// <see cref="Renderer3D.ElapsedSinceLastRender"/>.
     /// </summary>
-    public event WindowEventHandler<WindowRenderEventArgs<Renderer3D>>? Rendering
+    public event WindowRenderingEventHandler<Window3D, Renderer3D>? Rendering
     {
         add
         {
@@ -80,41 +96,40 @@ public class Window3D : Window
     }
 
     /// <summary>
-    /// Called when the window is rendering a frame
+    /// Called when the window is rendering a frame.
     /// </summary>
-    public virtual void OnRendering(WindowRenderEventArgs<Renderer3D> args)
+    public virtual void OnRendering(Renderer3D renderer)
     {
-        _renderingFrame?.Invoke(this, args);
+        _renderingFrame?.Invoke(this, renderer);
     }
 
     protected override void RaiseRenderingEvent()
     {
         if (TryGetRenderer(out var renderer))
         {
-            var (elapsedSinceWindowCreated, elapsedSinceLastFrame) = ConsumeRenderTimings();
-            renderer.BeginFrame(this);
-            OnRendering(new WindowRenderEventArgs<Renderer3D>(elapsedSinceWindowCreated, elapsedSinceLastFrame, renderer));
-            renderer.Present();
+            // The window owns the single per-frame Render() flush in the
+            // event-driven path. Stray Render() calls from inside the
+            // handler are suppressed so they don't double-present.
+            var prev = renderer.RenderSuppressed;
+            renderer.RenderSuppressed = true;
+            try
+            {
+                OnRendering(renderer);
+            }
+            finally
+            {
+                renderer.RenderSuppressed = prev;
+            }
+            renderer.Render();
         }
     }
 
     /// <summary>
-    /// Renders a frame manually using the provided render action.
-    /// This is an alternative to subscribing to the <see cref="Rendering"/> event.
+    /// The 3D renderer that draws into this window. Use it to queue draw
+    /// calls and call <see cref="Renderer3D.Render"/> to present.
     /// </summary>
-    public void Render(Action<WindowRenderEventArgs<Renderer3D>> renderAction)
-    {
-        Application.Current.Send(_ =>
-        {
-            if (TryGetRenderer(out var renderer))
-            {
-                var (sinceCreate, sinceLast) = ConsumeRenderTimings();
-                renderer.BeginFrame(this);
-                renderAction(new WindowRenderEventArgs<Renderer3D>(sinceCreate, sinceLast, renderer));
-                renderer.Present();
-            }
-        });
-    }
+    public Renderer3D Renderer => _renderer
+        ?? throw new InvalidOperationException("Renderer is not yet available.");
 
     private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer? renderer)
     {

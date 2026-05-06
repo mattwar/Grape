@@ -73,7 +73,7 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -89,8 +89,8 @@ window.Rendering += (w, e) =>
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    e.Renderer.RenderMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
-    e.Renderer.RenderMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+    e.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
+    e.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 
     // The indicator orbits faster, on a tilted ring that passes through
     // the centre of the scene -- which means at some moments its true 3D
@@ -107,10 +107,10 @@ window.Rendering += (w, e) =>
                          indicatorSpin *
                          Matrix4x4.CreateTranslation(indicatorOrbit);
 
-    using (e.Renderer.PushState())
+    using (e.PushState())
     {
-        e.Renderer.DepthMode = DepthMode.Overlay;
-        e.Renderer.RenderMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
+        e.DepthMode = DepthMode.Overlay;
+        e.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
     } // DepthMode automatically restored to Default here.
 
     w.Invalidate();

@@ -180,7 +180,7 @@ public static class ModelExtensions
         public bool RenderBitmap(SKBitmap bitmap, Rect source, Rect destination)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
-            return renderer.RenderImage(GetOrCreateMirrorImage(bitmap), source, destination);
+            return renderer.DrawImage(GetOrCreateMirrorImage(bitmap), source, destination);
         }
 
         /// <summary>
@@ -189,7 +189,7 @@ public static class ModelExtensions
         public bool RenderBitmap(SKBitmap bitmap, Rect destination)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
-            return renderer.RenderImage(GetOrCreateMirrorImage(bitmap), destination);
+            return renderer.DrawImage(GetOrCreateMirrorImage(bitmap), destination);
         }
 
         /// <summary>
@@ -198,7 +198,7 @@ public static class ModelExtensions
         public bool RenderBitmap(SKBitmap bitmap, float x, float y, float scale = 1.0f)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
-            return renderer.RenderImage(GetOrCreateMirrorImage(bitmap), x, y, scale);
+            return renderer.DrawImage(GetOrCreateMirrorImage(bitmap), x, y, scale);
         }
     }
 

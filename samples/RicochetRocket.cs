@@ -62,7 +62,7 @@ window.Rendering += (w, e) =>
 {
     var updateContext = new UpdateContext
     {
-        ElapsedSinceStart = e.ElapsedSinceWindowCreated,
+        ElapsedSinceStart = e.ElapsedSinceStart,
         ElaspsedSinceLastUpdate = e.ElapsedSinceLastRender,
         Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height)
     };
@@ -105,15 +105,15 @@ window.Rendering += (w, e) =>
         }
     }
 
-    rocket.Render(e.Renderer);
+    rocket.Draw(e);
 
-    e.Renderer.DrawColor = new Color(255, 255, 255);
-    e.Renderer.RenderDebugText(
+    e.DrawColor = new Color(255, 255, 255);
+    e.DrawDebugText(
         0, 10,
-        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#}",
+        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {e.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 4f);
 
-    w.Invalidate(); // schedule the next frame
+    w.Invalidate(); // request the next rendering
 };
 
 await window.WaitForCloseAsync();

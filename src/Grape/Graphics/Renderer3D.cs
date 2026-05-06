@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Numerics;
 
 namespace Grape;
@@ -12,9 +13,66 @@ public abstract class Renderer3D
     // is allocation-free in steady state.
     private readonly Stack<RendererState> _stateStack = new();
 
+    private readonly long _startTs = Stopwatch.GetTimestamp();
+    private long _lastRenderTs = Stopwatch.GetTimestamp();
+
+    /// <summary>
+    /// Elapsed wall-clock time since this renderer was created. Useful as
+    /// an animation phase (e.g. <c>sin(t)</c>) that keeps advancing through
+    /// minimisation, debugger breaks, and system sleep.
+    /// </summary>
+    public TimeSpan ElapsedSinceStart => Stopwatch.GetElapsedTime(_startTs);
+
+    /// <summary>
+    /// Elapsed wall-clock time since the last call to <see cref="GpuRenderer.Render"/>
+    /// (or since renderer creation if no frame has been rendered yet),
+    /// clamped by <see cref="MaxFrameDelta"/> so a long pause doesn't
+    /// teleport time-integrated state.
+    /// </summary>
+    public TimeSpan ElapsedSinceLastRender
+    {
+        get
+        {
+            var elapsed = Stopwatch.GetElapsedTime(_lastRenderTs);
+            return elapsed > MaxFrameDelta ? MaxFrameDelta : elapsed;
+        }
+    }
+
+    /// <summary>
+    /// Upper bound on <see cref="ElapsedSinceLastRender"/>. Long pauses
+    /// (window minimised, debugger break, system sleep) would otherwise
+    /// produce a single huge delta that teleports time-integrated state.
+    /// Set to <see cref="TimeSpan.MaxValue"/> to disable clamping.
+    /// </summary>
+    public TimeSpan MaxFrameDelta { get; set; } = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>
+    /// Color used to clear the render target at the start of each frame
+    /// when <see cref="AutoClear"/> is true. Set by the owning window;
+    /// not user-mutable through the renderer.
+    /// </summary>
+    public Color BackgroundColor { get; internal set; }
+
+    /// <summary>
+    /// When true (the default), each frame begins by clearing the render
+    /// target to <see cref="BackgroundColor"/>. Set to false for additive
+    /// or persistence-of-pixels rendering.
+    /// </summary>
+    internal bool AutoClear { get; set; } = true;
+
+    /// <summary>
+    /// Resets the <see cref="ElapsedSinceLastRender"/> clock. Concrete
+    /// renderers call this from their <c>Render()</c> implementation
+    /// after the frame has been submitted.
+    /// </summary>
+    private protected void AdvanceFrameClock()
+    {
+        _lastRenderTs = Stopwatch.GetTimestamp();
+    }
+
     /// <summary>
     /// How the next draw interacts with the depth buffer. Snapshotted
-    /// into each <c>RenderMesh</c> call at the time of the call, so
+    /// into each <c>DrawMesh</c> call at the time of the call, so
     /// changing this value after a draw is queued has no effect on it.
     /// </summary>
     public DepthMode DepthMode { get; set; } = DepthMode.Solid;
@@ -58,30 +116,30 @@ public abstract class Renderer3D
     }
 
     /// <summary>
-    /// Renders a mesh using a compatible <see cref="ShaderSet{TVertex}"/>.
+    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex}"/>.
     /// </summary>
-    public abstract void RenderMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
+    public abstract void DrawMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>
-    /// Renders a mesh using a compatible <see cref="ShaderSet{TVertex,TArgs}"/> with the given per-draw arguments.
+    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/> with the given per-draw arguments.
     /// </summary>
-    public abstract void RenderMesh<TVertex, TArgs>(
+    public abstract void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
 
-    /// <summary>Draws a mesh sampling from the given image.</summary>
-    public abstract void RenderMesh<TVertex>(
+    /// <summary>Queues a mesh for drawing, sampling from the given image.</summary>
+    public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex> shader)
         where TVertex : unmanaged;
 
-    /// <summary>Draws a textured mesh using a shader with typed per-draw args.</summary>
-    public abstract void RenderMesh<TVertex, TArgs>(
+    /// <summary>Queues a textured mesh for drawing using a shader with typed per-draw args.</summary>
+    public abstract void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex, TArgs> shader,
@@ -89,8 +147,36 @@ public abstract class Renderer3D
         where TVertex : unmanaged
         where TArgs : unmanaged;
 
-    /// <summary>Renders ASCII debug text at the given world-space transform.</summary>
-    public abstract void RenderDebugText(string text, in Matrix4x4 transform);
+    /// <summary>Queues ASCII debug text for drawing at the given world-space transform.</summary>
+    public abstract void DrawDebugText(string text, in Matrix4x4 transform);
+
+    /// <summary>
+    /// When true, calls to <see cref="Render"/> become no-ops. Used by
+    /// <see cref="Window3D"/> to suppress stray <c>Render()</c> calls
+    /// from inside a <c>Rendering</c> event handler so the window itself
+    /// can own the single per-event flush.
+    /// </summary>
+    internal bool RenderSuppressed { get; set; }
+
+    /// <summary>
+    /// Renders the entire frame to the output target.
+    /// Call this to manually render at any time. 
+    /// This is unnecessary when rendering within Rendering event handlers.
+    /// </summary>
+    public void Render()
+    {
+        if (RenderSuppressed)
+            return;
+        // Marshal to the application thread so callers can invoke Render()
+        // from any thread; Send is a no-op when already on the app thread.
+        Application.Current.Send(_ => RenderOnApplicationThread());
+    }
+
+    /// <summary>
+    /// Performs the actual frame rendering. Always invoked on the
+    /// application thread by <see cref="Render"/>.
+    /// </summary>
+    protected abstract void RenderOnApplicationThread();
 
     // Snapshot of every property a PushState/PopState cycle has to save
     // and restore. Add a field here whenever a new mutable knob is added

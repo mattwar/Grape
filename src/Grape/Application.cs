@@ -664,6 +664,14 @@ public delegate void ApplicationWindowEventHandler<T>(Application sender, Window
 /// </summary>
 public delegate void WindowEventHandler<T>(Window sender, T args);
 
+/// <summary>
+/// Handler for the per-frame <c>Rendering</c> event on a window. The
+/// concrete window and its renderer are passed directly so handlers
+/// don't have to cast.
+/// </summary>
+public delegate void WindowRenderingEventHandler<TWindow, TRenderer>(TWindow window, TRenderer renderer)
+    where TWindow : Window;
+
 // Application-only event arg records. Currently empty markers; signatures are
 // stable so payload can be added later without breaking handlers.
 public readonly record struct QuittingEventArgs;

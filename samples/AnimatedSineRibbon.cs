@@ -36,7 +36,7 @@ var window = new Window3D
 
 window.Rendering += (w, e) =>
 {
-    var t = (float)e.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)e.ElapsedSinceStart.TotalSeconds;
 
     for (int i = 0; i < Segments; i++)
     {
@@ -70,7 +70,7 @@ window.Rendering += (w, e) =>
     var aspect = (float)height / width;
     var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    e.Renderer.RenderMesh(vertices, transform);
+    e.DrawMesh(vertices, transform);
 
     w.Invalidate(); // schedule the next render
 };

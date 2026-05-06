@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 namespace Grape;
 
 /// <summary>
-/// A 2D vertex used by <see cref="Renderer2D.RenderGeometry"/>: a position,
+/// A 2D vertex used by <see cref="Renderer2D.DrawGeometry"/>: a position,
 /// a tint color (linear float RGBA), and a texture coordinate.
 /// </summary>
 /// <remarks>

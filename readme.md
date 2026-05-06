@@ -61,17 +61,21 @@ await window.WaitForCloseAsync();
 
 ## Animating with `Rendering` event
 
-Grape allows you to drive animation through the `Rendering` event. Call `Invalidate()` from your handler to schedule the next frame.
+Grape allows you to drive animation through the `Rendering` event. Call `Invalidate()` from your handler to schedule the next frame; the window paces frames at `MinRenderInterval` (default ~60 Hz).
+
+The handler receives the window and its renderer. Queue draws on the renderer; the window flushes the frame for you when the handler returns.
 
 ```csharp
 using Grape;
 
 var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
 
-window.Rendering += (w, frame) =>
+window.Rendering += (w, renderer) =>
 {
-    // update similution and use frame.Renderer to draw
-    ...
+    // update simulation, then queue draws on the renderer
+    renderer.DrawColor = new Color(255, 0, 0);
+    renderer.DrawFillRect(new Rect(10, 10, 100, 100));
+
     w.Invalidate(); // schedule the next frame
 };
 
@@ -80,28 +84,26 @@ await window.WaitForCloseAsync();
 
 ## Animating with a manual rendering loop
 
-Grape also allows you to take control of everything and do it your own way.
+Grape also allows you to take control and drive frames yourself. Use
+`window.Renderer` to queue draws and `Renderer.Render()` to flush; pace
+the loop with `window.NextFrameAsync()`.
 
 ```csharp
 using Grape;
 
 var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
 
-// use periodic timer to avoid 100% CPU, and have even intervals between frames
-var timer = new AsyncPeriodicTimer(TimeSpan.FromSeconds(1.0 / 60));
-
 while (!window.IsClosed)
 {
-    // update simulation
-    ...
+    var renderer = window.Renderer;
 
-    window.Render(frame =>
-    {
-        // draw using frame.Renderer
-    });
+    // update simulation, then queue draws
+    renderer.DrawColor = new Color(0, 255, 0);
+    renderer.DrawFillRect(new Rect(10, 10, 100, 100));
+    renderer.Render();
 
-    await timer.NextPeriod();
-};
+    await window.NextFrameAsync();
+}
 ```
 
 ## Subscribe to events to handle input
@@ -154,22 +156,22 @@ while (!window.IsClosed)
 ## A Spinning 3D Triangle
 
 ```csharp
-using System.Collections.Immutable;
 using System.Numerics;
 using Grape;
 
-var triangle = ImmutableArray.Create(
-    new ColorVertex3D(new Vertex3D( 0.0f,  0.12f, 0f), new Color(255,   0,   0)),
+var triangle = Mesh.Create([
+    new ColorVertex3D(new Vertex3D( 0.0f,   0.12f, 0f), new Color(255,   0,   0)),
     new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
-    new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
+    new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)),
+]);
 
 var window = new Window3D(800, 600) { Title = "Spinning Triangle", CloseKey = Key.Esc };
 
-window.Rendering += (w, frame) =>
+window.Rendering += (w, renderer) =>
 {
-    var t = (float)frame.ElapsedSinceWindowCreated.TotalSeconds;
+    var t = (float)renderer.ElapsedSinceStart.TotalSeconds;
     var transform = Matrix4x4.CreateRotationZ(t);
-    frame.Renderer.RenderMesh(triangle, transform);
+    renderer.DrawMesh(triangle, transform);
     w.Invalidate();
 };
 
@@ -181,7 +183,7 @@ await window.WaitForCloseAsync();
 Grape.Jelly defines some higher level concepts like sprites, panels and scenes 
 that let you compose and layer graphic elements together.
 
-The sprite implements it own update and rending logic and moves itself across frames.
+The sprite implements its own update and draw logic and moves itself across frames.
 
 ```csharp
 using Grape;
@@ -198,16 +200,16 @@ var rocket = new Sprite(image, 400, 300, 0.2f)
     Heading = 45f
 };
 
-window.Rendering += (w, frame) =>
+window.Rendering += (w, renderer) =>
 {
     var ctx = new UpdateContext
     {
-        ElapsedSinceStart = frame.ElapsedSinceWindowCreated,
-        ElaspsedSinceLastUpdate = frame.ElapsedSinceLastFrame,
+        ElapsedSinceStart = renderer.ElapsedSinceStart,
+        ElaspsedSinceLastUpdate = renderer.ElapsedSinceLastRender,
         Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height),
     };
     rocket.Update(ctx);
-    rocket.Render(frame.Renderer);
+    rocket.Draw(renderer);
     w.Invalidate();
 };
 
