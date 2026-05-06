@@ -147,7 +147,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, mesh.Topology));
     }
 
     /// <summary>
@@ -171,6 +171,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Sampler: null,
             DepthMode,
             CullMode,
+            mesh.Topology,
             shader.ArgsLayout,
             args));
     }
@@ -194,7 +195,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, mesh.Topology));
     }
 
     /// <summary>
@@ -217,6 +218,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Sampler: null,
             DepthMode,
             CullMode,
+            mesh.Topology,
             shader.ArgsLayout,
             args));
     }
@@ -237,7 +239,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, mesh.Topology));
     }
 
     internal void RenderTexturedMeshCore<TVertex, TArgs>(
@@ -260,6 +262,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             sampler,
             DepthMode,
             CullMode,
+            mesh.Topology,
             shader.ArgsLayout,
             args));
     }
@@ -579,7 +582,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         _colorFormat,
                         shader.VertexLayout,
                         command.Command.DepthMode,
-                        command.Command.CullMode);
+                        command.Command.CullMode,
+                        command.Command.Topology);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
                     command.Command.PushArgs(renderPass);
@@ -805,12 +809,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
-        CullMode cullMode)
+        CullMode cullMode,
+        Topology topology)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
             _pipelines[key] = pipeline;
         }
 
@@ -871,7 +876,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
-        CullMode cullMode)
+        CullMode cullMode,
+        Topology topology)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
@@ -958,7 +964,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 BufferDescriptions = bufferDescriptions,
                 Attributes = attributes.ToImmutable(),
             },
-            PrimitiveType = SDL.GPUPrimitiveType.TriangleList,
+            PrimitiveType = topology switch
+            {
+                Topology.TriangleList  => SDL.GPUPrimitiveType.TriangleList,
+                Topology.TriangleStrip => SDL.GPUPrimitiveType.TriangleStrip,
+                Topology.LineList      => SDL.GPUPrimitiveType.LineList,
+                Topology.LineStrip     => SDL.GPUPrimitiveType.LineStrip,
+                Topology.PointList     => SDL.GPUPrimitiveType.PointList,
+                _ => throw new ArgumentOutOfRangeException(nameof(topology), topology, null),
+            },
             RasterizerState = rasterizerState,
             DepthStencilState = depthState,
             TargetInfo = new GpuPipelineTargetInfo
@@ -984,7 +998,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat ColorFormat,
         ShaderVertexLayout Layout,
         DepthMode DepthMode,
-        CullMode CullMode);
+        CullMode CullMode,
+        Topology Topology);
 
     private record DrawCommand(
         Mesh Mesh,
@@ -992,7 +1007,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
-        CullMode CullMode)
+        CullMode CullMode,
+        Topology Topology)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -1010,9 +1026,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuSampler? Sampler,
         DepthMode DepthMode,
         CullMode CullMode,
+        Topology Topology,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)

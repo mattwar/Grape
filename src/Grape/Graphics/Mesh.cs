@@ -19,6 +19,13 @@ public abstract class Mesh
     public abstract ReadOnlySpan<uint> GetIndices();
 
     /// <summary>
+    /// How the mesh's vertices are grouped into rendered shapes
+    /// (triangles, lines, points). Set at construction; immutable for
+    /// the mesh's lifetime.
+    /// </summary>
+    public abstract Topology Topology { get; }
+
+    /// <summary>
     /// Bumped each time the mesh's contents are replaced. The renderer uses
     /// this to detect when its cached GPU vertex buffer needs to be re-uploaded.
     /// </summary>
@@ -30,16 +37,21 @@ public abstract class Mesh
     /// which would otherwise be ambiguous between the span and immutable-array
     /// constructor overloads.
     /// </summary>
-    public static Mesh<TVertex> Create<TVertex>(ReadOnlySpan<TVertex> vertices)
+    public static Mesh<TVertex> Create<TVertex>(
+        ReadOnlySpan<TVertex> vertices,
+        Topology topology = Topology.TriangleList)
         where TVertex : unmanaged =>
-        new Mesh<TVertex>(vertices);
+        new Mesh<TVertex>(vertices, ReadOnlySpan<uint>.Empty, topology);
 
     /// <summary>
     /// Creates a <see cref="Mesh{TVertex}"/> by copying the provided vertices and indices.
     /// </summary>
-    public static Mesh<TVertex> Create<TVertex>(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    public static Mesh<TVertex> Create<TVertex>(
+        ReadOnlySpan<TVertex> vertices,
+        ReadOnlySpan<uint> indices,
+        Topology topology = Topology.TriangleList)
         where TVertex : unmanaged =>
-        new Mesh<TVertex>(vertices, indices);
+        new Mesh<TVertex>(vertices, indices, topology);
 }
 
 /// <summary>
@@ -61,16 +73,19 @@ public class Mesh<TVertex> : Mesh
     private bool _ownsIndices;
 
     public Mesh(ReadOnlySpan<TVertex> vertices)
-        : this(vertices, ReadOnlySpan<uint>.Empty)
+        : this(vertices, ReadOnlySpan<uint>.Empty, Topology.TriangleList)
     {
     }
 
     public Mesh(ImmutableArray<TVertex> vertices)
-        : this(vertices, ImmutableArray<uint>.Empty)
+        : this(vertices, ImmutableArray<uint>.Empty, Topology.TriangleList)
     {
     }
 
-    public Mesh(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    public Mesh(
+        ReadOnlySpan<TVertex> vertices,
+        ReadOnlySpan<uint> indices,
+        Topology topology = Topology.TriangleList)
     {
         _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
         vertices.CopyTo(_vertices);
@@ -82,10 +97,14 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = true;
 
+        Topology = topology;
         Version = 1;
     }
 
-    public Mesh(ImmutableArray<TVertex> vertices, ImmutableArray<uint> indices)
+    public Mesh(
+        ImmutableArray<TVertex> vertices,
+        ImmutableArray<uint> indices,
+        Topology topology = Topology.TriangleList)
     {
         ThrowIfDefault(vertices, nameof(vertices));
         ThrowIfDefault(indices, nameof(indices));
@@ -101,12 +120,15 @@ public class Mesh<TVertex> : Mesh
         _indexCount = indices.Length;
         _ownsIndices = false;
 
+        Topology = topology;
         Version = 1;
     }
 
     public override int VertexCount => _vertexCount;
 
     public override int IndexCount => _indexCount;
+
+    public override Topology Topology { get; }
 
     public override ReadOnlySpan<byte> GetVertexBytes() =>
         MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
