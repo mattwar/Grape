@@ -25,6 +25,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
+
+    // Depth target. Sized to match the swapchain image and recreated when
+    // the window resizes. Used purely as scratch state during a frame so
+    // overlapping triangles are resolved by camera distance rather than
+    // submission order; never sampled or read by the user.
+    private GpuTexture? _depthTexture;
+    private uint _depthWidth;
+    private uint _depthHeight;
+    private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
     // One vertex buffer per RenderDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -92,15 +101,42 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 _renderFrame.CommandBuffer.CommandBufferId,
                 window.WindowId,
                 out var swapchainTextureId,
-                out _,
-                out _) && swapchainTextureId != 0)
+                out var swapchainWidth,
+                out var swapchainHeight) && swapchainTextureId != 0)
         {
             _colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
+            EnsureDepthTexture(swapchainWidth, swapchainHeight);
         }
         else
         {
             _colorTarget = null;
         }
+    }
+
+    /// <summary>
+    /// (Re)allocates the depth texture so its size matches the current
+    /// swapchain image. Disposes any previous texture when the window has
+    /// been resized.
+    /// </summary>
+    private void EnsureDepthTexture(uint width, uint height)
+    {
+        if (_depthTexture is { IsDisposed: false } && width == _depthWidth && height == _depthHeight)
+            return;
+
+        _depthTexture?.Dispose();
+        _depthTexture = _device.CreateTexture(new GpuTextureCreateInfo
+        {
+            Type = SDL.GPUTextureType.Texturetype2D,
+            Format = DepthFormat,
+            Usage = SDL.GPUTextureUsageFlags.DepthStencilTarget,
+            Width = width,
+            Height = height,
+            LayerCountOrDepth = 1,
+            NumLevels = 1,
+            SampleCount = SDL.GPUSampleCount.SampleCount1,
+        });
+        _depthWidth = width;
+        _depthHeight = height;
     }
 
     /// <summary>
@@ -477,9 +513,22 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 StoreOp = SDL.GPUStoreOp.Store,
             });
 
+            // Clear depth to 1.0 (the far plane in normalized device
+            // coordinates) at the start of every frame and discard the
+            // contents at the end -- nothing reads them after the frame.
+            var depthTarget = new GpuDepthStencilTargetInfo
+            {
+                Texture = _depthTexture,
+                ClearDepth = 1f,
+                LoadOp = SDL.GPULoadOp.Clear,
+                StoreOp = SDL.GPUStoreOp.DontCare,
+                StencilLoadOp = SDL.GPULoadOp.DontCare,
+                StencilStoreOp = SDL.GPUStoreOp.DontCare,
+            };
+
             if (!_renderFrame.TryBeginRenderPass(
                 colorTargets,
-                new GpuDepthStencilTargetInfo(),
+                depthTarget,
                 out var renderPass))
             {
                 return;
@@ -805,6 +854,17 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             },
         });
 
+        // Standard 3D depth state: write closer pixels and reject farther
+        // ones. With ClearDepth=1.0 at the start of each frame this means
+        // "first thing drawn at a pixel wins" only until something closer
+        // shows up, regardless of submission order.
+        var depthState = new SDL.GPUDepthStencilState
+        {
+            CompareOp = SDL.GPUCompareOp.Less,
+            EnableDepthTest = 1,
+            EnableDepthWrite = 1,
+        };
+
         return _device.CreateGraphicsPipeline(new GpuPipelineCreateInfo
         {
             VertexShader = vertexShader,
@@ -815,9 +875,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 Attributes = attributes.ToImmutable(),
             },
             PrimitiveType = SDL.GPUPrimitiveType.TriangleList,
+            DepthStencilState = depthState,
             TargetInfo = new GpuPipelineTargetInfo
             {
                 ColorTargetDescriptions = colorTargets,
+                DepthStencilFormat = DepthFormat,
+                HasDepthStencilTarget = true,
             },
         });
     }
