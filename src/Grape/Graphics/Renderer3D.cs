@@ -17,7 +17,16 @@ public abstract class Renderer3D
     /// into each <c>RenderMesh</c> call at the time of the call, so
     /// changing this value after a draw is queued has no effect on it.
     /// </summary>
-    public DepthMode DepthMode { get; set; } = DepthMode.Default;
+    public DepthMode DepthMode { get; set; } = DepthMode.Solid;
+
+    /// <summary>
+    /// Which triangles to skip based on facing direction. Defaults to
+    /// <see cref="CullMode.None"/> so hand-built or single-sided geometry
+    /// just works; switch to <see cref="CullMode.Back"/> for closed solid
+    /// meshes to halve their fragment work. Snapshotted per draw, like
+    /// <see cref="DepthMode"/>.
+    /// </summary>
+    public CullMode CullMode { get; set; } = CullMode.None;
 
     /// <summary>
     /// Saves the current renderer state and returns a scope whose
@@ -27,7 +36,7 @@ public abstract class Renderer3D
     /// </summary>
     public StateScope PushState()
     {
-        _stateStack.Push(new RendererState(DepthMode));
+        _stateStack.Push(new RendererState(DepthMode, CullMode));
         return new StateScope(this);
     }
 
@@ -35,6 +44,7 @@ public abstract class Renderer3D
     {
         var s = _stateStack.Pop();
         DepthMode = s.DepthMode;
+        CullMode = s.CullMode;
     }
 
     /// <summary>
@@ -76,7 +86,7 @@ public abstract class Renderer3D
     // and restore. Add a field here whenever a new mutable knob is added
     // to Renderer3D so existing callers that already use PushState don't
     // have to change.
-    private readonly record struct RendererState(DepthMode DepthMode);
+    private readonly record struct RendererState(DepthMode DepthMode, CullMode CullMode);
 
     /// <summary>
     /// A disposable scope returned from <see cref="PushState"/>. Disposing

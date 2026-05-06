@@ -6,10 +6,11 @@ namespace Grape;
 public enum DepthMode
 {
     /// <summary>
-    /// Default 3D occlusion: closer pixels win, and this draw can occlude
-    /// later draws. Use for solid geometry.
+    /// Opaque 3D geometry: closer pixels win, and this draw can occlude
+    /// later draws. The most common mode and the renderer's initial
+    /// setting.
     /// </summary>
-    Default,
+    Solid,
 
     /// <summary>
     /// Drawn only where it would be in front of existing solid geometry,

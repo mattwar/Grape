@@ -147,7 +147,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
 
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode));
     }
 
     /// <summary>
@@ -170,6 +170,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Texture: null,
             Sampler: null,
             DepthMode,
+            CullMode,
             shader.ArgsLayout,
             args));
     }
@@ -193,7 +194,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode));
     }
 
     /// <summary>
@@ -215,6 +216,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             texture,
             Sampler: null,
             DepthMode,
+            CullMode,
             shader.ArgsLayout,
             args));
     }
@@ -235,7 +237,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
 
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode));
     }
 
     internal void RenderTexturedMeshCore<TVertex, TArgs>(
@@ -257,6 +259,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             texture,
             sampler,
             DepthMode,
+            CullMode,
             shader.ArgsLayout,
             args));
     }
@@ -549,7 +552,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         fsGpu,
                         _colorFormat,
                         shader.VertexLayout,
-                        command.Command.DepthMode);
+                        command.Command.DepthMode,
+                        command.Command.CullMode);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
                     command.Command.PushArgs(renderPass);
@@ -754,12 +758,13 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
-        DepthMode depthMode)
+        DepthMode depthMode,
+        CullMode cullMode)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode);
             _pipelines[key] = pipeline;
         }
 
@@ -819,7 +824,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
-        DepthMode depthMode)
+        DepthMode depthMode,
+        CullMode cullMode)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
         uint offset = 0;
@@ -868,7 +874,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         // never occludes, never gets occluded.
         var (enableTest, enableWrite) = depthMode switch
         {
-            DepthMode.Default     => ((byte)1, (byte)1),
+            DepthMode.Solid       => ((byte)1, (byte)1),
             DepthMode.Transparent => ((byte)1, (byte)0),
             DepthMode.Overlay     => ((byte)0, (byte)0),
             _ => throw new ArgumentOutOfRangeException(nameof(depthMode), depthMode, null),
@@ -881,6 +887,22 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             EnableDepthWrite = enableWrite,
         };
 
+        // CCW winding identifies the "front" face -- the convention used
+        // by every common 3D content tool. Cull mode then decides whether
+        // to draw both sides, only fronts, or only backs.
+        var rasterizerState = new SDL.GPURasterizerState
+        {
+            FillMode = SDL.GPUFillMode.Fill,
+            CullMode = cullMode switch
+            {
+                CullMode.None  => SDL.GPUCullMode.None,
+                CullMode.Back  => SDL.GPUCullMode.Back,
+                CullMode.Front => SDL.GPUCullMode.Front,
+                _ => throw new ArgumentOutOfRangeException(nameof(cullMode), cullMode, null),
+            },
+            FrontFace = SDL.GPUFrontFace.CounterClockwise,
+        };
+
         return _device.CreateGraphicsPipeline(new GpuPipelineCreateInfo
         {
             VertexShader = vertexShader,
@@ -891,6 +913,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 Attributes = attributes.ToImmutable(),
             },
             PrimitiveType = SDL.GPUPrimitiveType.TriangleList,
+            RasterizerState = rasterizerState,
             DepthStencilState = depthState,
             TargetInfo = new GpuPipelineTargetInfo
             {
@@ -914,14 +937,16 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
         ShaderVertexLayout Layout,
-        DepthMode DepthMode);
+        DepthMode DepthMode,
+        CullMode CullMode);
 
     private record DrawCommand(
         Mesh Mesh,
         ShaderSet Shader,
         Image? Texture,
         GpuSampler? Sampler,
-        DepthMode DepthMode)
+        DepthMode DepthMode,
+        CullMode CullMode)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -938,9 +963,10 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
+        CullMode CullMode,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)
