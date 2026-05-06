@@ -506,6 +506,32 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         resources.LastUploadedVersion = mesh.Version;
                     }
 
+                    // Index buffer mirrors the vertex-buffer flow: the
+                    // same Version controls re-upload, capacity grows
+                    // monotonically, and meshes without indices skip
+                    // this whole branch and fall through to unindexed
+                    // drawing later.
+                    if (mesh.IndexCount > 0)
+                    {
+                        var indexBytes = MemoryMarshal.AsBytes(mesh.GetIndices());
+                        if (needsUpload || resources.IndexBuffer is null || resources.IndexBufferBytes != indexBytes.Length)
+                        {
+                            if (resources.IndexBuffer is null ||
+                                resources.IndexBufferCapacityBytes < indexBytes.Length)
+                            {
+                                resources.IndexBuffer?.Dispose();
+                                resources.IndexUploadBuffer?.Dispose();
+
+                                resources.IndexBuffer = _device.CreateIndexBuffer((uint)indexBytes.Length);
+                                resources.IndexUploadBuffer = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)indexBytes.Length);
+                                resources.IndexBufferCapacityBytes = indexBytes.Length;
+                            }
+
+                            copyPass!.Upload(resources.IndexUploadBuffer!, resources.IndexBuffer!, indexBytes);
+                            resources.IndexBufferBytes = indexBytes.Length;
+                        }
+                    }
+
                     if (command.Command.Texture is { } image)
                         EnsureTextureUploaded(copyPass!, image);
                 }
@@ -566,7 +592,25 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
-                    renderPass.DrawPrimitives((uint)command.Command.Mesh.VertexCount);
+
+                    // Indexed vs unindexed draw: indexed lets the GPU
+                    // reuse vertex-shader results across triangles that
+                    // share a vertex, and lets the mesh data store each
+                    // unique vertex only once. Mesh<T> with an empty
+                    // index span falls through to the original
+                    // DrawPrimitives path.
+                    var indexCount = command.Command.Mesh.IndexCount;
+                    if (indexCount > 0)
+                    {
+                        renderPass.BindIndexBuffer(
+                            command.Resources.IndexBuffer!,
+                            SDL.GPUIndexElementSize.IndexElementSize32Bit);
+                        renderPass.DrawIndexedPrimitives((uint)indexCount);
+                    }
+                    else
+                    {
+                        renderPass.DrawPrimitives((uint)command.Command.Mesh.VertexCount);
+                    }
                 }
             }
 
@@ -634,6 +678,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             {
                 entry.Resources.VertexBuffer?.Dispose();
                 entry.Resources.UploadBuffer?.Dispose();
+                entry.Resources.IndexBuffer?.Dispose();
+                entry.Resources.IndexUploadBuffer?.Dispose();
                 _meshResources.RemoveAt(i);
             }
         }
@@ -1011,6 +1057,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         public GpuUploadBuffer? UploadBuffer { get; set; }
         public int VertexBufferBytes { get; set; }
         public int VertexBufferCapacityBytes { get; set; }
+
+        // Index buffer + its own staging buffer. Lazily created -- a mesh
+        // with no indices keeps these null and uses the unindexed draw
+        // path. Sized independently of the vertex buffer.
+        public GpuIndexBuffer? IndexBuffer { get; set; }
+        public GpuUploadBuffer? IndexUploadBuffer { get; set; }
+        public int IndexBufferBytes { get; set; }
+        public int IndexBufferCapacityBytes { get; set; }
+
         public int LastUploadedVersion { get; set; }
     }
 

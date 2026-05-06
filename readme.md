@@ -151,7 +151,7 @@ while (!window.IsClosed)
 }
 ```
 
-## A 3D Triangle Swarm
+## A Spinning 3D Triangle
 
 ```csharp
 using System.Collections.Immutable;
@@ -163,7 +163,7 @@ var triangle = ImmutableArray.Create(
     new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
     new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
 
-var window = new Window3D(800, 600) { Title = "Triangle Swarm", CloseKey = Key.Esc };
+var window = new Window3D(800, 600) { Title = "Spinning Triangle", CloseKey = Key.Esc };
 
 window.Rendering += (w, frame) =>
 {
