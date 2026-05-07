@@ -24,8 +24,7 @@ var window = new Window3D
 {
     Title = "Manual Render Loop",
     BackgroundColor = new Color(0, 0, 32),
-    FullScreen = true,
-    MinRenderInterval = TimeSpan.FromSeconds(1.0 / 60),
+    FullScreen = true
 };
 
 while (!window.IsClosed && !Keyboard.IsDown(Key.Escape))

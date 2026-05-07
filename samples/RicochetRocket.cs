@@ -105,7 +105,7 @@ window.Rendering += (w, rd) =>
         if (bounce)
         {
             rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
-            _ = Audio.Play(sound, volume: .2f);
+            Audio.Play(sound, volume: .2f);
         }
     }
 
