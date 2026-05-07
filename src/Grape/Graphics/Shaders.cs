@@ -144,6 +144,71 @@ public static class Shaders
         }
         """;
 
+    // Skybox vertex shader. Takes a unit cube vertex in object space
+    // and:
+    //   1. Passes the raw position through as the cubemap sample
+    //      direction. Since the cube is centred on the origin, the
+    //      vector from the centre to each vertex is exactly the world
+    //      direction the corresponding pixel "looks toward".
+    //   2. Projects the vertex with the supplied transform, then
+    //      forces clip-space Z to equal W. After the perspective
+    //      divide that produces depth 1.0 (the far plane), so the
+    //      skybox is rendered behind everything else even with a
+    //      Less-or-Equal depth test. Caller is expected to pass a
+    //      view-projection that has the camera *translation* zeroed
+    //      out so the skybox stays centred on the camera regardless
+    //      of where the camera moves; Camera3D.GetSkyboxViewProjection
+    //      builds that for you.
+    private const string SkyboxVertHlsl = """
+        cbuffer UBO : register(b0, space1)
+        {
+            float4x4 transform : packoffset(c0);
+        };
+
+        struct Input
+        {
+            float3 Position : TEXCOORD0;
+        };
+
+        struct Output
+        {
+            float3 Direction : TEXCOORD0;
+            float4 Position  : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.Direction = input.Position;
+            float4 clip = mul(transform, float4(input.Position, 1.0f));
+            // Push the skybox onto the far plane: clip.z/clip.w = 1
+            // after the perspective divide. We use clip.w for both so
+            // any vertex at any depth resolves to depth 1 in NDC.
+            output.Position = float4(clip.xy, clip.w, clip.w);
+            return output;
+        }
+        """;
+
+    // Skybox fragment shader. Samples the cubemap by the interpolated
+    // direction. SDL3-GPU/HLSL note: the cubemap binding is a
+    // TextureCube; SDL_shadercross translates this to the equivalent
+    // SPIR-V/MSL/DXIL cube-sampled-image. The vertex shader emits the
+    // direction in left-handed cubemap-space convention (+X right,
+    // +Y up, +Z forward); the negate on .z below converts a normal
+    // right-handed System.Numerics camera direction so the skybox
+    // doesn't appear mirrored front-to-back. If your scene already
+    // uses a left-handed camera convention you can drop the negate.
+    private const string SkyboxFragHlsl = """
+        TextureCube<float4> Cubemap : register(t0, space2);
+        SamplerState        Sampler : register(s0, space2);
+
+        float4 main(float3 Direction : TEXCOORD0) : SV_Target0
+        {
+            float3 dir = float3(Direction.x, Direction.y, -Direction.z);
+            return Cubemap.Sample(Sampler, dir);
+        }
+        """;
+
     // Position-only vertex shader -- passes the position through unchanged.
     private const string PositionVertHlsl = """
         struct Input  { float3 Position : TEXCOORD0; };
@@ -336,6 +401,12 @@ public static class Shaders
     private static readonly Shader PositionTextureFrag =
         new(ShaderKind.Fragment, PositionTextureFragHlsl);
 
+    private static readonly Shader SkyboxVert =
+        new(ShaderKind.Vertex, SkyboxVertHlsl);
+
+    private static readonly Shader SkyboxFrag =
+        new(ShaderKind.Fragment, SkyboxFragHlsl);
+
     private static readonly Shader PositionVert =
         new(ShaderKind.Vertex, PositionVertHlsl);
 
@@ -430,6 +501,22 @@ public static class Shaders
     /// </summary>
     public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+
+    /// <summary>
+    /// Skybox shader: samples the bound <see cref="Cubemap"/> by the
+    /// world-space direction implied by each vertex's position, with
+    /// depth forced to the far plane so the result always renders
+    /// behind everything else. Pair with a unit cube mesh whose
+    /// vertices span [-1, 1] on each axis (e.g. the cube from
+    /// <c>samples/IndexedCube.cs</c>) and pass
+    /// <see cref="Camera3D.GetSkyboxViewProjection(float)"/> as the
+    /// per-draw transform so the skybox follows the camera. Use
+    /// <see cref="DepthMode.Default"/> -- the shader's depth output of
+    /// 1.0 ensures the skybox draws behind opaque geometry without
+    /// special depth state.
+    /// </summary>
+    public static ShaderSet<Vertex3D, Matrix4x4> Skybox { get; } =
+        new(SkyboxVert, SkyboxFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
     /// The per-instance vertex layout used by every built-in

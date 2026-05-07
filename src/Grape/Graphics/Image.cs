@@ -559,6 +559,72 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
+    /// Returns a new image with the pixels flipped along the requested
+    /// axis. The source image is unchanged. The new image inherits the
+    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
+    /// flag. <see cref="FlipMode.None"/> still allocates a fresh copy.
+    /// </summary>
+    public Image Flip(FlipMode mode)
+    {
+        ThrowIfDisposed();
+        var (width, height) = Size;
+        var result = Image.Create(width, height, PixelFormat, Mipmaps);
+        // Pixel-by-pixel via GetPixel/SetPixel so this works for every
+        // PixelFormat we support (including indexed and packed formats)
+        // without per-format byte arithmetic. Future optimisation: a
+        // per-format byte-stride memcpy path for Horizontal+Vertical
+        // on the common 32-bit RGBA formats.
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int srcX = mode == FlipMode.Horizontal ? width - 1 - x : x;
+                int srcY = mode == FlipMode.Vertical ? height - 1 - y : y;
+                result.SetPixel(x, y, GetPixel(srcX, srcY));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Returns a new image rotated by the requested right angle. The
+    /// source image is unchanged. For <see cref="Rotation.Clockwise90"/>
+    /// and <see cref="Rotation.Counterclockwise90"/> the result's
+    /// width and height are swapped. The new image inherits the
+    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
+    /// flag. <see cref="Rotation.None"/> still allocates a fresh copy.
+    /// </summary>
+    public Image Rotate(Rotation rotation)
+    {
+        ThrowIfDisposed();
+        var (width, height) = Size;
+        var (resultWidth, resultHeight) = rotation switch
+        {
+            Rotation.Clockwise90 or Rotation.Counterclockwise90 => (height, width),
+            _ => (width, height),
+        };
+        var result = Image.Create(resultWidth, resultHeight, PixelFormat, Mipmaps);
+        // Pixel-by-pixel via GetPixel/SetPixel for the same reasons as
+        // Flip. Future optimisation: row-stride memcpy for Half on the
+        // common 32-bit formats; transposed strided copy for the 90s.
+        for (int y = 0; y < resultHeight; y++)
+        {
+            for (int x = 0; x < resultWidth; x++)
+            {
+                var (srcX, srcY) = rotation switch
+                {
+                    Rotation.Clockwise90 => (y, resultWidth - 1 - x),
+                    Rotation.Counterclockwise90 => (resultHeight - 1 - y, x),
+                    Rotation.Half => (width - 1 - x, height - 1 - y),
+                    _ => (x, y),
+                };
+                result.SetPixel(x, y, GetPixel(srcX, srcY));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
     /// A 2D renderer that draws into an <see cref="Image"/> in CPU memory using
     /// SDL's software renderer. Pixels written by this renderer land directly
     /// in the image's surface.

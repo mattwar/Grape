@@ -20,6 +20,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly Window3D? _window;
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
+    private readonly List<CubemapCacheEntry> _cubemapResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
@@ -33,6 +34,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private int _instanceBuffersAcquired;
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
+    private GpuSampler? _cubemapSampler;
     private Image? _debugFontAtlas;
 
     // Textures whose base mip level was just (re)uploaded this frame and
@@ -183,6 +185,25 @@ internal class GpuRenderer : Renderer3D, IDisposable
         // is actually elongated, so always-on is the right default.
         EnableAnisotropy = true,
         MaxAnisotropy = 16f,
+    });
+
+    /// <summary>
+    /// Sampler used for cubemap fragment binds. Differs from
+    /// <see cref="DefaultSampler"/> only in address mode: cubemaps need
+    /// ClampToEdge on every axis to avoid one-pixel seams between
+    /// adjacent faces (a Repeat sampler walks across the cube face
+    /// boundary into the wrong face's pixels and produces a black/garbage
+    /// line at every edge).
+    /// </summary>
+    internal GpuSampler CubemapSampler => _cubemapSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
+    {
+        MinFilter = SDL.GPUFilter.Linear,
+        MagFilter = SDL.GPUFilter.Linear,
+        MipmapMode = SDL.GPUSamplerMipmapMode.Linear,
+        AddressModeU = SDL.GPUSamplerAddressMode.ClampToEdge,
+        AddressModeV = SDL.GPUSamplerAddressMode.ClampToEdge,
+        AddressModeW = SDL.GPUSamplerAddressMode.ClampToEdge,
+        MaxLod = 1000f,
     });
 
     /// <summary>
@@ -373,7 +394,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -395,6 +416,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             mesh,
             shader,
             Texture: null,
+            Cubemap: null,
             Sampler: null,
             DepthMode,
             BlendMode,
@@ -427,7 +449,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -448,6 +470,56 @@ internal class GpuRenderer : Renderer3D, IDisposable
             mesh,
             shader,
             texture,
+            Cubemap: null,
+            Sampler: null,
+            DepthMode,
+            BlendMode,
+            CullMode,
+            topology,
+            wireframe,
+            Viewport,
+            ClipRect,
+            shader.ArgsLayout,
+            args));
+    }
+
+    /// <summary>
+    /// Cubemap variant of <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Image, ShaderSet{TVertex})"/>.
+    /// The shader's fragment-stage texture binding (slot 0) must be a
+    /// <c>TextureCube</c> rather than a <c>Texture2D</c>.
+    /// </summary>
+    public override void DrawMesh<TVertex>(
+        Mesh<TVertex> mesh,
+        Cubemap cubemap,
+        ShaderSet<TVertex> shader)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(cubemap);
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, cubemap, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+    }
+
+    /// <summary>
+    /// Cubemap variant of <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Image, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// </summary>
+    public override void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        Cubemap cubemap,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(cubemap);
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new DrawCommand<TArgs>(
+            mesh,
+            shader,
+            Texture: null,
+            cubemap,
             Sampler: null,
             DepthMode,
             BlendMode,
@@ -477,7 +549,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -498,6 +570,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             mesh,
             shader,
             texture,
+            Cubemap: null,
             sampler,
             DepthMode,
             BlendMode,
@@ -912,6 +985,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     if (command.Command.Texture is { } image)
                         EnsureTextureUploaded(copyPass!, image);
 
+                    if (command.Command.Cubemap is { } cubemap)
+                        EnsureCubemapUploaded(copyPass!, cubemap);
+
                     // Per-instance vertex data (slot 1) for instanced
                     // commands. Acquired from a pool that grows monotonically
                     // and is recycled across frames; the user's instance
@@ -1070,6 +1146,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
+                    else if (command.Command.Cubemap is { } cubemap)
+                    {
+                        var gpuTexture = LookupCubemap(cubemap)
+                            ?? throw new InvalidOperationException(
+                                "Cubemap upload was not recorded for this cubemap.");
+                        var sampler = command.Command.Sampler ?? CubemapSampler;
+                        renderPass.BindFragmentSamplers(0,
+                            [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
+                    }
 
                     // Wireframe takes precedence over the mesh's native
                     // index/unindexed paths: it always draws indexed,
@@ -1203,6 +1288,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 _textureResources.RemoveAt(i);
             }
         }
+
+        for (int i = _cubemapResources.Count - 1; i >= 0; i--)
+        {
+            var entry = _cubemapResources[i];
+            var idle = _frameNumber - entry.LastUsedFrame > IdleEvictionFrames;
+            var dead = !entry.Cubemap.TryGetTarget(out _);
+            if (idle || dead)
+            {
+                entry.Texture.Dispose();
+                _cubemapResources.RemoveAt(i);
+            }
+        }
     }
 
     private void EnsureTextureUploaded(GpuCopyPass copyPass, Image image)
@@ -1305,6 +1402,107 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Mipmaps = image.Mipmaps,
             NumLevels = numLevels,
         });
+    }
+
+    private GpuTexture? LookupCubemap(Cubemap cubemap)
+    {
+        for (int i = 0; i < _cubemapResources.Count; i++)
+        {
+            var entry = _cubemapResources[i];
+            if (entry.Cubemap.TryGetTarget(out var target) && ReferenceEquals(target, cubemap))
+            {
+                entry.LastUsedFrame = _frameNumber;
+                return entry.Texture;
+            }
+        }
+        return null;
+    }
+
+    // Cubemap version of EnsureTextureUploaded. The 6 face images are
+    // uploaded into the 6 layers of a single GPU texture marked
+    // Texturetypecube. Re-upload is keyed on Cubemap.Version (a single
+    // counter for the whole cubemap), not on the individual face images'
+    // versions -- this keeps the API simple at the cost of always
+    // re-uploading all 6 faces when any one changes (acceptable: cubemap
+    // contents rarely change at runtime; this isn't a per-frame stream).
+    private void EnsureCubemapUploaded(GpuCopyPass copyPass, Cubemap cubemap)
+    {
+        for (int i = 0; i < _cubemapResources.Count; i++)
+        {
+            var entry = _cubemapResources[i];
+            if (entry.Cubemap.TryGetTarget(out var target) && ReferenceEquals(target, cubemap))
+            {
+                entry.LastUsedFrame = _frameNumber;
+                if (entry.LastUploadedVersion != cubemap.Version)
+                {
+                    UploadCubemapFaces(copyPass, cubemap, entry.Texture, (uint)entry.Size);
+                    if (entry.Mipmaps && entry.NumLevels > 1)
+                        _pendingMipmapGeneration.Add(entry.Texture);
+                    entry.LastUploadedVersion = cubemap.Version;
+                }
+                return;
+            }
+        }
+
+        var size = cubemap.Size;
+        var format = MapPixelFormat(cubemap.Format);
+        var numLevels = ComputeMipLevelCount(size, size, cubemap.Mipmaps);
+
+        var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
+        {
+            Type = SDL.GPUTextureType.TexturetypeCube,
+            Format = format,
+            Usage = MipmapTextureUsage(cubemap.Mipmaps),
+            Width = (uint)size,
+            Height = (uint)size,
+            // Cubemaps must declare exactly 6 layers (the 6 faces).
+            LayerCountOrDepth = 6,
+            NumLevels = numLevels,
+            SampleCount = SDL.GPUSampleCount.SampleCount1,
+        });
+
+        UploadCubemapFaces(copyPass, cubemap, gpuTexture, (uint)size);
+
+        if (cubemap.Mipmaps && numLevels > 1)
+            _pendingMipmapGeneration.Add(gpuTexture);
+
+        _cubemapResources.Add(new CubemapCacheEntry(
+            new WeakReference<Cubemap>(cubemap), gpuTexture, _frameNumber)
+        {
+            Size = size,
+            LastUploadedVersion = cubemap.Version,
+            Mipmaps = cubemap.Mipmaps,
+            NumLevels = numLevels,
+        });
+    }
+
+    // SDL_GPU layer indices for cubemap faces follow the Direct3D /
+    // Vulkan convention: +X, -X, +Y, -Y, +Z, -Z in that order.
+    private void UploadCubemapFaces(
+        GpuCopyPass copyPass,
+        Cubemap cubemap,
+        GpuTexture destination,
+        uint size)
+    {
+        var faces = new[]
+        {
+            cubemap.PositiveX,
+            cubemap.NegativeX,
+            cubemap.PositiveY,
+            cubemap.NegativeY,
+            cubemap.PositiveZ,
+            cubemap.NegativeZ,
+        };
+
+        for (uint layer = 0; layer < 6; layer++)
+        {
+            var pixels = faces[layer].GetPixels();
+            // One-shot upload buffer per face. The cubemap path is not
+            // a per-frame hot path, so allocating six small buffers and
+            // disposing them is fine; pooling can come later if needed.
+            using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
+            copyPass.UploadToTextureLayer(upload, destination, size, size, layer, mipLevel: 0, pixels);
+        }
     }
 
     // SDL_GenerateMipmapsForGPUTexture requires the texture to be usable
@@ -1604,9 +1802,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
             _ => throw new ArgumentOutOfRangeException(nameof(depthMode), depthMode, null),
         };
 
+        // LessOrEqual (not Less) so a skybox shader emitting depth = 1.0
+        // (clip.z == clip.w) still passes against the cleared depth target
+        // value of 1.0. Standard convention in modern engines; harmless
+        // for normal opaque draws (no z-fighting at the far plane in
+        // practice).
         var depthState = new SDL.GPUDepthStencilState
         {
-            CompareOp = SDL.GPUCompareOp.Less,
+            CompareOp = SDL.GPUCompareOp.LessOrEqual,
             EnableDepthTest = enableTest,
             EnableDepthWrite = enableWrite,
         };
@@ -1837,6 +2040,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Mesh Mesh,
         ShaderSet Shader,
         Image? Texture,
+        Cubemap? Cubemap,
         GpuSampler? Sampler,
         DepthMode DepthMode,
         BlendMode BlendMode,
@@ -1886,6 +2090,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Mesh Mesh,
         ShaderSet Shader,
         Image? Texture,
+        Cubemap? Cubemap,
         GpuSampler? Sampler,
         DepthMode DepthMode,
         BlendMode BlendMode,
@@ -1896,7 +2101,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Rect? ClipRect,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+        : DrawCommand(Mesh, Shader, Texture, Cubemap, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)
@@ -1953,7 +2158,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         byte[] InstanceBytesArray,
         int InstanceBytesLength,
         int InstanceCountValue)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+        : DrawCommand(Mesh, Shader, Texture, Cubemap: null, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
         where TArgs : unmanaged
     {
         public override ShaderVertexLayout? InstanceLayout => InstanceLayoutValue;
@@ -2091,6 +2296,24 @@ internal class GpuRenderer : Renderer3D, IDisposable
         // Stored on the entry so re-uploads (Version bumps with same
         // dimensions) can re-trigger mipmap generation without having
         // to look at the Image again.
+        public bool Mipmaps { get; set; }
+        public uint NumLevels { get; set; }
+    }
+
+    private sealed class CubemapCacheEntry
+    {
+        public CubemapCacheEntry(WeakReference<Cubemap> cubemap, GpuTexture texture, long lastUsedFrame)
+        {
+            Cubemap = cubemap;
+            Texture = texture;
+            LastUsedFrame = lastUsedFrame;
+        }
+
+        public WeakReference<Cubemap> Cubemap { get; }
+        public GpuTexture Texture { get; set; }
+        public long LastUsedFrame { get; set; }
+        public int LastUploadedVersion { get; set; }
+        public int Size { get; set; }
         public bool Mipmaps { get; set; }
         public uint NumLevels { get; set; }
     }

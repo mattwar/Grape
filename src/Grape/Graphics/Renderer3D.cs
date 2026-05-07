@@ -217,6 +217,30 @@ public abstract class Renderer3D
         where TArgs : unmanaged;
 
     /// <summary>
+    /// Cubemap variant of the textured draw overload. The shader's
+    /// fragment-stage texture binding (slot 0) must declare a
+    /// <c>TextureCube</c> rather than a <c>Texture2D</c>; pair this
+    /// with <see cref="Shaders.Skybox"/> or another cubemap shader.
+    /// </summary>
+    public abstract void DrawMesh<TVertex>(
+        Mesh<TVertex> mesh,
+        Cubemap cubemap,
+        ShaderSet<TVertex> shader)
+        where TVertex : unmanaged;
+
+    /// <summary>
+    /// Cubemap variant of the textured draw overload with typed
+    /// per-draw arguments.
+    /// </summary>
+    public abstract void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        Cubemap cubemap,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged;
+
+    /// <summary>
     /// Queues a mesh for instanced drawing. The mesh is drawn once per
     /// entry in <paramref name="instances"/>; each instance picks up its
     /// own per-instance values from the matching slot, and all instances

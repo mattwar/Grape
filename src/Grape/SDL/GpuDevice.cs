@@ -810,6 +810,72 @@ internal sealed class GpuCopyPass : IDisposable
         }
     }
 
+    /// <summary>
+    /// Uploads a 2D bitmap region into a specific layer (and mip level)
+    /// of the destination texture. Used for cubemap face uploads, 2D
+    /// texture-array slices, and explicit per-mip uploads.
+    /// </summary>
+    /// <param name="source">Transfer buffer holding the pixel bytes.</param>
+    /// <param name="destination">Destination GPU texture.</param>
+    /// <param name="width">Region width in pixels.</param>
+    /// <param name="height">Region height in pixels.</param>
+    /// <param name="layer">Destination layer index (cubemap face index 0..5, array slice).</param>
+    /// <param name="mipLevel">Destination mip level (0 is the base level).</param>
+    /// <param name="bytes">Pixel bytes, tightly packed (PixelsPerRow = width).</param>
+    public void UploadToTextureLayer(
+        GpuUploadBuffer source,
+        GpuTexture destination,
+        uint width,
+        uint height,
+        uint layer,
+        uint mipLevel,
+        ReadOnlySpan<byte> bytes)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (source.IsDisposed)
+            throw new ObjectDisposedException(nameof(source));
+        if (destination.IsDisposed)
+            throw new ObjectDisposedException(nameof(destination));
+
+        unsafe
+        {
+            fixed (byte* pBytes = bytes)
+            {
+                void* pMappedBytes = (void*)SDL.MapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId, true);
+                if (pMappedBytes == null)
+                    throw new InvalidOperationException("Failed to map transfer buffer.");
+
+                Buffer.MemoryCopy(pBytes, pMappedBytes, bytes.Length, bytes.Length);
+                SDL.UnmapGPUTransferBuffer(source.Gpu.GpuDeviceID, source.BufferId);
+
+                SDL.UploadToGPUTexture(
+                    _copyPassId,
+                    new SDL.GPUTextureTransferInfo
+                    {
+                        TransferBuffer = source.BufferId,
+                        Offset = 0,
+                        PixelsPerRow = width,
+                        RowsPerLayer = height,
+                    },
+                    new SDL.GPUTextureRegion
+                    {
+                        Texture = destination.TextureId,
+                        MipLevel = mipLevel,
+                        Layer = layer,
+                        X = 0,
+                        Y = 0,
+                        Z = 0,
+                        W = width,
+                        H = height,
+                        D = 1,
+                    },
+                    cycle: false
+                );
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (!_disposed)
