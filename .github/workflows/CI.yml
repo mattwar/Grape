@@ -7,6 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  # Opt JavaScript-based actions into Node 24 ahead of the June 2026 default
+  # switch (see https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build & Pack
