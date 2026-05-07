@@ -35,6 +35,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
 
+    // Textures whose base mip level was just (re)uploaded this frame and
+    // need their mip chain regenerated. Drained after the copy pass closes,
+    // since SDL_GenerateMipmapsForGPUTexture takes a command buffer rather
+    // than running inside a copy pass.
+    private readonly List<GpuTexture> _pendingMipmapGeneration = new();
+
     // Depth target. Sized to match the swapchain image and recreated when
     // the window resizes. Used purely as scratch state during a frame so
     // overlapping triangles are resolved by camera distance rather than
@@ -148,6 +154,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
         AddressModeU = SDL.GPUSamplerAddressMode.Repeat,
         AddressModeV = SDL.GPUSamplerAddressMode.Repeat,
         AddressModeW = SDL.GPUSamplerAddressMode.Repeat,
+        // Allow the sampler to walk the entire mip chain. Without this,
+        // MaxLod defaults to 0 and the sampler is clamped to the base
+        // level even on textures that have a mip chain -- mipmaps would
+        // generate but never be visible.
+        MaxLod = 1000f,
     });
 
     /// <summary>
@@ -831,6 +842,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 }
             }
 
+            // After the copy pass closes, regenerate mip chains for
+            // textures whose base level was just (re)uploaded. SDL drives
+            // this with a series of internal render passes from the
+            // command buffer directly, so it can't run inside a copy pass.
+            if (_pendingMipmapGeneration.Count > 0)
+            {
+                var commandBufferId = _renderFrame!.CommandBuffer.CommandBufferId;
+                foreach (var texture in _pendingMipmapGeneration)
+                    SDL.GenerateMipmapsForGPUTexture(commandBufferId, texture.TextureId);
+                _pendingMipmapGeneration.Clear();
+            }
+
             var colorTargets = ImmutableArray.Create(new GpuColorTargetInfo
             {
                 Texture = _colorTarget,
@@ -1112,24 +1135,30 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         entry.UploadBufferBytes = 0;
 
                         var resizedFormat = MapPixelFormat(image.PixelFormat);
+                        var resizedLevels = ComputeMipLevelCount(w, h, image.Mipmaps);
                         entry.Texture = _device.CreateTexture(new GpuTextureCreateInfo
                         {
                             Type = SDL.GPUTextureType.Texturetype2D,
                             Format = resizedFormat,
-                            Usage = SDL.GPUTextureUsageFlags.Sampler,
+                            Usage = MipmapTextureUsage(image.Mipmaps),
                             Width = (uint)w,
                             Height = (uint)h,
                             LayerCountOrDepth = 1,
-                            NumLevels = 1,
+                            NumLevels = resizedLevels,
                             SampleCount = SDL.GPUSampleCount.SampleCount1,
                         });
                         entry.Width = w;
                         entry.Height = h;
+                        entry.Mipmaps = image.Mipmaps;
+                        entry.NumLevels = resizedLevels;
 
                         var px = image.GetPixels();
                         using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)px.Length);
                         copyPass.UploadToTexture(upload, entry.Texture, (uint)w, (uint)h, px);
                     }
+
+                    if (entry.Mipmaps && entry.NumLevels > 1)
+                        _pendingMipmapGeneration.Add(entry.Texture);
 
                     entry.LastUploadedVersion = image.Version;
                 }
@@ -1139,16 +1168,17 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         var (width, height) = image.Size;
         var format = MapPixelFormat(image.PixelFormat);
+        var numLevels = ComputeMipLevelCount(width, height, image.Mipmaps);
 
         var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
         {
             Type = SDL.GPUTextureType.Texturetype2D,
             Format = format,
-            Usage = SDL.GPUTextureUsageFlags.Sampler,
+            Usage = MipmapTextureUsage(image.Mipmaps),
             Width = (uint)width,
             Height = (uint)height,
             LayerCountOrDepth = 1,
-            NumLevels = 1,
+            NumLevels = numLevels,
             SampleCount = SDL.GPUSampleCount.SampleCount1,
         });
 
@@ -1156,13 +1186,38 @@ internal class GpuRenderer : Renderer3D, IDisposable
         using var firstUpload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
         copyPass.UploadToTexture(firstUpload, gpuTexture, (uint)width, (uint)height, pixels);
 
+        if (image.Mipmaps && numLevels > 1)
+            _pendingMipmapGeneration.Add(gpuTexture);
+
         _textureResources.Add(new TextureCacheEntry(
             new WeakReference<Image>(image), gpuTexture, _frameNumber)
         {
             Width = width,
             Height = height,
             LastUploadedVersion = image.Version,
+            Mipmaps = image.Mipmaps,
+            NumLevels = numLevels,
         });
+    }
+
+    // SDL_GenerateMipmapsForGPUTexture requires the texture to be usable
+    // as both a shader resource and a color render target (the per-level
+    // downsample is implemented as a series of render passes under the
+    // hood), so mipmapped textures need both flags.
+    private static SDL.GPUTextureUsageFlags MipmapTextureUsage(bool mipmaps) =>
+        mipmaps
+            ? SDL.GPUTextureUsageFlags.Sampler | SDL.GPUTextureUsageFlags.ColorTarget
+            : SDL.GPUTextureUsageFlags.Sampler;
+
+    // The full mip chain has floor(log2(max(w, h))) + 1 levels (down to a
+    // single 1x1 pixel). Returns 1 when mipmapping is disabled or when the
+    // image is degenerate, since SDL rejects NumLevels of 0.
+    private static uint ComputeMipLevelCount(int width, int height, bool mipmaps)
+    {
+        if (!mipmaps) return 1;
+        int max = Math.Max(width, height);
+        if (max <= 1) return 1;
+        return (uint)(BitOperations.Log2((uint)max) + 1);
     }
 
     // Acquire a pooled instance-rate vertex buffer + matching upload
@@ -1912,6 +1967,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public int Height { get; set; }
         public GpuUploadBuffer? UploadBuffer { get; set; }
         public int UploadBufferBytes { get; set; }
+
+        // Mirror of the Image.Mipmaps flag at texture creation time.
+        // Stored on the entry so re-uploads (Version bumps with same
+        // dimensions) can re-trigger mipmap generation without having
+        // to look at the Image again.
+        public bool Mipmaps { get; set; }
+        public uint NumLevels { get; set; }
     }
 
     private List<PreparedDrawCommand> PrepareCommands()

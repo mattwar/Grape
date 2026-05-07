@@ -9,15 +9,28 @@ public sealed class Image : IDisposable
     internal nint _imageId;
     private int _version;
 
-    private Image(nint imageId)
+    private Image(nint imageId, bool mipmaps = false)
     {
         _imageId = imageId;
         _application = Application.Current;
         _application.AddResource(this);
         _version = 1;
+        Mipmaps = mipmaps;
     }
 
-    public static Image Create(int width, int height, PixelFormat format)
+    /// <summary>
+    /// When <c>true</c>, hints to renderers that they should produce a
+    /// full mipmap chain for this image's GPU texture and re-generate
+    /// it whenever <see cref="Version"/> bumps. Costs ~33% extra GPU
+    /// memory and a one-time generation step per upload, but eliminates
+    /// shimmering / aliasing when the texture is minified (drawn small
+    /// or at distance) and unlocks anisotropic filtering. Defaults to
+    /// <c>false</c>; set when creating images that will be sampled at
+    /// arbitrary scales.
+    /// </summary>
+    public bool Mipmaps { get; }
+
+    public static Image Create(int width, int height, PixelFormat format, bool mipmaps = false)
     {
         // SDL must be initialised before any SDL.* call. Touching
         // Application.Current starts the app on demand.
@@ -26,7 +39,7 @@ public sealed class Image : IDisposable
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
             throw new InvalidOperationException("Cannot create image");
-        return new Image(imageId);
+        return new Image(imageId, mipmaps);
     }
 
     public bool IsDisposed => _imageId == 0;
@@ -194,14 +207,14 @@ public sealed class Image : IDisposable
     /// <summary>
     /// Loads a bitmap from the specified file path.
     /// </summary>
-    public static Image LoadBitmap(string filePath)
+    public static Image LoadBitmap(string filePath, bool mipmaps = false)
     {
         _ = Application.Current;
 
         var imageId = SDL.LoadBMP(filePath);
         if (imageId == 0)
             throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
-        return new Image(imageId);
+        return new Image(imageId, mipmaps);
     }
 
     /// <summary>
