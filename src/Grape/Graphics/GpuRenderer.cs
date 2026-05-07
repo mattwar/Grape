@@ -1650,6 +1650,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
             MultisampleState = new SDL.GPUMultisampleState
             {
                 SampleCount = sampleCount,
+                // Leave SampleMask + EnableMask at their zero defaults.
+                // EnableMask=0 means "ignore SampleMask and write every
+                // sample" -- the standard rendering behaviour. Setting
+                // EnableMask=1 with SampleMask!=0xFFFFFFFF is for exotic
+                // stippling effects and would silently drop samples.
             },
             TargetInfo = new GpuPipelineTargetInfo
             {
