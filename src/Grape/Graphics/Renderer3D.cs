@@ -85,6 +85,18 @@ public abstract class Renderer3D
     public DepthMode DepthMode { get; set; } = DepthMode.Solid;
 
     /// <summary>
+    /// How the next draw's output color combines with the existing
+    /// pixels in the render target. Defaults to <see cref="BlendMode.Alpha"/>.
+    /// Snapshotted per draw, like <see cref="DepthMode"/>.
+    /// </summary>
+    /// <remarks>
+    /// Translucent modes are order-dependent: draw far things first.
+    /// Pair translucent draws with <see cref="DepthMode.Transparent"/>
+    /// so they don't write depth and occlude things behind them.
+    /// </remarks>
+    public BlendMode BlendMode { get; set; } = BlendMode.Alpha;
+
+    /// <summary>
     /// Which triangles to skip based on facing direction. Defaults to
     /// <see cref="CullMode.None"/> so hand-built or single-sided geometry
     /// just works; switch to <see cref="CullMode.Back"/> for closed solid
@@ -141,7 +153,7 @@ public abstract class Renderer3D
     /// </summary>
     public StateScope PushState()
     {
-        _stateStack.Push(new RendererState(DepthMode, CullMode, Wireframe, Viewport, ClipRect));
+        _stateStack.Push(new RendererState(DepthMode, BlendMode, CullMode, Wireframe, Viewport, ClipRect));
         return new StateScope(this);
     }
 
@@ -149,6 +161,7 @@ public abstract class Renderer3D
     {
         var s = _stateStack.Pop();
         DepthMode = s.DepthMode;
+        BlendMode = s.BlendMode;
         CullMode = s.CullMode;
         Wireframe = s.Wireframe;
         Viewport = s.Viewport;
@@ -224,6 +237,7 @@ public abstract class Renderer3D
     // have to change.
     private readonly record struct RendererState(
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         bool Wireframe,
         Rect? Viewport,

@@ -78,9 +78,9 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.5f, 5f),
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, r) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)r.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -91,19 +91,19 @@ window.Rendering += (w, e) =>
     // Closed solid -> back faces are always hidden by front faces, so
     // culling them costs nothing visually and saves the rasteriser
     // half the triangles.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.CullMode = CullMode.Back;
-        e.DrawMesh(cube, Shaders.PositionColorWithTransform, model * viewProjection);
+        r.CullMode = CullMode.Back;
+        r.DrawMesh(cube, Shaders.PositionColorWithTransform, model * viewProjection);
     }
 
     // Caption sits in front of everything regardless of depth.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.DepthMode = DepthMode.Overlay;
-        e.CullMode = CullMode.None;
+        r.DepthMode = DepthMode.Overlay;
+        r.CullMode = CullMode.None;
 
-        DrawLabel(e, "8 vertices, 36 indices (vs 36 vertices unindexed)",
+        DrawLabel(r, "8 vertices, 36 indices (vs 36 vertices unindexed)",
             yOffset: -1.6f, viewProjection);
     }
 

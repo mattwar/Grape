@@ -86,9 +86,9 @@ void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
     r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 }
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, r) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)r.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
 
     // Each pane is half the window's width. The aspect ratio passed to
@@ -99,16 +99,16 @@ window.Rendering += (w, e) =>
     // PushState() snapshots Viewport (and the rest of the renderer
     // state) so when this scope ends Viewport reverts to its previous
     // value. The next pane sets its own viewport independently.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.Viewport = new Rect(0, 0, paneWidth, height);
-        DrawScene(e, cameraLeft.GetViewProjection(paneAspect), t);
+        r.Viewport = new Rect(0, 0, paneWidth, height);
+        DrawScene(r, cameraLeft.GetViewProjection(paneAspect), t);
     }
 
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.Viewport = new Rect(paneWidth, 0, paneWidth, height);
-        DrawScene(e, cameraRight.GetViewProjection(paneAspect), t);
+        r.Viewport = new Rect(paneWidth, 0, paneWidth, height);
+        DrawScene(r, cameraRight.GetViewProjection(paneAspect), t);
     }
 
     w.Invalidate();

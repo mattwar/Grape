@@ -268,7 +268,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -292,6 +292,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Texture: null,
             Sampler: null,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
@@ -321,7 +322,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -344,6 +345,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             texture,
             Sampler: null,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
@@ -370,7 +372,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -393,6 +395,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             texture,
             sampler,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
@@ -784,6 +787,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         _colorFormat,
                         shader.VertexLayout,
                         command.Command.DepthMode,
+                        command.Command.BlendMode,
                         command.Command.CullMode,
                         command.Command.Topology);
                     renderPass!.BindGraphicsPipeline(pipeline);
@@ -1061,13 +1065,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
+        BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
             _pipelines[key] = pipeline;
         }
 
@@ -1152,12 +1157,57 @@ internal class GpuRenderer : Renderer3D, IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
     };
 
+    // Translate the user-facing BlendMode to the GPU color/alpha
+    // blend factors and op. Alpha channel uses (One, OneMinusSrcAlpha,
+    // Add) for every translucent mode -- this is the standard rule
+    // for accumulating coverage when compositing into a target whose
+    // alpha may itself be sampled later.
+    private static SDL.GPUColorTargetBlendState MapBlendMode(BlendMode blendMode) => blendMode switch
+    {
+        BlendMode.Opaque => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 0,
+        },
+        BlendMode.Alpha => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
+            DstColorBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        BlendMode.Additive => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
+            DstColorBlendfactor = SDL.GPUBlendFactor.One,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        BlendMode.Multiply => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.DstColor,
+            DstColorBlendfactor = SDL.GPUBlendFactor.Zero,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        _ => throw new ArgumentOutOfRangeException(nameof(blendMode), blendMode, null),
+    };
+
     private GpuPipeline CreatePipeline(
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
+        BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
@@ -1188,16 +1238,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         var colorTargets = ImmutableArray.Create(new SDL.GPUColorTargetDescription
         {
             Format = colorFormat,
-            BlendState = new SDL.GPUColorTargetBlendState
-            {
-                EnableBlend = 1,
-                SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
-                DstColorBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
-                ColorBlendOp = SDL.GPUBlendOp.Add,
-                SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
-                DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
-                AlphaBlendOp = SDL.GPUBlendOp.Add,
-            },
+            BlendState = MapBlendMode(blendMode),
         });
 
         // Map the user-facing DepthMode to the two GPU switches it
@@ -1337,6 +1378,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat ColorFormat,
         ShaderVertexLayout Layout,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology);
 
@@ -1346,6 +1388,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology,
         bool Wireframe,
@@ -1367,6 +1410,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology,
         bool Wireframe,
@@ -1374,7 +1418,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Rect? ClipRect,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)

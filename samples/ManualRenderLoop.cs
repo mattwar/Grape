@@ -30,8 +30,8 @@ var window = new Window3D
 
 while (!window.IsClosed && !Keyboard.IsDown(Key.Escape))
 {
-    var frame = window.Renderer;
-    var seconds = (float)frame.ElapsedSinceStart.TotalSeconds;
+    var r = window.Renderer;
+    var seconds = (float)r.ElapsedSinceStart.TotalSeconds;
     var (width, height) = window.Size;
     var aspect = (float)height / width;
     var transform =
@@ -39,8 +39,8 @@ while (!window.IsClosed && !Keyboard.IsDown(Key.Escape))
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    frame.DrawMesh(triangle, transform);
-    frame.Render();
+    r.DrawMesh(triangle, transform);
+    r.Render();
 
     await window.NextFrameAsync();
 }

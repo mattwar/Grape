@@ -78,9 +78,9 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0f, 5f),
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, r) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)r.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -99,32 +99,32 @@ window.Rendering += (w, e) =>
     // everything else. When the right quad's back face is culled, the
     // missing pixels reveal this gradient.
     var modelBackdrop = Matrix4x4.CreateTranslation(0f, 0f, -1f);
-    e.DrawMesh(backdrop, Shaders.PositionColorWithTransform, modelBackdrop * viewProjection);
+    r.DrawMesh(backdrop, Shaders.PositionColorWithTransform, modelBackdrop * viewProjection);
 
     // Left: CullMode.None. Both faces drawn, quad always visible.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.CullMode = CullMode.None;
-        e.DrawMesh(quadLeft, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        r.CullMode = CullMode.None;
+        r.DrawMesh(quadLeft, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right: CullMode.Back. Front face only; the quad disappears when
     // its CCW-wound side rotates away from the camera.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.CullMode = CullMode.Back;
-        e.DrawMesh(quadRight, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        r.CullMode = CullMode.Back;
+        r.DrawMesh(quadRight, Shaders.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels. Debug text uses textured quads, so we draw them as
     // overlays so they aren't culled or occluded by the spinning quads.
-    using (e.PushState())
+    using (r.PushState())
     {
-        e.DepthMode = DepthMode.Overlay;
-        e.CullMode = CullMode.None;
+        r.DepthMode = DepthMode.Overlay;
+        r.CullMode = CullMode.None;
 
-        DrawLabel(e, "CullMode.None", offsetX: -1.5f, viewProjection);
-        DrawLabel(e, "CullMode.Back", offsetX:  1.5f, viewProjection);
+        DrawLabel(r, "CullMode.None", offsetX: -1.5f, viewProjection);
+        DrawLabel(r, "CullMode.Back", offsetX:  1.5f, viewProjection);
     }
 
     w.Invalidate();

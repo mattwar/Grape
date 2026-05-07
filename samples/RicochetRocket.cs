@@ -62,12 +62,12 @@ window.KeyDown += (_, e) =>
     }
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, r) =>
 {
     var updateContext = new UpdateContext
     {
-        ElapsedSinceStart = e.ElapsedSinceStart,
-        ElaspsedSinceLastUpdate = e.ElapsedSinceLastRender,
+        ElapsedSinceStart = r.ElapsedSinceStart,
+        ElaspsedSinceLastUpdate = r.ElapsedSinceLastRender,
         Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height)
     };
 
@@ -109,12 +109,12 @@ window.Rendering += (w, e) =>
         }
     }
 
-    rocket.Draw(e);
+    rocket.Draw(r);
 
-    e.DrawColor = new Color(255, 255, 255);
-    e.DrawDebugText(
+    r.DrawColor = new Color(255, 255, 255);
+    r.DrawDebugText(
         0, 10,
-        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {e.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
+        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {r.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 4f);
 
     w.Invalidate(); // request the next rendering
