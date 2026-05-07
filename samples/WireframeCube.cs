@@ -63,9 +63,9 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.0f, 6.5f),
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -78,10 +78,10 @@ window.Rendering += (w, e) =>
 
     // Left cube: solid. CullMode.Back is safe because the cube is a
     // closed solid -- back faces are always hidden inside.
-    using (e.PushState())
+    using (rd.PushState())
     {
-        e.CullMode = CullMode.Back;
-        e.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        rd.CullMode = CullMode.Back;
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right cube: wireframe. The renderer builds a deduped edge index
@@ -90,19 +90,19 @@ window.Rendering += (w, e) =>
     //
     // CullMode is left at None for wireframe -- there are no faces to
     // cull, just lines, and lines have no facing.
-    using (e.PushState())
+    using (rd.PushState())
     {
-        e.Wireframe = true;
-        e.DrawMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        rd.Wireframe = true;
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels.
-    using (e.PushState())
+    using (rd.PushState())
     {
-        e.DepthMode = DepthMode.Overlay;
+        rd.DepthMode = DepthMode.Overlay;
 
-        DrawLabel(e, "Solid",     offsetX: -1.8f, viewProjection);
-        DrawLabel(e, "Wireframe", offsetX:  1.8f, viewProjection);
+        DrawLabel(rd, "Solid",     offsetX: -1.8f, viewProjection);
+        DrawLabel(rd, "Wireframe", offsetX:  1.8f, viewProjection);
     }
 
     w.Invalidate();

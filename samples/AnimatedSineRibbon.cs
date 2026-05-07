@@ -34,9 +34,9 @@ var window = new Window3D
     CloseKey = Key.Escape
 };
 
-window.Rendering += (w, r) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)r.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
 
     for (int i = 0; i < Segments; i++)
     {
@@ -70,7 +70,7 @@ window.Rendering += (w, r) =>
     var aspect = (float)height / width;
     var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    r.DrawMesh(vertices, transform);
+    rd.DrawMesh(vertices, transform);
 
     w.Invalidate(); // schedule the next render
 };

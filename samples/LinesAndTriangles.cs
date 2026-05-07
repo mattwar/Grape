@@ -75,9 +75,9 @@ var camera = new PerspectiveCamera
     Target = new Vector3(0f, 0.2f, 0f),
 };
 
-window.Rendering += (w, r) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)r.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -97,17 +97,17 @@ window.Rendering += (w, r) =>
     plot.Reset(plotVertices, ReadOnlySpan<uint>.Empty);
 
     // Axes at the world origin.
-    r.DrawMesh(axes, Shaders.PositionColorWithTransform, viewProjection);
+    rd.DrawMesh(axes, Shaders.PositionColorWithTransform, viewProjection);
 
     // Sine plot, lifted slightly so it doesn't sit on the X axis.
     var plotModel = Matrix4x4.CreateTranslation(0f, 0.3f, 0f);
-    r.DrawMesh(plot, Shaders.PositionColorWithTransform, plotModel * viewProjection);
+    rd.DrawMesh(plot, Shaders.PositionColorWithTransform, plotModel * viewProjection);
 
     // Filled triangle, parked above and to the right.
     var triModel =
         Matrix4x4.CreateScale(0.6f) *
         Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
-    r.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
+    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
 
     w.Invalidate();
 };

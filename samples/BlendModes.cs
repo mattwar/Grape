@@ -133,16 +133,16 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0f, 4f),
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
     // Backdrop drawn opaque (default DepthMode.Solid + BlendMode.Alpha
     // is fine here -- the quad's vertices have alpha=255 so it acts
     // opaque and writes depth normally).
-    e.DrawMesh(backdrop, Shaders.PositionColorWithTransform, viewProjection);
+    rd.DrawMesh(backdrop, Shaders.PositionColorWithTransform, viewProjection);
 
     // Four wide thin bands stacked vertically. Bands are well
     // separated by visible gaps so the bare backdrop shows through
@@ -169,15 +169,15 @@ window.Rendering += (w, e) =>
 
         // PushState() so each sample's blend setting is scoped: the
         // Opaque draw doesn't leak into the Alpha draw, etc.
-        using (e.PushState())
+        using (rd.PushState())
         {
-            e.BlendMode = sample.Mode;
+            rd.BlendMode = sample.Mode;
             // Bands and backdrop are coplanar at z=0, so use Overlay
             // to bypass depth testing entirely -- otherwise the bands
             // get discarded on the equal-depth comparison and you only
             // see the gradient backdrop.
-            e.DepthMode = DepthMode.Overlay;
-            e.DrawMesh(sample.Mesh, Shaders.PositionColorWithTransform, transform);
+            rd.DepthMode = DepthMode.Overlay;
+            rd.DrawMesh(sample.Mesh, Shaders.PositionColorWithTransform, transform);
         }
     }
 
@@ -185,12 +185,12 @@ window.Rendering += (w, e) =>
     // regardless of depth and aren't affected by the per-sample blend
     // state. Centered horizontally inside each band so the connection
     // between band and mode is obvious.
-    using (e.PushState())
+    using (rd.PushState())
     {
-        e.DepthMode = DepthMode.Overlay;
-        e.BlendMode = BlendMode.Alpha;
+        rd.DepthMode = DepthMode.Overlay;
+        rd.BlendMode = BlendMode.Alpha;
         foreach (var sample in samples)
-            DrawLabel(e, sample.Label, sample.Y, viewProjection);
+            DrawLabel(rd, sample.Label, sample.Y, viewProjection);
     }
 
     w.Invalidate();

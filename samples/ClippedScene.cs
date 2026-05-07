@@ -53,9 +53,9 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, r) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)r.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -66,10 +66,10 @@ window.Rendering += (w, r) =>
     // so it's obvious where the spinning shape is even when masked away.
     // Technically achieved by drawing in wireframe so no surface fill
     // competes with the clipped solid pass below.
-    using (r.PushState())
+    using (rd.PushState())
     {
-        r.Wireframe = true;
-        r.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.Wireframe = true;
+        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
     }
 
     // The "porthole" slides horizontally across the window. ClipRect is
@@ -80,10 +80,10 @@ window.Rendering += (w, r) =>
     var travel = (width + portholeW) * (0.5f + 0.5f * MathF.Sin(t * 0.6f)) - portholeW;
     var porthole = new Rect(travel, (height - portholeH) / 2f, portholeW, portholeH);
 
-    using (r.PushState())
+    using (rd.PushState())
     {
-        r.ClipRect = porthole;
-        r.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.ClipRect = porthole;
+        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
     }
 
     w.Invalidate();

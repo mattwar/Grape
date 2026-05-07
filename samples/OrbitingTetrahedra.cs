@@ -76,9 +76,9 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, r) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)r.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var viewProjection = camera.GetViewProjection((float)width / height);
 
@@ -95,8 +95,8 @@ window.Rendering += (w, r) =>
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    r.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
-    r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+    rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
+    rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 
     w.Invalidate();
 };
