@@ -54,6 +54,13 @@ public abstract class Renderer3D
     public Color BackgroundColor { get; internal set; }
 
     /// <summary>
+    /// How frames are scheduled against the display's vertical blank.
+    /// Treated as a hint: unsupported modes fall back to the next-best
+    /// supported mode. Defaults to <see cref="SyncMode.WaitForSync"/>.
+    /// </summary>
+    public virtual SyncMode SyncMode { get; set; } = SyncMode.WaitForSync;
+
+    /// <summary>
     /// When true (the default), each frame begins by clearing the render
     /// target to <see cref="BackgroundColor"/>. Set to false for additive
     /// or persistence-of-pixels rendering.

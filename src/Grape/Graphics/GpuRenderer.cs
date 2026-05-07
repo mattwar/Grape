@@ -54,12 +54,63 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     {
         _device = device;
         _window = window;
+        ApplySyncMode(base.SyncMode);
     }
 
     /// <summary>
     /// The <see cref="GpuDevice"/> this renderer draws through.
     /// </summary>
     internal GpuDevice Device => _device;
+
+    /// <inheritdoc/>
+    public override SyncMode SyncMode
+    {
+        get => base.SyncMode;
+        set
+        {
+            base.SyncMode = value;
+            ApplySyncMode(value);
+        }
+    }
+
+    private void ApplySyncMode(SyncMode mode)
+    {
+        // Map the requested mode to the closest supported SDL_GPU
+        // present mode. WaitForSync (FIFO) is always supported, so it's
+        // the universal fallback. Hint -> first supported in priority
+        // order: Latest -> Mailbox, Immediate, VSync; Immediate ->
+        // Immediate, VSync; WaitForSync -> VSync.
+        var preferences = mode switch
+        {
+            SyncMode.Latest => new[] { SDL.GPUPresentMode.Mailbox, SDL.GPUPresentMode.Immediate, SDL.GPUPresentMode.VSync },
+            SyncMode.Immediate => new[] { SDL.GPUPresentMode.Immediate, SDL.GPUPresentMode.VSync },
+            _ => new[] { SDL.GPUPresentMode.VSync },
+        };
+
+        var deviceId = _device.GpuDeviceID;
+        var windowId = _window.WindowId;
+        if (deviceId == 0 || windowId == 0)
+            return;
+
+        SDL.GPUPresentMode chosen = SDL.GPUPresentMode.VSync;
+        foreach (var candidate in preferences)
+        {
+            if (candidate == SDL.GPUPresentMode.VSync ||
+                SDL.WindowSupportsGPUPresentMode(deviceId, windowId, candidate))
+            {
+                chosen = candidate;
+                break;
+            }
+        }
+
+        // Composition stays at SDL's default (SDR); we only adjust the
+        // present mode here.
+        SDL.SetGPUSwapchainParameters(
+            deviceId,
+            windowId,
+            SDL.GPUSwapchainComposition.SDR,
+            chosen);
+    }
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
