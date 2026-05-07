@@ -309,6 +309,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <summary>The color target for the current frame, or null if acquisition failed.</summary>
     private protected GpuTexture? CurrentColorTarget => _colorTarget;
 
+    /// <inheritdoc/>
+    protected override float GetTargetAspectRatio()
+    {
+        // Read the live window size each call so a resize is reflected
+        // immediately. The window is null only in unit-test scenarios;
+        // fall back to the base default in that case.
+        if (_window is null)
+            return base.GetTargetAspectRatio();
+        var (width, height) = _window.Size;
+        return height > 0 ? (float)width / height : base.GetTargetAspectRatio();
+    }
+
     /// <summary>
     /// (Re)allocates the depth texture so its size and sample count match
     /// the current frame's color target. Disposes any previous texture
@@ -403,7 +415,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// stage/slot pairs as described by
     /// <see cref="ShaderSet{TVertex,TArgs}.ArgsLayout"/>.
     /// </summary>
-    public override void DrawMesh<TVertex, TArgs>(
+    public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
@@ -455,7 +467,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Queues a textured mesh for drawing using a shader that takes typed per-draw args.
     /// </summary>
-    public override void DrawMesh<TVertex, TArgs>(
+    public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex, TArgs> shader,
@@ -502,9 +514,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Cubemap variant of <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Image, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// Cubemap variant of <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Image, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
     /// </summary>
-    public override void DrawMesh<TVertex, TArgs>(
+    public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
         ShaderSet<TVertex, TArgs> shader,
@@ -584,7 +596,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <inheritdoc/>
-    public override void DrawMesh<TVertex, TArgs, TInstance>(
+    public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         InstancedShaderSet<TVertex, TArgs, TInstance> shader,
         in TArgs args,
@@ -594,7 +606,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <inheritdoc/>
-    public override void DrawMesh<TVertex, TArgs, TInstance>(
+    public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         Image texture,
         InstancedShaderSet<TVertex, TArgs, TInstance> shader,
@@ -781,12 +793,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
             mesh.Reset(span, ReadOnlySpan<uint>.Empty);
         }
 
+        Transform argsTransform = transform;
         DrawTexturedMeshCore(
             mesh,
             atlas,
             Shaders.PositionTextureWithTransform,
             sampler,
-            in transform);
+            in argsTransform);
     }
 
     private Image GetDebugFontAtlas()

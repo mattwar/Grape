@@ -115,7 +115,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.None;
-        rd.DrawMesh(skyboxMesh, cubemap, Shaders.Skybox,
+        rd.DrawMeshRaw(skyboxMesh, cubemap, Shaders.Skybox,
             camera.GetSkyboxViewProjection(aspect));
     }
 

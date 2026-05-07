@@ -80,9 +80,12 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
+    // Camera lives on the renderer; DrawMesh composes
+    // model * camera.GetViewProjection(rd.AspectRatio) for us, so the
+    // user-side draw call only carries the model matrix.
+    rd.Camera = camera;
+
     var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
 
     var model =
         Matrix4x4.CreateRotationY(t * 0.7f) *
@@ -94,10 +97,14 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, model * viewProjection);
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, model);
     }
 
     // Caption sits in front of everything regardless of depth.
+    // DrawDebugText still takes a raw clip-space transform, so build
+    // the view-projection once for it.
+    var (width, height) = w.Size;
+    var viewProjection = camera.GetViewProjection((float)width / height);
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;

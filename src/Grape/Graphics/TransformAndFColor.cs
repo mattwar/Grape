@@ -12,7 +12,7 @@ namespace Grape;
 /// 8 bits per channel.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct TransformAndFColor
+public struct TransformAndFColor : IRenderArgs<TransformAndFColor>
 {
     /// <summary>4x4 transform matrix.</summary>
     public Matrix4x4 Transform;
@@ -30,4 +30,12 @@ public struct TransformAndFColor
         : this(transform, new Vector4(1f, 1f, 1f, 1f))
     {
     }
+
+    /// <inheritdoc cref="IRenderArgs{TSelf}.GetTransform"/>
+    public static Func<TransformAndFColor, Matrix4x4>? GetTransform { get; } =
+        args => args.Transform;
+
+    /// <inheritdoc cref="IRenderArgs{TSelf}.SetTransform"/>
+    public static Func<TransformAndFColor, Matrix4x4, TransformAndFColor>? SetTransform { get; } =
+        (args, m) => new TransformAndFColor(m, args.FColor);
 }

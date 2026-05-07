@@ -459,7 +459,7 @@ public static class Shaders
     /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
     /// opaque white.
     /// </summary>
-    public static ShaderSet<Vertex3D, Matrix4x4> PositionWithTransform { get; } =
+    public static ShaderSet<Vertex3D, Transform> PositionWithTransform { get; } =
         new(PositionWithTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -483,7 +483,18 @@ public static class Shaders
     /// Draws each vertex at its position with its color, transforming the
     /// position by a per-draw 4x4 model-view-projection matrix.
     /// </summary>
-    public static ShaderSet<ColorVertex3D, Matrix4x4> PositionColorWithTransform { get; } =
+    /// <remarks>
+    /// The args type is <see cref="Transform"/> (a single
+    /// <see cref="Matrix4x4"/> field) rather than a bare
+    /// <see cref="Matrix4x4"/> so this shader works with
+    /// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// ShaderSet{TVertex,TArgs}, in TArgs)"/>: pass a model matrix and
+    /// the renderer composes <see cref="Renderer3D.Camera"/> into it.
+    /// Existing callers passing <c>model * viewProjection</c> continue
+    /// to work via the implicit <see cref="Matrix4x4"/> → <see
+    /// cref="Transform"/> conversion.
+    /// </remarks>
+    public static ShaderSet<ColorVertex3D, Transform> PositionColorWithTransform { get; } =
         new(PositionColorWithTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -499,7 +510,7 @@ public static class Shaders
     /// model-view-projection matrix, sampling the bound texture using the
     /// vertex texture coordinate.
     /// </summary>
-    public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureWithTransform { get; } =
+    public static ShaderSet<TextureVertex3D, Transform> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>

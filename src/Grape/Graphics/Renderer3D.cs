@@ -162,6 +162,33 @@ public abstract class Renderer3D
     public Antialiasing Antialiasing { get; set; } = Antialiasing.None;
 
     /// <summary>
+    /// The camera used to compose view-projection matrices for
+    /// <see cref="DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// ShaderSet{TVertex,TArgs}, in TArgs)"/>. <see langword="null"/>
+    /// (the default) means scene-aware draws skip applying any view-
+    /// projection transform -- the args struct's transform field, if
+    /// any, is sent to the GPU unchanged.
+    /// </summary>
+    public Camera3D? Camera { get; set; }
+
+    /// <summary>
+    /// Aspect ratio (width / height) used when sampling the camera's
+    /// projection in scene-aware draws. Computed from the active
+    /// render target's pixel dimensions; concrete renderers override
+    /// <see cref="GetTargetAspectRatio"/> to supply the real value.
+    /// Falls back to 16:9 when no target dimensions are known yet.
+    /// </summary>
+    public float AspectRatio => GetTargetAspectRatio();
+
+    /// <summary>
+    /// Override in concrete renderers to expose the current render
+    /// target's aspect ratio. Called from
+    /// <see cref="AspectRatio"/> on every read so resize is picked up
+    /// automatically.
+    /// </summary>
+    protected virtual float GetTargetAspectRatio() => 16f / 9f;
+
+    /// <summary>
     /// Saves the current renderer state and returns a scope whose
     /// disposal restores it. Intended for use with a <c>using</c>
     /// statement so callers can change state for a sub-region of drawing
@@ -191,9 +218,15 @@ public abstract class Renderer3D
         where TVertex : unmanaged;
 
     /// <summary>
-    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/> with the given per-draw arguments.
+    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/>
+    /// with the given per-draw arguments. The args struct is forwarded to the
+    /// shader unchanged -- no renderer state (camera, lights, ...) is composed
+    /// into it. This is the escape hatch for shaders whose arg layout doesn't
+    /// fit <see cref="IRenderArgs{TSelf}"/>; prefer
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// when your args struct can opt in.
     /// </summary>
-    public abstract void DrawMesh<TVertex, TArgs>(
+    public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
@@ -207,8 +240,9 @@ public abstract class Renderer3D
         ShaderSet<TVertex> shader)
         where TVertex : unmanaged;
 
-    /// <summary>Queues a textured mesh for drawing using a shader with typed per-draw args.</summary>
-    public abstract void DrawMesh<TVertex, TArgs>(
+    /// <summary>Raw textured draw with no scene composition. See
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.</summary>
+    public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
         ShaderSet<TVertex, TArgs> shader,
@@ -229,16 +263,110 @@ public abstract class Renderer3D
         where TVertex : unmanaged;
 
     /// <summary>
-    /// Cubemap variant of the textured draw overload with typed
-    /// per-draw arguments.
+    /// Raw cubemap draw with no scene composition. See
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// Used by <see cref="Shaders.Skybox"/>, which needs a translation-stripped
+    /// view-projection that the regular camera composition can't supply.
     /// </summary>
-    public abstract void DrawMesh<TVertex, TArgs>(
+    public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
+
+    /// <summary>
+    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/>
+    /// with the given per-draw arguments, composing the renderer's
+    /// <see cref="Camera"/> view-projection (and, in the future, lights,
+    /// ambient, time, ...) into the args struct via
+    /// <see cref="IRenderArgs{TSelf}"/> accessors before forwarding to the
+    /// underlying draw path.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Pass a model matrix (or any args struct holding one); the shader will
+    /// receive <c>model * camera.GetViewProjection(aspect)</c>. When
+    /// <see cref="Camera"/> is <see langword="null"/> the args struct is
+    /// forwarded unchanged.
+    /// </para>
+    /// <para>
+    /// New traits (lights, ambient, etc.) appear as additional accessor pairs
+    /// on <see cref="IRenderArgs{TSelf}"/> with corresponding apply steps in
+    /// this overload. Args structs that don't opt in to a given trait are
+    /// unaffected.
+    /// </para>
+    /// <para>
+    /// For args layouts that <em>can't</em> implement <see cref="IRenderArgs{TSelf}"/>
+    /// (e.g. a bare <see cref="System.Numerics.Matrix4x4"/>), use
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// </para>
+    /// </remarks>
+    public void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        var resolved = ApplyRenderArgs(args);
+        DrawMeshRaw(mesh, shader, in resolved);
+    }
+
+    /// <summary>
+    /// Scene-aware textured draw. See
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// for trait-application behavior.
+    /// </summary>
+    public void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        Image texture,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        var resolved = ApplyRenderArgs(args);
+        DrawMeshRaw(mesh, texture, shader, in resolved);
+    }
+
+    /// <summary>
+    /// Scene-aware cubemap draw. See
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// for trait-application behavior.
+    /// </summary>
+    public void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        Cubemap cubemap,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        var resolved = ApplyRenderArgs(args);
+        DrawMeshRaw(mesh, cubemap, shader, in resolved);
+    }
+
+    // The single point where renderer state is pushed into a special
+    // args struct. New traits land here as additional non-null-accessor
+    // checks; an args struct that doesn't expose a given accessor is
+    // unaffected.
+    private TArgs ApplyRenderArgs<TArgs>(TArgs args)
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        // Camera -> transform field (compose model * view-projection).
+        if (Camera is { } camera
+            && TArgs.GetTransform is { } get
+            && TArgs.SetTransform is { } set)
+        {
+            var model = get(args);
+            var vp = camera.GetViewProjection(AspectRatio);
+            args = set(args, model * vp);
+        }
+
+        return args;
+    }
 
     /// <summary>
     /// Queues a mesh for instanced drawing. The mesh is drawn once per
@@ -248,7 +376,15 @@ public abstract class Renderer3D
     /// only read for the duration of the call -- callers may reuse or
     /// discard the underlying buffer immediately after the call returns.
     /// </summary>
-    public abstract void DrawMesh<TVertex, TArgs, TInstance>(
+    /// <remarks>
+    /// Instanced draws skip scene composition: callers must supply the full
+    /// view-projection in <paramref name="args"/> themselves. The
+    /// <c>Raw</c> suffix flags this -- there is no scene-aware instanced
+    /// overload yet because the per-call args for instanced shaders is
+    /// almost always exactly the camera's view-projection (no model matrix
+    /// to compose with), so the convenience would be small.
+    /// </remarks>
+    public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         InstancedShaderSet<TVertex, TArgs, TInstance> shader,
         in TArgs args,
@@ -262,7 +398,7 @@ public abstract class Renderer3D
     /// semantics; <paramref name="texture"/> is bound to fragment sampler
     /// slot 0 for the whole batch.
     /// </summary>
-    public abstract void DrawMesh<TVertex, TArgs, TInstance>(
+    public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         Image texture,
         InstancedShaderSet<TVertex, TArgs, TInstance> shader,

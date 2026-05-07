@@ -74,7 +74,7 @@ window.Rendering += (w, rd) =>
     // Per-call uniform: identity view-projection -- the per-instance
     // transforms above already place each triangle directly in clip
     // space.
-    rd.DrawMesh(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
+    rd.DrawMeshRaw(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
 
     w.Invalidate(); // schedule the next frame
 };
