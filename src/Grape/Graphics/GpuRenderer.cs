@@ -159,6 +159,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
         // level even on textures that have a mip chain -- mipmaps would
         // generate but never be visible.
         MaxLod = 1000f,
+        // Anisotropic filtering: keeps minified textures sharp at
+        // grazing angles (floors, roads, walls seen edge-on) where
+        // plain trilinear blurs along the elongated axis. Free on
+        // modern GPUs and only spent when the screen-pixel footprint
+        // is actually elongated, so always-on is the right default.
+        EnableAnisotropy = true,
+        MaxAnisotropy = 16f,
     });
 
     /// <summary>
