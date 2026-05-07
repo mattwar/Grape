@@ -268,7 +268,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -295,6 +295,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -319,7 +321,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -345,6 +347,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -366,7 +370,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -392,6 +396,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -756,6 +762,17 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
             using (renderPass)
             {
+                // The render pass starts with viewport/scissor implicitly
+                // covering the whole render target. We track the last
+                // values we explicitly applied so consecutive draws with
+                // the same setting don't emit redundant SDL calls.
+                Rect? lastViewport = null;
+                Rect? lastClipRect = null;
+                bool viewportApplied = false;
+                bool clipApplied = false;
+                var fullW = _depthWidth;
+                var fullH = _depthHeight;
+
                 foreach (var command in prepared)
                 {
                     var shader = command.Command.Shader;
@@ -771,6 +788,38 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         command.Command.Topology);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
+
+                    // Apply viewport/scissor only on transitions: the
+                    // first user-set value and any change after.
+                    // Switching back to "null" (full target) requires
+                    // an explicit reset call once we've ever applied a
+                    // user value -- otherwise SDL keeps the previous.
+                    var v = command.Command.Viewport;
+                    if (!viewportApplied && v is not null)
+                    {
+                        ApplyViewport(renderPass, v.Value, fullW, fullH);
+                        viewportApplied = true;
+                        lastViewport = v;
+                    }
+                    else if (viewportApplied && v != lastViewport)
+                    {
+                        ApplyViewport(renderPass, v ?? new Rect(0, 0, fullW, fullH), fullW, fullH);
+                        lastViewport = v;
+                    }
+
+                    var c = command.Command.ClipRect;
+                    if (!clipApplied && c is not null)
+                    {
+                        ApplyClip(renderPass, c.Value, fullW, fullH);
+                        clipApplied = true;
+                        lastClipRect = c;
+                    }
+                    else if (clipApplied && c != lastClipRect)
+                    {
+                        ApplyClip(renderPass, c ?? new Rect(0, 0, fullW, fullH), fullW, fullH);
+                        lastClipRect = c;
+                    }
+
                     command.Command.PushArgs(renderPass);
                     if (command.Command.Texture is { } image)
                     {
@@ -1025,6 +1074,36 @@ internal class GpuRenderer : Renderer3D, IDisposable
         return pipeline;
     }
 
+    private static void ApplyViewport(GpuRenderPass renderPass, Rect rect, uint targetWidth, uint targetHeight)
+    {
+        // SDL_GPU expects viewport coordinates in pixels of the render
+        // target with (0, 0) at the top-left -- same convention Rect
+        // uses, so no Y flip is needed.
+        renderPass.SetViewport(new SDL.GPUViewport
+        {
+            X = rect.X,
+            Y = rect.Y,
+            W = rect.Width,
+            H = rect.Height,
+            MinDepth = 0f,
+            MaxDepth = 1f,
+        });
+    }
+
+    private static void ApplyClip(GpuRenderPass renderPass, Rect rect, uint targetWidth, uint targetHeight)
+    {
+        // SDL.Rect uses signed-int pixel coordinates; clamp Rect to the
+        // target so we don't pass a scissor that exceeds it (which SDL
+        // treats as an error).
+        var x = (int)Math.Max(0f, rect.X);
+        var y = (int)Math.Max(0f, rect.Y);
+        var w = (int)Math.Min(rect.Width, targetWidth - x);
+        var h = (int)Math.Min(rect.Height, targetHeight - y);
+        if (w < 0) w = 0;
+        if (h < 0) h = 0;
+        renderPass.SetScissor(new SDL.Rect { X = x, Y = y, W = w, H = h });
+    }
+
     private GpuShader GetOrCreateGpuShader(Shader stage)
     {
         if (_stageShaders.TryGetValue(stage, out var existing))
@@ -1269,7 +1348,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         DepthMode DepthMode,
         CullMode CullMode,
         Topology Topology,
-        bool Wireframe)
+        bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -1289,9 +1370,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
         CullMode CullMode,
         Topology Topology,
         bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology, Wireframe)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)

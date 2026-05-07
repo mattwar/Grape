@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Immutable;
 
 namespace Grape;
@@ -21,10 +20,19 @@ public static class Audio
     /// <summary>
     /// Plays the audio data on the default playback device.
     /// </summary>
-    public static Task Play(AudioData data, float volume = 1f)
+    public static void Play(AudioData data, float volume = 1f)
+    {
+        // fire and forget
+        var _ = PlayAsync(data, volume);
+    }
+    
+    /// <summary>
+    /// Plays the audio data on the default playback device.
+    /// </summary>
+    public static Task PlayAsync(AudioData data, float volume = 1f)
     {
         EnsureInit();
-        return AudioPlaybackDevice.Default.Play(data, volume);
+        return AudioPlaybackDevice.Default.PlayAsync(data, volume);
     }
 
     private static ImmutableList<AudioPlaybackDevice>? _playbackDevices;
@@ -212,11 +220,19 @@ public class AudioPlaybackDevice : AudioDevice
     /// <summary>
     /// Plays the audio data on the device.
     /// </summary>
-    public async Task Play(AudioData data, float volume = 1f)
+    public void Play(AudioData data, float volume = 1f)
+    {
+        // fire and forget
+        var _ = PlayAsync(data, volume);
+    }
+
+    /// <summary>
+    /// Plays the audio data on the device.
+    /// </summary>
+    public virtual async Task PlayAsync(AudioData data, float volume = 1f)
     {
         var device = Open();
-        device.Volume = volume;
-        await device.Play(data);
+        await device.PlayAsync(data, volume);
         device.Dispose();
     }
 }
@@ -277,8 +293,10 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     /// <summary>
     /// Play the specified audio data on the device.
     /// </summary>
-    public Task Play(AudioData data)
+    public override Task PlayAsync(AudioData data, float volume = 1f)
     {
+        this.Volume = volume;
+
         var tcs = new TaskCompletionSource();
         var stream = CreateStream(data.Spec, (stream, additionalAmount, totalAmount) =>
         {
