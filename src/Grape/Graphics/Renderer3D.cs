@@ -200,6 +200,38 @@ public abstract class Renderer3D
         where TVertex : unmanaged
         where TArgs : unmanaged;
 
+    /// <summary>
+    /// Queues a mesh for instanced drawing. The mesh is drawn once per
+    /// entry in <paramref name="instances"/>; each instance picks up its
+    /// own per-instance values from the matching slot, and all instances
+    /// share the per-call <paramref name="args"/>. The instance span is
+    /// only read for the duration of the call -- callers may reuse or
+    /// discard the underlying buffer immediately after the call returns.
+    /// </summary>
+    public abstract void DrawMesh<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged
+        where TInstance : unmanaged;
+
+    /// <summary>
+    /// Textured variant of the instanced draw overload. Same per-instance
+    /// semantics; <paramref name="texture"/> is bound to fragment sampler
+    /// slot 0 for the whole batch.
+    /// </summary>
+    public abstract void DrawMesh<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        Image texture,
+        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged
+        where TInstance : unmanaged;
+
     /// <summary>Queues ASCII debug text for drawing at the given world-space transform.</summary>
     public abstract void DrawDebugText(string text, in Matrix4x4 transform);
 

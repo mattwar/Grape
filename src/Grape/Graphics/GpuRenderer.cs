@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
@@ -22,6 +23,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
+
+    // Pool of instance-rate vertex buffers + their staging upload buffers.
+    // Each instanced DrawCommand acquires one for the frame; at frame end
+    // they all return to the pool. Buffers grow monotonically and are
+    // recycled across frames; SDL's Upload uses cycle:true so re-writing
+    // a buffer that may still be in flight is safe.
+    private readonly List<InstanceBuffer> _instanceBufferPool = new();
+    private int _instanceBuffersAcquired;
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private Image? _debugFontAtlas;
@@ -405,6 +414,81 @@ internal class GpuRenderer : Renderer3D, IDisposable
             args));
     }
 
+    /// <inheritdoc/>
+    public override void DrawMesh<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+    {
+        QueueInstanced(mesh, texture: null, shader, args, instances);
+    }
+
+    /// <inheritdoc/>
+    public override void DrawMesh<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        Image texture,
+        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+    {
+        ArgumentNullException.ThrowIfNull(texture);
+        QueueInstanced(mesh, texture, shader, args, instances);
+    }
+
+    private void QueueInstanced<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        Image? texture,
+        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged
+        where TInstance : unmanaged
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+
+        if (instances.IsEmpty)
+            return;
+
+        // Snapshot the instance bytes into a pooled byte[] so the user's
+        // span doesn't have to outlive the call. The array is returned to
+        // ArrayPool at frame end.
+        var bytes = MemoryMarshal.AsBytes(instances);
+        var rented = ArrayPool<byte>.Shared.Rent(bytes.Length);
+        bytes.CopyTo(rented);
+
+        // Per-instance Matrix4x4 attributes are reconstructed in HLSL with
+        // consecutive locations as rows, so the shader sees them in their
+        // native layout. Per-uniform cbuffer matrices, by contrast, are
+        // implicitly transposed by HLSL's column-major cbuffer storage. To
+        // keep the shaders symmetric (`mul(M, v)` everywhere), we transpose
+        // each per-instance matrix here so both paths arrive at the shader
+        // with the same orientation.
+        TransposeInstanceMatrices(rented.AsSpan(0, bytes.Length), shader.InstanceLayout, instances.Length);
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        _commands.Add(new InstancedDrawCommand<TArgs>(
+            mesh,
+            shader,
+            texture,
+            Sampler: null,
+            DepthMode,
+            BlendMode,
+            CullMode,
+            topology,
+            wireframe,
+            Viewport,
+            ClipRect,
+            shader.ArgsLayout,
+            args,
+            shader.InstanceLayout,
+            rented,
+            bytes.Length,
+            instances.Length));
+    }
+
     // Combines the mesh's declared topology with the renderer's
     // current Wireframe flag. When wireframe is on AND the mesh is
     // triangle-based, the effective topology becomes LineList (drawn
@@ -731,6 +815,19 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
                     if (command.Command.Texture is { } image)
                         EnsureTextureUploaded(copyPass!, image);
+
+                    // Per-instance vertex data (slot 1) for instanced
+                    // commands. Acquired from a pool that grows monotonically
+                    // and is recycled across frames; the user's instance
+                    // bytes were already snapshotted into a pooled byte[]
+                    // at queue time.
+                    var instanceBytes = command.Command.InstanceBytes;
+                    if (!instanceBytes.IsEmpty)
+                    {
+                        var instance = AcquireInstanceBuffer(instanceBytes.Length);
+                        copyPass!.Upload(instance.Upload!, instance.Buffer!, instanceBytes);
+                        command.Instance = instance;
+                    }
                 }
             }
 
@@ -786,12 +883,21 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         fsGpu,
                         _colorFormat,
                         shader.VertexLayout,
+                        command.Command.InstanceLayout,
                         command.Command.DepthMode,
                         command.Command.BlendMode,
                         command.Command.CullMode,
                         command.Command.Topology);
                     renderPass!.BindGraphicsPipeline(pipeline);
-                    renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
+                    if (command.Instance is { Buffer: not null } instance)
+                    {
+                        renderPass.BindVertexBuffers(
+                            [command.Resources.VertexBuffer!, instance.Buffer]);
+                    }
+                    else
+                    {
+                        renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
+                    }
 
                     // Apply viewport/scissor only on transitions: the
                     // first user-set value and any change after.
@@ -838,12 +944,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // Wireframe takes precedence over the mesh's native
                     // index/unindexed paths: it always draws indexed,
                     // through the derived edge buffer above.
+                    var instanceCount = (uint)command.Command.InstanceCount;
                     if (command.Command.Wireframe)
                     {
                         renderPass.BindIndexBuffer(
                             command.Resources.WireframeIndexBuffer!,
                             SDL.GPUIndexElementSize.IndexElementSize32Bit);
-                        renderPass.DrawIndexedPrimitives((uint)command.Resources.WireframeIndexCount);
+                        renderPass.DrawIndexedPrimitives(
+                            (uint)command.Resources.WireframeIndexCount,
+                            instanceCount);
                     }
                     else
                     {
@@ -859,11 +968,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
                             renderPass.BindIndexBuffer(
                                 command.Resources.IndexBuffer!,
                                 SDL.GPUIndexElementSize.IndexElementSize32Bit);
-                            renderPass.DrawIndexedPrimitives((uint)indexCount);
+                            renderPass.DrawIndexedPrimitives((uint)indexCount, instanceCount);
                         }
                         else
                         {
-                            renderPass.DrawPrimitives((uint)command.Command.Mesh.VertexCount);
+                            renderPass.DrawPrimitives(
+                                (uint)command.Command.Mesh.VertexCount,
+                                instanceCount);
                         }
                     }
                 }
@@ -876,7 +987,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
             _renderFrame?.Dispose();
             _renderFrame = null;
             _colorTarget = null;
+            // Return any pooled CPU staging buffers (instance bytes) and
+            // mark all acquired GPU instance buffers as free for the next
+            // frame's commands.
+            foreach (var c in _commands)
+                c.Release();
             _commands.Clear();
+            _instanceBuffersAcquired = 0;
             _debugTextVertexIndex = 0;
             _frameNumber++;
             SweepCaches();
@@ -1048,6 +1165,60 @@ internal class GpuRenderer : Renderer3D, IDisposable
         });
     }
 
+    // Acquire a pooled instance-rate vertex buffer + matching upload
+    // buffer of capacity >= bytes. The pool grows monotonically; buffers
+    // marked acquired this frame are not reused again until frame end
+    // resets _instanceBuffersAcquired.
+    private InstanceBuffer AcquireInstanceBuffer(int bytes)
+    {
+        // Try to reuse a slot whose buffer is already big enough.
+        for (int i = _instanceBuffersAcquired; i < _instanceBufferPool.Count; i++)
+        {
+            var candidate = _instanceBufferPool[i];
+            if (candidate.CapacityBytes >= bytes)
+            {
+                if (i != _instanceBuffersAcquired)
+                {
+                    // Move the chosen entry to the front of the unused
+                    // region so subsequent acquires don't keep scanning
+                    // past it.
+                    _instanceBufferPool[i] = _instanceBufferPool[_instanceBuffersAcquired];
+                    _instanceBufferPool[_instanceBuffersAcquired] = candidate;
+                }
+                _instanceBuffersAcquired++;
+                return candidate;
+            }
+        }
+
+        // No big-enough free entry: either grow an existing too-small
+        // one (avoids unbounded slot growth) or add a fresh slot.
+        InstanceBuffer slot;
+        if (_instanceBuffersAcquired < _instanceBufferPool.Count)
+        {
+            slot = _instanceBufferPool[_instanceBuffersAcquired];
+            slot.Buffer?.Dispose();
+            slot.Upload?.Dispose();
+        }
+        else
+        {
+            slot = new InstanceBuffer();
+            _instanceBufferPool.Add(slot);
+        }
+
+        slot.Buffer = _device.CreateVertexBuffer<byte>(
+            (uint)bytes,
+            new GpuVertexBufferLayout
+            {
+                Pitch = 0,
+                Elements = ImmutableArray<GpuShaderVertexElement>.Empty,
+                InputRate = SDL.GPUVertexInputRate.Instance,
+            });
+        slot.Upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)bytes);
+        slot.CapacityBytes = bytes;
+        _instanceBuffersAcquired++;
+        return slot;
+    }
+
     private static SDL.GPUTextureFormat MapPixelFormat(PixelFormat format) => format switch
     {
         // SDL_PIXELFORMAT_ABGR8888 stores bytes in memory as R, G, B, A on
@@ -1064,15 +1235,16 @@ internal class GpuRenderer : Renderer3D, IDisposable
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
+        ShaderVertexLayout? instanceLayout,
         DepthMode depthMode,
         BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology);
             _pipelines[key] = pipeline;
         }
 
@@ -1206,34 +1378,47 @@ internal class GpuRenderer : Renderer3D, IDisposable
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
+        ShaderVertexLayout? instanceLayout,
         DepthMode depthMode,
         BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
-        var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>(layout.Elements.Length);
-        uint offset = 0;
-        for (var i = 0; i < layout.Elements.Length; i++)
-        {
-            var element = layout.Elements[i];
-            var (format, size) = MapShaderVertexElement(element.Kind);
-            attributes.Add(new SDL.GPUVertexAttribute
-            {
-                Location = (uint)i,
-                BufferSlot = 0,
-                Format = format,
-                Offset = offset,
-            });
-            offset += size;
-        }
+        var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>();
+        uint location = 0;
 
-        var bufferDescriptions = ImmutableArray.Create(new SDL.GPUVertexBufferDescription
+        // Slot 0: per-vertex attributes from the mesh's vertex layout.
+        uint vertexPitch = AppendVertexAttributes(attributes, layout, bufferSlot: 0, ref location);
+
+        // Slot 1: per-instance attributes from the shader's instance
+        // layout, when present. Locations continue past the per-vertex
+        // ones, and a Matrix4x4 element expands to four consecutive
+        // float4 attribute locations -- one per matrix row -- because
+        // SDL/Vulkan/HLSL describe a mat4 vertex input that way.
+        uint instancePitch = 0;
+        if (instanceLayout is not null)
+            instancePitch = AppendVertexAttributes(attributes, instanceLayout, bufferSlot: 1, ref location);
+
+        var bufferDescriptionsBuilder = ImmutableArray.CreateBuilder<SDL.GPUVertexBufferDescription>(instanceLayout is null ? 1 : 2);
+        bufferDescriptionsBuilder.Add(new SDL.GPUVertexBufferDescription
         {
             Slot = 0,
-            Pitch = offset,
+            Pitch = vertexPitch,
             InputRate = SDL.GPUVertexInputRate.Vertex,
             InstanceStepRate = 0,
         });
+        if (instanceLayout is not null)
+        {
+            bufferDescriptionsBuilder.Add(new SDL.GPUVertexBufferDescription
+            {
+                Slot = 1,
+                Pitch = instancePitch,
+                InputRate = SDL.GPUVertexInputRate.Instance,
+                InstanceStepRate = 1,
+            });
+        }
+
+        var bufferDescriptions = bufferDescriptionsBuilder.ToImmutable();
 
         var colorTargets = ImmutableArray.Create(new SDL.GPUColorTargetDescription
         {
@@ -1312,8 +1497,99 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ShaderVertexElementKind.Position3 => (SDL.GPUVertexElementFormat.Float3, 12u),
         ShaderVertexElementKind.TextureCoordinate2 => (SDL.GPUVertexElementFormat.Float2, 8u),
         ShaderVertexElementKind.Color4 => (SDL.GPUVertexElementFormat.Ubyte4Norm, 4u),
+        ShaderVertexElementKind.Float4 => (SDL.GPUVertexElementFormat.Float4, 16u),
+        // Matrix4x4 is not single-attribute on the GPU side -- it's handled
+        // by AppendVertexAttributes which expands it to four Float4 rows.
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
+
+    // Appends the GPU vertex attributes for one ShaderVertexLayout to the
+    // attributes builder, advancing the running attribute-location counter
+    // and returning the per-vertex (or per-instance) byte stride. Matrix4x4
+    // expands into four consecutive Float4 attribute locations -- one per
+    // row -- because GPU vertex inputs are at most 16 bytes (vec4) wide.
+    private static uint AppendVertexAttributes(
+        ImmutableArray<SDL.GPUVertexAttribute>.Builder attributes,
+        ShaderVertexLayout layout,
+        uint bufferSlot,
+        ref uint location)
+    {
+        uint offset = 0;
+        foreach (var element in layout.Elements)
+        {
+            if (element.Kind == ShaderVertexElementKind.Matrix4x4)
+            {
+                for (int row = 0; row < 4; row++)
+                {
+                    attributes.Add(new SDL.GPUVertexAttribute
+                    {
+                        Location = location++,
+                        BufferSlot = bufferSlot,
+                        Format = SDL.GPUVertexElementFormat.Float4,
+                        Offset = offset,
+                    });
+                    offset += 16;
+                }
+            }
+            else
+            {
+                var (format, size) = MapShaderVertexElement(element.Kind);
+                attributes.Add(new SDL.GPUVertexAttribute
+                {
+                    Location = location++,
+                    BufferSlot = bufferSlot,
+                    Format = format,
+                    Offset = offset,
+                });
+                offset += size;
+            }
+        }
+        return offset;
+    }
+
+    // Walks the per-instance byte buffer and transposes every Matrix4x4
+    // field in place. See QueueInstanced for why this is needed.
+    private static void TransposeInstanceMatrices(Span<byte> bytes, ShaderVertexLayout layout, int instanceCount)
+    {
+        // Collect matrix offsets within one instance. Most layouts have
+        // exactly one matrix, so a tiny stack-allocated list is plenty.
+        Span<int> matrixOffsets = stackalloc int[layout.Elements.Length];
+        int matrixCount = 0;
+        int instanceStride = 0;
+        foreach (var element in layout.Elements)
+        {
+            if (element.Kind == ShaderVertexElementKind.Matrix4x4)
+            {
+                matrixOffsets[matrixCount++] = instanceStride;
+                instanceStride += 64;
+            }
+            else
+            {
+                instanceStride += element.Kind switch
+                {
+                    ShaderVertexElementKind.Position3          => 12,
+                    ShaderVertexElementKind.TextureCoordinate2 => 8,
+                    ShaderVertexElementKind.Color4             => 4,
+                    ShaderVertexElementKind.Float4             => 16,
+                    _ => throw new ArgumentOutOfRangeException(nameof(layout)),
+                };
+            }
+        }
+
+        if (matrixCount == 0)
+            return;
+
+        for (int i = 0; i < instanceCount; i++)
+        {
+            int instanceBase = i * instanceStride;
+            for (int m = 0; m < matrixCount; m++)
+            {
+                ref var matrix = ref MemoryMarshal.AsRef<Matrix4x4>(
+                    bytes.Slice(instanceBase + matrixOffsets[m], 64));
+                matrix = Matrix4x4.Transpose(matrix);
+            }
+        }
+    }
 
     /// <summary>
     /// Builds a deduped LineList index buffer enumerating every unique
@@ -1377,6 +1653,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         GpuShader FragmentShader,
         SDL.GPUTextureFormat ColorFormat,
         ShaderVertexLayout Layout,
+        ShaderVertexLayout? InstanceLayout,
         DepthMode DepthMode,
         BlendMode BlendMode,
         CullMode CullMode,
@@ -1402,6 +1679,33 @@ internal class GpuRenderer : Renderer3D, IDisposable
         /// the slots described by its <see cref="ShaderArgsLayout"/>.
         /// </summary>
         public virtual void PushArgs(GpuRenderPass renderPass) { }
+
+        /// <summary>
+        /// Per-instance vertex layout (slot 1) when this is an instanced
+        /// draw, otherwise <see langword="null"/>. Drives the pipeline
+        /// cache key and the second vertex-buffer bind in the render
+        /// loop.
+        /// </summary>
+        public virtual ShaderVertexLayout? InstanceLayout => null;
+
+        /// <summary>
+        /// Number of instances to draw. Always 1 for non-instanced
+        /// commands; the per-instance count for instanced ones.
+        /// </summary>
+        public virtual int InstanceCount => 1;
+
+        /// <summary>
+        /// Raw bytes of the per-instance buffer for instanced commands.
+        /// Empty for non-instanced. The renderer copies these into a
+        /// pooled GPU instance-rate vertex buffer for the frame.
+        /// </summary>
+        public virtual ReadOnlySpan<byte> InstanceBytes => ReadOnlySpan<byte>.Empty;
+
+        /// <summary>
+        /// Returns any pooled CPU buffers held by this command. Called
+        /// at frame end after the GPU work has been recorded.
+        /// </summary>
+        public virtual void Release() { }
     }
 
     private sealed record DrawCommand<TArgs>(
@@ -1453,9 +1757,99 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    private sealed record PreparedDrawCommand(
-        DrawCommand Command,
-        MeshResources Resources);
+    // Instanced draw. Owns a pooled byte[] holding the user's instance
+    // span, copied at queue time so the user's storage doesn't have to
+    // outlive the call. The render loop uploads InstanceBytes into a
+    // pooled GPU instance-rate vertex buffer and binds it on slot 1.
+    private sealed record InstancedDrawCommand<TArgs>(
+        Mesh Mesh,
+        ShaderSet Shader,
+        Image? Texture,
+        GpuSampler? Sampler,
+        DepthMode DepthMode,
+        BlendMode BlendMode,
+        CullMode CullMode,
+        Topology Topology,
+        bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect,
+        ShaderArgsLayout ArgsLayoutValue,
+        TArgs Args,
+        ShaderVertexLayout InstanceLayoutValue,
+        byte[] InstanceBytesArray,
+        int InstanceBytesLength,
+        int InstanceCountValue)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+        where TArgs : unmanaged
+    {
+        public override ShaderVertexLayout? InstanceLayout => InstanceLayoutValue;
+        public override int InstanceCount => InstanceCountValue;
+        public override ReadOnlySpan<byte> InstanceBytes =>
+            InstanceBytesArray.AsSpan(0, InstanceBytesLength);
+
+        public override void PushArgs(GpuRenderPass renderPass)
+        {
+            var value = Args;
+            var bytes = MemoryMarshal.AsBytes(
+                MemoryMarshal.CreateReadOnlySpan(ref value, 1));
+            int offset = 0;
+            foreach (var element in ArgsLayoutValue.Elements)
+            {
+                var slice = bytes.Slice(offset, element.Size);
+                switch (element.Stage)
+                {
+                    case ShaderArgStage.Vertex:
+                        renderPass.PushVertexUniformData((uint)element.Slot, slice);
+                        break;
+                    case ShaderArgStage.Fragment:
+                        renderPass.PushFragmentUniformData((uint)element.Slot, slice);
+                        break;
+                }
+                offset += element.Size;
+            }
+        }
+
+        public override void Release()
+        {
+            ArrayPool<byte>.Shared.Return(InstanceBytesArray);
+        }
+    }
+
+    // Pooled GPU instance buffer. Lives as long as the renderer; SDL
+    // upload uses cycle:true so re-writing the same buffer in a later
+    // frame is safe even if the previous frame is still in flight.
+    private sealed class InstanceBuffer : IDisposable
+    {
+        public GpuVertexBuffer? Buffer;
+        public GpuUploadBuffer? Upload;
+        public int CapacityBytes;
+
+        public void Dispose()
+        {
+            Buffer?.Dispose();
+            Upload?.Dispose();
+            Buffer = null;
+            Upload = null;
+            CapacityBytes = 0;
+        }
+    }
+
+    private sealed class PreparedDrawCommand
+    {
+        public PreparedDrawCommand(DrawCommand command, MeshResources resources)
+        {
+            Command = command;
+            Resources = resources;
+        }
+
+        public DrawCommand Command { get; }
+        public MeshResources Resources { get; }
+
+        // Set in the copy pass for instanced commands; null otherwise.
+        // Holds the pooled GPU instance-rate vertex buffer the upload
+        // was staged into and that the render pass binds on slot 1.
+        public InstanceBuffer? Instance { get; set; }
+    }
 
     private sealed class MeshResources
     {

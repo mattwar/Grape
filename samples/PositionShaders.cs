@@ -66,10 +66,10 @@ window.Rendering += (w, rd) =>
 
     // Bottom-left: Shaders.PositionWithTransformAndColor with red.
     var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
-    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
+    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColor
     {
-        Mvp = bottomLeft,
-        Color = new Vector4(1f, 0.2f, 0.2f, 1f),
+        Transform = bottomLeft,
+        FColor = new Vector4(1f, 0.2f, 0.2f, 1f),
     });
 
     // Bottom-right: Shaders.PositionWithTransformAndColor with hue-cycling color
@@ -78,10 +78,10 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateRotationZ(-seconds) * fit *
         Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
 
-    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
+    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColor
     {
-        Mvp = bottomRight,
-        Color = HueToRgb(seconds * 0.25f),
+        Transform = bottomRight,
+        FColor = HueToRgb(seconds * 0.25f),
     });
 
     w.Invalidate(); // schedule the next frame

@@ -2,7 +2,7 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/TriangleSwarm.cs
+//     dotnet run samples/TriangleSwarmInstanced.cs
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
@@ -11,10 +11,11 @@
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 //
-// Draws 24 copies of one triangle by issuing 24 separate DrawMesh
-// calls -- one per triangle -- each with its own transform. Compare
-// with TriangleSwarmInstanced.cs, which renders the same scene as a
-// single instanced DrawMesh call.
+// Instanced version of TriangleSwarm: 24 copies of one triangle drawn
+// in a single DrawMesh call. Each instance contributes its own
+// per-instance transform; the per-call uniform supplies the camera VP
+// that is shared across the batch. Compare with TriangleSwarm.cs, which
+// renders the same scene as 24 separate DrawMesh calls.
 
 using System.Collections.Immutable;
 using System.Numerics;
@@ -22,16 +23,20 @@ using Grape;
 
 const int Count = 24;
 
-// One small triangle in model space, shared by every draw.
+// One small triangle in model space, shared by every instance.
 var triangle = ImmutableArray.Create(
     new ColorVertex3D(new Vertex3D( 0.0f,   0.12f, 0f), new Color(255,   0,   0)),
     new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
     new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
 var mesh = Mesh.Create(triangle.AsSpan());
 
+// Reusable instance buffer -- updated in place each frame to avoid
+// allocating a fresh array.
+var instances = new TransformAndColor[Count];
+
 var window = new Window3D
 {
-    Title = "Triangle Swarm",
+    Title = "Triangle Swarm (Instanced)",
     BackgroundColor = new Color(8, 0, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
@@ -62,15 +67,18 @@ window.Rendering += (w, rd) =>
             Matrix4x4.CreateTranslation(cx, cy, 0f) *
             aspectScale;
 
-        // One DrawMesh call per triangle. Renderer3D + GpuRenderer have
-        // to allocate a draw command, look up the pipeline state, and
-        // walk the per-draw bookkeeping for every iteration of this
-        // loop -- contrast with the single submission used by the
-        // instanced version.
-        rd.DrawMesh(mesh, Shaders.PositionColorWithTransform, transform);
+        // White tint -- pass the mesh's baked vertex colors through unchanged.
+        instances[i] = new TransformAndColor(transform, Color.White);
     }
+
+    // Per-call uniform: identity view-projection -- the per-instance
+    // transforms above already place each triangle directly in clip
+    // space.
+    rd.DrawMesh(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
 
     w.Invalidate(); // schedule the next frame
 };
 
 await window.WaitForCloseAsync();
+
+

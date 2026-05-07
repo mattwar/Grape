@@ -25,5 +25,17 @@ public enum ShaderVertexElementKind
 {
     Position3,
     TextureCoordinate2,
-    Color4
+    Color4,
+    /// <summary>
+    /// Four-component float vector (16 bytes). Useful as a per-instance
+    /// floating-point color or an RGBA value that must preserve full
+    /// float precision (HDR, accumulators).
+    /// </summary>
+    Float4,
+    /// <summary>
+    /// 4x4 float matrix (64 bytes). Consumes four consecutive shader
+    /// attribute locations on the GPU side, one per row. Typical use is
+    /// a per-instance world transform on an instance-rate vertex slot.
+    /// </summary>
+    Matrix4x4,
 }

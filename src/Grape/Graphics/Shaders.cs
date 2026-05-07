@@ -199,6 +199,120 @@ public static class Shaders
         }
         """;
 
+    // ---- Instanced shaders. Per-vertex inputs take the same TEXCOORDn
+    // slots as the non-instanced variants. Per-instance inputs follow on
+    // higher slots: a float4x4 transform consumes four consecutive
+    // semantic indices (one per row), then the float4 tint. The per-call
+    // uniform is the camera view-projection matrix; each instance's final
+    // clip-space position is VP * InstanceTransform * vertexPosition.
+
+    private const string PositionInstancedVertHlsl = """
+        cbuffer UBO : register(b0, space1)
+        {
+            float4x4 ViewProjection : packoffset(c0);
+        };
+
+        struct Input
+        {
+            float3 Position          : TEXCOORD0;
+            float4x4 InstanceTransform : TEXCOORD1;
+            float4 InstanceTint      : TEXCOORD5;
+        };
+
+        struct Output
+        {
+            float4 Color    : TEXCOORD0;
+            float4 Position : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.Color    = input.InstanceTint;
+            output.Position = mul(ViewProjection, mul(input.InstanceTransform, float4(input.Position, 1.0f)));
+            return output;
+        }
+        """;
+
+    private const string PositionColorInstancedVertHlsl = """
+        cbuffer UBO : register(b0, space1)
+        {
+            float4x4 ViewProjection : packoffset(c0);
+        };
+
+        struct Input
+        {
+            float3 Position          : TEXCOORD0;
+            float4 Color             : TEXCOORD1;
+            float4x4 InstanceTransform : TEXCOORD2;
+            float4 InstanceTint      : TEXCOORD6;
+        };
+
+        struct Output
+        {
+            float4 Color    : TEXCOORD0;
+            float4 Position : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.Color    = input.Color * input.InstanceTint;
+            output.Position = mul(ViewProjection, mul(input.InstanceTransform, float4(input.Position, 1.0f)));
+            return output;
+        }
+        """;
+
+    private const string PositionTextureInstancedVertHlsl = """
+        cbuffer UBO : register(b0, space1)
+        {
+            float4x4 ViewProjection : packoffset(c0);
+        };
+
+        struct Input
+        {
+            float3 Position          : TEXCOORD0;
+            float2 TexCoord          : TEXCOORD1;
+            float4x4 InstanceTransform : TEXCOORD2;
+            float4 InstanceTint      : TEXCOORD6;
+        };
+
+        struct Output
+        {
+            float2 TexCoord : TEXCOORD0;
+            float4 Tint     : TEXCOORD1;
+            float4 Position : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            output.TexCoord = input.TexCoord;
+            output.Tint     = input.InstanceTint;
+            output.Position = mul(ViewProjection, mul(input.InstanceTransform, float4(input.Position, 1.0f)));
+            return output;
+        }
+        """;
+
+    // Pairs with PositionTextureInstancedVertHlsl: samples the texture
+    // and multiplies by the per-instance tint piped through from the
+    // vertex stage.
+    private const string PositionTextureTintedFragHlsl = """
+        Texture2D<float4> Texture : register(t0, space2);
+        SamplerState      Sampler : register(s0, space2);
+
+        struct Input
+        {
+            float2 TexCoord : TEXCOORD0;
+            float4 Tint     : TEXCOORD1;
+        };
+
+        float4 main(Input input) : SV_Target0
+        {
+            return Texture.Sample(Sampler, input.TexCoord) * input.Tint;
+        }
+        """;
+
     // ---- Per-stage Shader instances. Several sets share a fragment stage
     // (e.g. SolidColor is used by both PositionColor variants), so we cache
     // each stage shader as a singleton to keep GPU upload bookkeeping
@@ -234,6 +348,18 @@ public static class Shaders
     private static readonly Shader WhiteFrag =
         new(ShaderKind.Fragment, WhiteFragHlsl);
 
+    private static readonly Shader PositionInstancedVert =
+        new(ShaderKind.Vertex, PositionInstancedVertHlsl);
+
+    private static readonly Shader PositionColorInstancedVert =
+        new(ShaderKind.Vertex, PositionColorInstancedVertHlsl);
+
+    private static readonly Shader PositionTextureInstancedVert =
+        new(ShaderKind.Vertex, PositionTextureInstancedVertHlsl);
+
+    private static readonly Shader PositionTextureTintedFrag =
+        new(ShaderKind.Fragment, PositionTextureTintedFragHlsl);
+
     /// <summary>
     /// A single-element <see cref="ShaderArgsLayout"/> describing a 4x4
     /// matrix at vertex slot 0 -- the convention shared by every built-in
@@ -245,7 +371,7 @@ public static class Shaders
     /// <summary>
     /// Two-element layout: a vertex-stage 4x4 transform at slot 0 plus a
     /// fragment-stage <c>float4</c> color at slot 0. Pairs with
-    /// <see cref="TransformAndColorArgs"/>.
+    /// <see cref="TransformAndFColor"/>.
     /// </summary>
     private static readonly ShaderArgsLayout TransformAndColorLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex,   0, ShaderArgKind.Matrix4x4),
@@ -268,9 +394,9 @@ public static class Shaders
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix, with a
     /// per-draw fragment color. Pair with
-    /// <see cref="TransformAndColorArgs"/>.
+    /// <see cref="TransformAndFColor"/>.
     /// </summary>
-    public static ShaderSet<Vertex3D, TransformAndColorArgs> PositionWithTransformAndColor { get; } =
+    public static ShaderSet<Vertex3D, TransformAndFColor> PositionWithTransformAndColor { get; } =
         new(PositionWithTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
 
     /// <summary>
@@ -304,4 +430,46 @@ public static class Shaders
     /// </summary>
     public static ShaderSet<TextureVertex3D, Matrix4x4> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+
+    /// <summary>
+    /// The per-instance vertex layout used by every built-in
+    /// <c>*Instanced</c> shader: a 4x4 transform followed by an 8-bit
+    /// RGBA color. Pairs with <see cref="TransformAndColor"/>.
+    /// </summary>
+    private static readonly ShaderVertexLayout TransformAndColorVertexLayout = new(
+        ShaderVertexElementKind.Matrix4x4,
+        ShaderVertexElementKind.Color4);
+
+    /// <summary>
+    /// Instanced variant of <see cref="PositionWithTransform"/>: draws the
+    /// mesh once per <see cref="TransformAndColor"/> in the supplied span.
+    /// The per-call uniform is the camera view-projection matrix; each
+    /// instance contributes its own world transform and color.
+    /// </summary>
+    public static InstancedShaderSet<Vertex3D, Matrix4x4, TransformAndColor> PositionInstanced { get; } =
+        new(PositionInstancedVert, SolidColorFrag,
+            Vertex3D.ShaderVertexLayout,
+            TransformAndColorVertexLayout,
+            TransformLayout);
+
+    /// <summary>
+    /// Instanced variant of <see cref="PositionColorWithTransform"/>: the
+    /// per-vertex color is multiplied by the per-instance color, so a
+    /// white-color instance shows the mesh's baked colors unchanged.
+    /// </summary>
+    public static InstancedShaderSet<ColorVertex3D, Matrix4x4, TransformAndColor> PositionColorInstanced { get; } =
+        new(PositionColorInstancedVert, SolidColorFrag,
+            ColorVertex3D.ShaderVertexLayout,
+            TransformAndColorVertexLayout,
+            TransformLayout);
+
+    /// <summary>
+    /// Instanced variant of <see cref="PositionTextureWithTransform"/>:
+    /// the texture sample is multiplied by the per-instance color.
+    /// </summary>
+    public static InstancedShaderSet<TextureVertex3D, Matrix4x4, TransformAndColor> PositionTextureInstanced { get; } =
+        new(PositionTextureInstancedVert, PositionTextureTintedFrag,
+            TextureVertex3D.ShaderVertexLayout,
+            TransformAndColorVertexLayout,
+            TransformLayout);
 }
