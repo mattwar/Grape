@@ -176,7 +176,16 @@ public class Application : IDisposable
                 application = new Application();
                 application.Run(() => tcs.SetResult(application));
                 application.Dispose();
-            });
+            })
+            {
+                // Background so a headless caller (e.g. Image.Render3D
+                // with no window ever opened) doesn't keep the process
+                // alive after the main thread exits. Windowed apps still
+                // shut down cleanly via _quitRequested when the last
+                // window closes; this only changes the no-window case.
+                IsBackground = true,
+                Name = "Grape.Application",
+            };
             appThread.Start();
             application = tcs.Task.Result;
         }

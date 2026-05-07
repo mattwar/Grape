@@ -11,11 +11,15 @@
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 //
-// Asset paths below are resolved relative to the current working directory,
-// so run this file from the repository root.
+// Asset paths below resolve relative to this source file, so the
+// sample works regardless of the shell's current directory.
 
+using System.Runtime.CompilerServices;
 using Grape;
 using Grape.Jelly;
+
+static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
+    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
 
 var window = new Window2D
 {
@@ -25,11 +29,11 @@ var window = new Window2D
     CloseKey = Key.Escape,
 };
 
-var icon = Image.LoadImage("grape.bmp");
+var icon = Image.LoadImage(SampleAsset("grape.bmp"));
 icon.SetAlpha(0, icon.GetPixel(0, 0));
 window.Icon = icon;
 
-var rocketImage = Image.LoadImage("rocket.png");
+var rocketImage = Image.LoadImage(SampleAsset("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f)
 {
@@ -37,7 +41,7 @@ var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height /
     Heading = 45f,
 };
 
-var sound = AudioData.LoadWAV("szwoopy.wav");
+var sound = AudioData.LoadWAV(SampleAsset("szwoopy.wav"));
 
 window.KeyDown += (_, e) =>
 {
