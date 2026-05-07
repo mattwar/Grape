@@ -20,7 +20,7 @@ public static class Audio
     /// <summary>
     /// Plays the audio data on the default playback device.
     /// </summary>
-    public static void Play(AudioData data, float volume = 1f)
+    public static void Play(Sound data, float volume = 1f)
     {
         // fire and forget
         var _ = PlayAsync(data, volume);
@@ -29,7 +29,7 @@ public static class Audio
     /// <summary>
     /// Plays the audio data on the default playback device.
     /// </summary>
-    public static Task PlayAsync(AudioData data, float volume = 1f)
+    public static Task PlayAsync(Sound data, float volume = 1f)
     {
         EnsureInit();
         return AudioPlaybackDevice.Default.PlayAsync(data, volume);
@@ -220,7 +220,7 @@ public class AudioPlaybackDevice : AudioDevice
     /// <summary>
     /// Plays the audio data on the device.
     /// </summary>
-    public void Play(AudioData data, float volume = 1f)
+    public void Play(Sound data, float volume = 1f)
     {
         // fire and forget
         var _ = PlayAsync(data, volume);
@@ -229,7 +229,7 @@ public class AudioPlaybackDevice : AudioDevice
     /// <summary>
     /// Plays the audio data on the device.
     /// </summary>
-    public virtual async Task PlayAsync(AudioData data, float volume = 1f)
+    public virtual async Task PlayAsync(Sound data, float volume = 1f)
     {
         var device = Open();
         await device.PlayAsync(data, volume);
@@ -293,7 +293,7 @@ public class LogicalPlaybackDevice : AudioPlaybackDevice
     /// <summary>
     /// Play the specified audio data on the device.
     /// </summary>
-    public override Task PlayAsync(AudioData data, float volume = 1f)
+    public override Task PlayAsync(Sound data, float volume = 1f)
     {
         this.Volume = volume;
 
@@ -472,7 +472,7 @@ public class AudioStream : IDisposable
     /// <summary>
     /// Queues audio data to be played on the stream.
     /// </summary>
-    public void Queue(AudioData data)
+    public void Queue(Sound data)
     {
         unsafe
         {
@@ -485,37 +485,3 @@ public class AudioStream : IDisposable
     }
 }
 
-/// <summary>
-/// Represents audio data, including its specification and raw audio bytes.
-/// </summary>
-public sealed class AudioData
-{
-    public AudioSpec Spec { get; }
-    public ReadOnlyMemory<byte> Data { get; }
-
-    public AudioData(AudioSpec spec, ReadOnlyMemory<byte> data)
-    {
-        this.Spec = spec;
-        this.Data = data;
-    }
-
-    /// <summary>
-    /// Loads the WAV file from the specified path.
-    /// </summary>
-    public static AudioData LoadWAV(string path)
-    {
-        if (!SDL.LoadWAV(path, out var spec, out var audioBuffer, out var audioLength))
-            throw new InvalidOperationException($"SDL_LoadWAV Error: {SDL.GetError()}");
-        unsafe
-        {
-            byte* sourceBytesPtr = (byte*)audioBuffer;
-            var bytes = new byte[audioLength];
-            fixed (byte* targetBytePtr = bytes)
-            {
-                Buffer.MemoryCopy(sourceBytesPtr, targetBytePtr, audioLength, audioLength);
-            }
-            var data = new ReadOnlyMemory<byte>(bytes);
-            return new AudioData(AudioSpec.From(spec), data);
-        }
-    }
-}

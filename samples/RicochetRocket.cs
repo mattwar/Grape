@@ -41,7 +41,7 @@ var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height /
     Heading = 45f,
 };
 
-var sound = AudioData.LoadWAV(SampleAsset("szwoopy.wav"));
+var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
 
 window.KeyDown += (_, e) =>
 {
