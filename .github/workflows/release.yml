@@ -9,10 +9,19 @@ on:
         description: "Version to pack (e.g. 1.2.3 or 1.2.3-preview.1). If omitted on a release, the tag name is used."
         required: false
 
+env:
+  # Opt JavaScript-based actions into Node 24 ahead of the June 2026 default
+  # switch (see https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   pack:
     name: Pack & Publish
     runs-on: windows-latest
+    # Required so softprops/action-gh-release can attach assets to the
+    # GitHub Release (otherwise: "Resource not accessible by integration").
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
