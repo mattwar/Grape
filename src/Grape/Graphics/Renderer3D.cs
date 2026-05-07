@@ -54,6 +54,13 @@ public abstract class Renderer3D
     public Color BackgroundColor { get; internal set; }
 
     /// <summary>
+    /// How frames are scheduled against the display's vertical blank.
+    /// Treated as a hint: unsupported modes fall back to the next-best
+    /// supported mode. Defaults to <see cref="SyncMode.WaitForSync"/>.
+    /// </summary>
+    public virtual SyncMode SyncMode { get; set; } = SyncMode.WaitForSync;
+
+    /// <summary>
     /// When true (the default), each frame begins by clearing the render
     /// target to <see cref="BackgroundColor"/>. Set to false for additive
     /// or persistence-of-pixels rendering.
@@ -78,6 +85,18 @@ public abstract class Renderer3D
     public DepthMode DepthMode { get; set; } = DepthMode.Solid;
 
     /// <summary>
+    /// How the next draw's output color combines with the existing
+    /// pixels in the render target. Defaults to <see cref="BlendMode.Alpha"/>.
+    /// Snapshotted per draw, like <see cref="DepthMode"/>.
+    /// </summary>
+    /// <remarks>
+    /// Translucent modes are order-dependent: draw far things first.
+    /// Pair translucent draws with <see cref="DepthMode.Transparent"/>
+    /// so they don't write depth and occlude things behind them.
+    /// </remarks>
+    public BlendMode BlendMode { get; set; } = BlendMode.Alpha;
+
+    /// <summary>
     /// Which triangles to skip based on facing direction. Defaults to
     /// <see cref="CullMode.None"/> so hand-built or single-sided geometry
     /// just works; switch to <see cref="CullMode.Back"/> for closed solid
@@ -96,6 +115,37 @@ public abstract class Renderer3D
     public bool Wireframe { get; set; } = false;
 
     /// <summary>
+    /// Rectangle of the render target the scene is mapped into. The
+    /// vertex shader's clip-space output is scaled to fit this region.
+    /// Coordinates are in pixels of the render target, with (0, 0) at
+    /// the top-left. <see langword="null"/> (the default) means the
+    /// full render target.
+    /// </summary>
+    /// <remarks>
+    /// A half-width viewport squishes the entire scene horizontally
+    /// into half the screen -- this is the property to use for
+    /// split-screen, picture-in-picture, or rendering a scene into a
+    /// HUD panel. To restrict <em>which pixels</em> can be touched
+    /// without scaling the scene, use <see cref="ClipRect"/> instead.
+    /// Snapshotted per draw, like <see cref="DepthMode"/>.
+    /// </remarks>
+    public Rect? Viewport { get; set; } = null;
+
+    /// <summary>
+    /// Rectangle outside which fragment writes are discarded. Unlike
+    /// <see cref="Viewport"/>, this does not scale the scene -- it just
+    /// masks pixels. Coordinates are in pixels of the render target,
+    /// with (0, 0) at the top-left. <see langword="null"/> (the
+    /// default) means the full render target.
+    /// </summary>
+    /// <remarks>
+    /// Maps to GPU scissor under the hood. Use this to clip to a UI
+    /// panel, mask a sub-region, or skip fragments you know will be
+    /// hidden. Snapshotted per draw, like <see cref="DepthMode"/>.
+    /// </remarks>
+    public Rect? ClipRect { get; set; } = null;
+
+    /// <summary>
     /// Saves the current renderer state and returns a scope whose
     /// disposal restores it. Intended for use with a <c>using</c>
     /// statement so callers can change state for a sub-region of drawing
@@ -103,7 +153,7 @@ public abstract class Renderer3D
     /// </summary>
     public StateScope PushState()
     {
-        _stateStack.Push(new RendererState(DepthMode, CullMode, Wireframe));
+        _stateStack.Push(new RendererState(DepthMode, BlendMode, CullMode, Wireframe, Viewport, ClipRect));
         return new StateScope(this);
     }
 
@@ -111,8 +161,11 @@ public abstract class Renderer3D
     {
         var s = _stateStack.Pop();
         DepthMode = s.DepthMode;
+        BlendMode = s.BlendMode;
         CullMode = s.CullMode;
         Wireframe = s.Wireframe;
+        Viewport = s.Viewport;
+        ClipRect = s.ClipRect;
     }
 
     /// <summary>
@@ -182,7 +235,13 @@ public abstract class Renderer3D
     // and restore. Add a field here whenever a new mutable knob is added
     // to Renderer3D so existing callers that already use PushState don't
     // have to change.
-    private readonly record struct RendererState(DepthMode DepthMode, CullMode CullMode, bool Wireframe);
+    private readonly record struct RendererState(
+        DepthMode DepthMode,
+        BlendMode BlendMode,
+        CullMode CullMode,
+        bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect);
 
     /// <summary>
     /// A disposable scope returned from <see cref="PushState"/>. Disposing

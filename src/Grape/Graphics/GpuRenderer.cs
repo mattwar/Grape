@@ -7,7 +7,7 @@ namespace Grape;
 /// <summary>
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
-internal sealed class GpuRenderer : Renderer3D, IDisposable
+internal class GpuRenderer : Renderer3D, IDisposable
 {
     /// <summary>
     /// Number of frames a cached mesh or texture upload may go unused
@@ -16,7 +16,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private const int IdleEvictionFrames = 120;
 
     private readonly GpuDevice _device;
-    private readonly Window3D _window;
+    private readonly Window3D? _window;
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
@@ -54,12 +54,78 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     {
         _device = device;
         _window = window;
+        ApplySyncMode(base.SyncMode);
+    }
+
+    /// <summary>
+    /// Constructor for subclasses that own their own color target (no
+    /// window/swapchain). They must override <see cref="TryAcquireColorTarget"/>
+    /// and <see cref="PresentFrame"/>; <see cref="ApplySyncMode"/> becomes a
+    /// no-op (sync mode is meaningful only for swapchain presentation).
+    /// </summary>
+    private protected GpuRenderer(GpuDevice device)
+    {
+        _device = device;
+        _window = null;
     }
 
     /// <summary>
     /// The <see cref="GpuDevice"/> this renderer draws through.
     /// </summary>
     internal GpuDevice Device => _device;
+
+    /// <inheritdoc/>
+    public override SyncMode SyncMode
+    {
+        get => base.SyncMode;
+        set
+        {
+            base.SyncMode = value;
+            ApplySyncMode(value);
+        }
+    }
+
+    private void ApplySyncMode(SyncMode mode)
+    {
+        if (_window is null)
+            return;
+
+        // Map the requested mode to the closest supported SDL_GPU
+        // present mode. WaitForSync (FIFO) is always supported, so it's
+        // the universal fallback. Hint -> first supported in priority
+        // order: Latest -> Mailbox, Immediate, VSync; Immediate ->
+        // Immediate, VSync; WaitForSync -> VSync.
+        var preferences = mode switch
+        {
+            SyncMode.Latest => new[] { SDL.GPUPresentMode.Mailbox, SDL.GPUPresentMode.Immediate, SDL.GPUPresentMode.VSync },
+            SyncMode.Immediate => new[] { SDL.GPUPresentMode.Immediate, SDL.GPUPresentMode.VSync },
+            _ => new[] { SDL.GPUPresentMode.VSync },
+        };
+
+        var deviceId = _device.GpuDeviceID;
+        var windowId = _window.WindowId;
+        if (deviceId == 0 || windowId == 0)
+            return;
+
+        SDL.GPUPresentMode chosen = SDL.GPUPresentMode.VSync;
+        foreach (var candidate in preferences)
+        {
+            if (candidate == SDL.GPUPresentMode.VSync ||
+                SDL.WindowSupportsGPUPresentMode(deviceId, windowId, candidate))
+            {
+                chosen = candidate;
+                break;
+            }
+        }
+
+        // Composition stays at SDL's default (SDR); we only adjust the
+        // present mode here.
+        SDL.SetGPUSwapchainParameters(
+            deviceId,
+            windowId,
+            SDL.GPUSwapchainComposition.SDR,
+            chosen);
+    }
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
@@ -90,25 +156,82 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             A = bg.A / 255f,
         };
 
-        _colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, _window.WindowId);
-
         _renderFrame = _device.BeginFrame();
 
-        if (SDL.WaitAndAcquireGPUSwapchainTexture(
-                _renderFrame.CommandBuffer.CommandBufferId,
-                _window.WindowId,
-                out var swapchainTextureId,
-                out var swapchainWidth,
-                out var swapchainHeight) && swapchainTextureId != 0)
+        if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height))
         {
-            _colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
-            EnsureDepthTexture(swapchainWidth, swapchainHeight);
+            EnsureDepthTexture(width, height);
         }
         else
         {
             _colorTarget = null;
         }
     }
+
+    /// <summary>
+    /// Resolves the color target for the current frame. The default
+    /// implementation acquires the next swapchain image of the bound
+    /// window. Subclasses that own their target (e.g. an image-bound
+    /// renderer) override this to return their owned texture.
+    /// </summary>
+    protected virtual bool TryAcquireColorTarget(
+        GpuRenderFrame frame,
+        out GpuTexture? colorTarget,
+        out SDL.GPUTextureFormat colorFormat,
+        out uint width,
+        out uint height)
+    {
+        colorTarget = null;
+        colorFormat = SDL.GPUTextureFormat.Invalid;
+        width = 0;
+        height = 0;
+
+        if (_window is null)
+            return false;
+
+        colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, _window.WindowId);
+
+        if (SDL.WaitAndAcquireGPUSwapchainTexture(
+                frame.CommandBuffer.CommandBufferId,
+                _window.WindowId,
+                out var swapchainTextureId,
+                out width,
+                out height) && swapchainTextureId != 0)
+        {
+            colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Finalises the current frame's command buffer. The default just
+    /// submits it (the swapchain present is implied). Subclasses that
+    /// render into their own target override this to also queue a
+    /// download copy pass and read pixels back to the CPU.
+    /// </summary>
+    protected virtual void PresentFrame()
+    {
+        _renderFrame!.Submit();
+    }
+
+    /// <summary>
+    /// Hook invoked at the start of the frame's main copy pass, before
+    /// any mesh/texture uploads. The default does nothing. Subclasses
+    /// override this to stage extra uploads into their target -- for
+    /// example, copying an image's existing CPU pixels into the GPU
+    /// color target so subsequent draws compose on top of them.
+    /// </summary>
+    protected virtual void OnBeforeUploads(GpuCopyPass copyPass)
+    {
+    }
+
+    /// <summary>The frame currently being recorded, or null between frames.</summary>
+    private protected GpuRenderFrame? CurrentFrame => _renderFrame;
+
+    /// <summary>The color target for the current frame, or null if acquisition failed.</summary>
+    private protected GpuTexture? CurrentColorTarget => _colorTarget;
 
     /// <summary>
     /// (Re)allocates the depth texture so its size matches the current
@@ -145,7 +268,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -169,9 +292,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             Texture: null,
             Sampler: null,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -196,7 +322,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, texture, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     /// <summary>
@@ -219,9 +345,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             texture,
             Sampler: null,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -243,7 +372,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, CullMode, topology, wireframe));
+        _commands.Add(new DrawCommand(mesh, shader, texture, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -266,9 +395,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             texture,
             sampler,
             DepthMode,
+            BlendMode,
             CullMode,
             topology,
             wireframe,
+            Viewport,
+            ClipRect,
             shader.ArgsLayout,
             args));
     }
@@ -492,6 +624,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
             using (copyPass)
             {
+                OnBeforeUploads(copyPass!);
+
                 foreach (var command in prepared)
                 {
                     var mesh = command.Command.Mesh;
@@ -631,6 +765,17 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
             using (renderPass)
             {
+                // The render pass starts with viewport/scissor implicitly
+                // covering the whole render target. We track the last
+                // values we explicitly applied so consecutive draws with
+                // the same setting don't emit redundant SDL calls.
+                Rect? lastViewport = null;
+                Rect? lastClipRect = null;
+                bool viewportApplied = false;
+                bool clipApplied = false;
+                var fullW = _depthWidth;
+                var fullH = _depthHeight;
+
                 foreach (var command in prepared)
                 {
                     var shader = command.Command.Shader;
@@ -642,10 +787,43 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                         _colorFormat,
                         shader.VertexLayout,
                         command.Command.DepthMode,
+                        command.Command.BlendMode,
                         command.Command.CullMode,
                         command.Command.Topology);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
+
+                    // Apply viewport/scissor only on transitions: the
+                    // first user-set value and any change after.
+                    // Switching back to "null" (full target) requires
+                    // an explicit reset call once we've ever applied a
+                    // user value -- otherwise SDL keeps the previous.
+                    var v = command.Command.Viewport;
+                    if (!viewportApplied && v is not null)
+                    {
+                        ApplyViewport(renderPass, v.Value, fullW, fullH);
+                        viewportApplied = true;
+                        lastViewport = v;
+                    }
+                    else if (viewportApplied && v != lastViewport)
+                    {
+                        ApplyViewport(renderPass, v ?? new Rect(0, 0, fullW, fullH), fullW, fullH);
+                        lastViewport = v;
+                    }
+
+                    var c = command.Command.ClipRect;
+                    if (!clipApplied && c is not null)
+                    {
+                        ApplyClip(renderPass, c.Value, fullW, fullH);
+                        clipApplied = true;
+                        lastClipRect = c;
+                    }
+                    else if (clipApplied && c != lastClipRect)
+                    {
+                        ApplyClip(renderPass, c ?? new Rect(0, 0, fullW, fullH), fullW, fullH);
+                        lastClipRect = c;
+                    }
+
                     command.Command.PushArgs(renderPass);
                     if (command.Command.Texture is { } image)
                     {
@@ -691,7 +869,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 }
             }
 
-            _renderFrame.Submit();
+            PresentFrame();
         }
         finally
         {
@@ -705,7 +883,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         Render();
     }
@@ -887,17 +1065,48 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
+        BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, cullMode, topology);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, depthMode, blendMode, cullMode, topology);
             _pipelines[key] = pipeline;
         }
 
         return pipeline;
+    }
+
+    private static void ApplyViewport(GpuRenderPass renderPass, Rect rect, uint targetWidth, uint targetHeight)
+    {
+        // SDL_GPU expects viewport coordinates in pixels of the render
+        // target with (0, 0) at the top-left -- same convention Rect
+        // uses, so no Y flip is needed.
+        renderPass.SetViewport(new SDL.GPUViewport
+        {
+            X = rect.X,
+            Y = rect.Y,
+            W = rect.Width,
+            H = rect.Height,
+            MinDepth = 0f,
+            MaxDepth = 1f,
+        });
+    }
+
+    private static void ApplyClip(GpuRenderPass renderPass, Rect rect, uint targetWidth, uint targetHeight)
+    {
+        // SDL.Rect uses signed-int pixel coordinates; clamp Rect to the
+        // target so we don't pass a scissor that exceeds it (which SDL
+        // treats as an error).
+        var x = (int)Math.Max(0f, rect.X);
+        var y = (int)Math.Max(0f, rect.Y);
+        var w = (int)Math.Min(rect.Width, targetWidth - x);
+        var h = (int)Math.Min(rect.Height, targetHeight - y);
+        if (w < 0) w = 0;
+        if (h < 0) h = 0;
+        renderPass.SetScissor(new SDL.Rect { X = x, Y = y, W = w, H = h });
     }
 
     private GpuShader GetOrCreateGpuShader(Shader stage)
@@ -948,12 +1157,57 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
     };
 
+    // Translate the user-facing BlendMode to the GPU color/alpha
+    // blend factors and op. Alpha channel uses (One, OneMinusSrcAlpha,
+    // Add) for every translucent mode -- this is the standard rule
+    // for accumulating coverage when compositing into a target whose
+    // alpha may itself be sampled later.
+    private static SDL.GPUColorTargetBlendState MapBlendMode(BlendMode blendMode) => blendMode switch
+    {
+        BlendMode.Opaque => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 0,
+        },
+        BlendMode.Alpha => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
+            DstColorBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        BlendMode.Additive => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
+            DstColorBlendfactor = SDL.GPUBlendFactor.One,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        BlendMode.Multiply => new SDL.GPUColorTargetBlendState
+        {
+            EnableBlend = 1,
+            SrcColorBlendfactor = SDL.GPUBlendFactor.DstColor,
+            DstColorBlendfactor = SDL.GPUBlendFactor.Zero,
+            ColorBlendOp = SDL.GPUBlendOp.Add,
+            SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
+            DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
+            AlphaBlendOp = SDL.GPUBlendOp.Add,
+        },
+        _ => throw new ArgumentOutOfRangeException(nameof(blendMode), blendMode, null),
+    };
+
     private GpuPipeline CreatePipeline(
         GpuShader vertexShader,
         GpuShader fragmentShader,
         SDL.GPUTextureFormat colorFormat,
         ShaderVertexLayout layout,
         DepthMode depthMode,
+        BlendMode blendMode,
         CullMode cullMode,
         Topology topology)
     {
@@ -984,16 +1238,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         var colorTargets = ImmutableArray.Create(new SDL.GPUColorTargetDescription
         {
             Format = colorFormat,
-            BlendState = new SDL.GPUColorTargetBlendState
-            {
-                EnableBlend = 1,
-                SrcColorBlendfactor = SDL.GPUBlendFactor.SrcAlpha,
-                DstColorBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
-                ColorBlendOp = SDL.GPUBlendOp.Add,
-                SrcAlphaBlendfactor = SDL.GPUBlendFactor.One,
-                DstAlphaBlendfactor = SDL.GPUBlendFactor.OneMinusSrcAlpha,
-                AlphaBlendOp = SDL.GPUBlendOp.Add,
-            },
+            BlendState = MapBlendMode(blendMode),
         });
 
         // Map the user-facing DepthMode to the two GPU switches it
@@ -1133,6 +1378,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         SDL.GPUTextureFormat ColorFormat,
         ShaderVertexLayout Layout,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology);
 
@@ -1142,9 +1388,12 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology,
-        bool Wireframe)
+        bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect)
     {
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
@@ -1161,12 +1410,15 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         Image? Texture,
         GpuSampler? Sampler,
         DepthMode DepthMode,
+        BlendMode BlendMode,
         CullMode CullMode,
         Topology Topology,
         bool Wireframe,
+        Rect? Viewport,
+        Rect? ClipRect,
         ShaderArgsLayout Layout,
         TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, CullMode, Topology, Wireframe)
+        : DrawCommand(Mesh, Shader, Texture, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
         where TArgs : unmanaged
     {
         public override void PushArgs(GpuRenderPass renderPass)

@@ -36,9 +36,9 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
-    var seconds = (float)e.ElapsedSinceStart.TotalSeconds;
+    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var transform =
@@ -46,7 +46,7 @@ window.Rendering += (w, e) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    e.DrawMesh(
+    rd.DrawMesh(
         triangle,
         checker,
         Shaders.PositionTextureWithTransform,

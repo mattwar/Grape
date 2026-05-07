@@ -31,9 +31,9 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
-    var t = (float)e.ElapsedSinceStart.TotalSeconds;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var aspectScale = Matrix4x4.CreateScale(aspect, 1f, 1f);
@@ -56,7 +56,7 @@ window.Rendering += (w, e) =>
             Matrix4x4.CreateTranslation(cx, cy, 0f) *
             aspectScale;
 
-        e.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+        rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
     }
 
     w.Invalidate(); // schedule the next frame

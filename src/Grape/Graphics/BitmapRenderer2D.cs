@@ -18,9 +18,32 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     private protected BitmapRenderer2D(nint rendererId)
     {
         _rendererId = rendererId;
+        ApplySyncMode(base.SyncMode);
     }
 
     internal nint RendererId => _rendererId;
+
+    /// <inheritdoc/>
+    public override SyncMode SyncMode
+    {
+        get => base.SyncMode;
+        set
+        {
+            base.SyncMode = value;
+            ApplySyncMode(value);
+        }
+    }
+
+    private void ApplySyncMode(SyncMode mode)
+    {
+        if (_rendererId == 0)
+            return;
+        // SDL_Renderer's vsync is just an int interval (0=off, 1=every
+        // refresh). Map Latest to vsync as well -- it's the closest
+        // tear-free, low-latency option this backend offers.
+        var interval = mode == SyncMode.Immediate ? 0 : 1;
+        SDL.SetRenderVSync(_rendererId, interval);
+    }
 
     internal void AddResource(IDisposable resource)
     {

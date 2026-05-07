@@ -61,30 +61,28 @@ public static class ModelExtensions
         }
 
         /// <summary>
-        /// Renders image using SkiaSharp Canvas API.
+        /// Renders into the image using a SkiaSharp <see cref="SKCanvas"/>.
+        /// The image's existing pixels are used as the canvas backdrop;
+        /// the canvas draws compose on top of them.
         /// </summary>
+        /// <param name="renderAction">Callback that issues canvas draws.</param>
         public void RenderCanvas(Action<SKCanvas> renderAction)
-        {
-            ArgumentNullException.ThrowIfNull(renderAction);
-            ObjectDisposedException.ThrowIf(image.IsDisposed, image);
+            => RenderCanvasCore(image, null, renderAction);
 
-            var (width, height) = image.Size;
-            if (width == 0 || height == 0)
-                return;
-
-            var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Unpremul);
-            using var bitmap = new SKBitmap(info);
-
-            image.CopyToBitmap(bitmap);
-
-            using (var canvas = new SKCanvas(bitmap))
-            {
-                renderAction(canvas);
-                canvas.Flush();
-            }
-
-            image.CopyFromBitmap(bitmap);
-        }
+        /// <summary>
+        /// Renders into the image using a SkiaSharp <see cref="SKCanvas"/>,
+        /// painting <paramref name="backgroundColor"/> behind the draws.
+        /// </summary>
+        /// <param name="backgroundColor">
+        /// The background painted behind the draws. An opaque alpha
+        /// (255) replaces the prior content (and skips copying the
+        /// image into the bitmap, which is the perf win); a
+        /// translucent alpha blends over the prior content using
+        /// standard source-over compositing.
+        /// </param>
+        /// <param name="renderAction">Callback that issues canvas draws.</param>
+        public void RenderCanvas(Grape.Color backgroundColor, Action<SKCanvas> renderAction)
+            => RenderCanvasCore(image, backgroundColor, renderAction);
 
         /// <summary>
         /// Creates a new <see cref="SKBitmap"/> the same size as the image
@@ -100,6 +98,52 @@ public static class ModelExtensions
             image.CopyToBitmap(bitmap);
             return bitmap;
         }
+    }
+
+    private static void RenderCanvasCore(Image image, Grape.Color? backgroundColor, Action<SKCanvas> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        ObjectDisposedException.ThrowIf(image.IsDisposed, image);
+
+        var (width, height) = image.Size;
+        if (width == 0 || height == 0)
+            return;
+
+        var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Unpremul);
+        using var bitmap = new SKBitmap(info);
+
+        // Stage the image's pixels as backdrop unless the caller
+        // requested an opaque background -- an opaque background
+        // overwrites everything anyway, so the copy would be wasted
+        // work.
+        var hasOpaqueBackground = backgroundColor is { A: 255 };
+        if (!hasOpaqueBackground)
+            image.CopyToBitmap(bitmap);
+
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            if (backgroundColor is { } c)
+            {
+                var skColor = new SKColor(c.R, c.G, c.B, c.A);
+                if (c.A == 255)
+                {
+                    // Replace: equivalent to clearing the canvas
+                    // since opaque alpha drops the prior content.
+                    canvas.Clear(skColor);
+                }
+                else
+                {
+                    // Blend the translucent fill over the staged
+                    // backdrop. DrawColor uses the canvas' default
+                    // SrcOver blend mode.
+                    canvas.DrawColor(skColor);
+                }
+            }
+            renderAction(canvas);
+            canvas.Flush();
+        }
+
+        image.CopyFromBitmap(bitmap);
     }
 
     extension(SKBitmap bitmap)

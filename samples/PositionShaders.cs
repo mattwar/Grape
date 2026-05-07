@@ -48,9 +48,9 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
-    var seconds = (float)e.ElapsedSinceStart.TotalSeconds;
+    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
     var (width, height) = w.Size;
     var aspect = (float)height / width;
 
@@ -58,15 +58,15 @@ window.Rendering += (w, e) =>
     var spin = Matrix4x4.CreateRotationZ(seconds);
 
     // Top-left: Shaders.Position (no transform).
-    e.DrawMesh(staticTopLeft, Shaders.Position);
+    rd.DrawMesh(staticTopLeft, Shaders.Position);
 
     // Top-right: Shaders.PositionWithTransform (white, spinning, translated).
     var topRight = spin * fit * Matrix4x4.CreateTranslation(0.5f, 0.5f, 0f);
-    e.DrawMesh(triangle, Shaders.PositionWithTransform, topRight);
+    rd.DrawMesh(triangle, Shaders.PositionWithTransform, topRight);
 
     // Bottom-left: Shaders.PositionWithTransformAndColor with red.
     var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
-    e.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
+    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
     {
         Mvp = bottomLeft,
         Color = new Vector4(1f, 0.2f, 0.2f, 1f),
@@ -78,7 +78,7 @@ window.Rendering += (w, e) =>
         Matrix4x4.CreateRotationZ(-seconds) * fit *
         Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
 
-    e.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
+    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndColorArgs
     {
         Mvp = bottomRight,
         Color = HueToRgb(seconds * 0.25f),

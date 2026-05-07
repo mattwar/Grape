@@ -511,6 +511,60 @@ internal class GpuUploadBuffer : GpuBuffer
 }
 
 /// <summary>
+/// A staging buffer used to read GPU data back into CPU memory. Pair
+/// with <see cref="GpuCopyPass.DownloadFromTexture"/> to queue a
+/// download, then submit + wait the fence before mapping for read.
+/// </summary>
+internal sealed class GpuDownloadBuffer : GpuBuffer
+{
+    private GpuDownloadBuffer(GpuDevice device, nint bufferId, uint size)
+        : base(device, bufferId, size)
+    {
+    }
+
+    internal static GpuDownloadBuffer Create(GpuDevice device, uint size)
+    {
+        var info = new GPUTransferBufferCreateInfo { Usage = GPUTransferBufferUsage.Download, Size = size };
+        var transferBufferId = SDL.CreateGPUTransferBuffer(device.GpuDeviceID, info);
+        if (transferBufferId == 0)
+            throw new InvalidOperationException("Failed to create download transfer buffer.");
+        return new GpuDownloadBuffer(device, transferBufferId, size);
+    }
+
+    internal override bool IsTransferBuffer => true;
+
+    /// <summary>
+    /// Maps the buffer's bytes for reading and copies them into
+    /// <paramref name="destination"/>. The fence from the download's
+    /// submit must be signaled before this is called, otherwise the
+    /// bytes may be incomplete.
+    /// </summary>
+    public unsafe void Read(Span<byte> destination)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuDownloadBuffer));
+        if (destination.Length > this.Size)
+            throw new ArgumentException(
+                $"Destination span ({destination.Length} bytes) is larger than this download buffer ({this.Size} bytes).",
+                nameof(destination));
+
+        void* pMapped = (void*)SDL.MapGPUTransferBuffer(this.Gpu.GpuDeviceID, this.BufferId, false);
+        if (pMapped == null)
+            throw new InvalidOperationException("Failed to map download transfer buffer.");
+
+        try
+        {
+            fixed (byte* pDest = destination)
+                Buffer.MemoryCopy(pMapped, pDest, destination.Length, destination.Length);
+        }
+        finally
+        {
+            SDL.UnmapGPUTransferBuffer(this.Gpu.GpuDeviceID, this.BufferId);
+        }
+    }
+}
+
+/// <summary>
 /// A single frame of GPU work, including copy and render passes.
 /// </summary>
 internal sealed class GpuRenderFrame : IDisposable
@@ -654,6 +708,49 @@ internal sealed class GpuCopyPass : IDisposable
     }
 
     /// <summary>
+    /// Queues a download of a 2D region of <paramref name="source"/>'s
+    /// mip 0 layer 0 into <paramref name="destination"/>'s memory. The
+    /// download executes when the command buffer is submitted; the
+    /// caller must wait on the submit fence before mapping
+    /// <paramref name="destination"/>.
+    /// </summary>
+    public void DownloadFromTexture(
+        GpuTexture source,
+        GpuDownloadBuffer destination,
+        uint width,
+        uint height)
+    {
+        if (_disposed)
+            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (source.IsDisposed)
+            throw new ObjectDisposedException(nameof(source));
+        if (destination.IsDisposed)
+            throw new ObjectDisposedException(nameof(destination));
+
+        SDL.DownloadFromGPUTexture(
+            _copyPassId,
+            new SDL.GPUTextureRegion
+            {
+                Texture = source.TextureId,
+                MipLevel = 0,
+                Layer = 0,
+                X = 0,
+                Y = 0,
+                Z = 0,
+                W = width,
+                H = height,
+                D = 1,
+            },
+            new SDL.GPUTextureTransferInfo
+            {
+                TransferBuffer = destination.BufferId,
+                Offset = 0,
+                PixelsPerRow = width,
+                RowsPerLayer = height,
+            });
+    }
+
+    /// <summary>
     /// Uploads a 2D bitmap region into the destination texture's mip 0 layer 0.
     /// </summary>
     /// <param name="source">Transfer buffer holding the pixel bytes.</param>
@@ -740,6 +837,18 @@ internal sealed class GpuFence : IDisposable
     public bool IsDisposed => _fenceId == 0;
 
     public bool IsSignaled => !IsDisposed && SDL.QueryGPUFence(_device.GpuDeviceID, _fenceId);
+
+    /// <summary>
+    /// Blocks the calling thread until this fence is signaled (i.e. the
+    /// submitted command buffer has finished executing on the GPU).
+    /// Returns immediately if already signaled or disposed.
+    /// </summary>
+    public void Wait()
+    {
+        if (IsDisposed)
+            return;
+        SDL.WaitForGPUFences(_device.GpuDeviceID, true, [_fenceId], 1);
+    }
 
     public void Dispose()
     {

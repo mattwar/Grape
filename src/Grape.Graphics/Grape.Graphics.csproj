@@ -25,7 +25,7 @@
          the NuGet global cache. CI/release builds override this via /p:Version=... -->
     <Version>0.1.0-dev</Version>
     <Description>Grape - Graphics Programming Extensions. Class wrappers around SDL3 for graphics, input, audio, and more. Bundles the core Grape library, SkiaSharp-powered image loading and Skia rendering helpers, and the Grape.Jelly scene/sprite layer.</Description>
-    <PackageReadmeFile>readme.md</PackageReadmeFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>grape.png</PackageIcon>
     <PackageTags>graphics;sdl3;sdl;gamedev;rendering;skiasharp</PackageTags>
     <IncludeSymbols>true</IncludeSymbols>
@@ -78,7 +78,7 @@
 
   <!-- Files at the package root -->
   <ItemGroup>
-    <None Include="..\..\readme.md" Pack="true" PackagePath="\" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
     <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
     <None Include="..\..\assets\grape.png" Pack="true" PackagePath="\" />

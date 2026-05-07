@@ -11,11 +11,15 @@
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 //
-// Asset paths below are resolved relative to the current working directory,
-// so run this file from the repository root.
+// Asset paths below resolve relative to this source file, so the
+// sample works regardless of the shell's current directory.
 
+using System.Runtime.CompilerServices;
 using Grape;
 using Grape.Jelly;
+
+static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
+    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
 
 var window = new Window2D
 {
@@ -25,11 +29,11 @@ var window = new Window2D
     CloseKey = Key.Escape,
 };
 
-var icon = Image.LoadImage("grape.bmp");
+var icon = Image.LoadImage(SampleAsset("grape.bmp"));
 icon.SetAlpha(0, icon.GetPixel(0, 0));
 window.Icon = icon;
 
-var rocketImage = Image.LoadImage("rocket.png");
+var rocketImage = Image.LoadImage(SampleAsset("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f)
 {
@@ -37,7 +41,7 @@ var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height /
     Heading = 45f,
 };
 
-var sound = AudioData.LoadWAV("szwoopy.wav");
+var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
 
 window.KeyDown += (_, e) =>
 {
@@ -58,12 +62,12 @@ window.KeyDown += (_, e) =>
     }
 };
 
-window.Rendering += (w, e) =>
+window.Rendering += (w, rd) =>
 {
     var updateContext = new UpdateContext
     {
-        ElapsedSinceStart = e.ElapsedSinceStart,
-        ElaspsedSinceLastUpdate = e.ElapsedSinceLastRender,
+        ElapsedSinceStart = rd.ElapsedSinceStart,
+        ElaspsedSinceLastUpdate = rd.ElapsedSinceLastRender,
         Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height)
     };
 
@@ -101,16 +105,16 @@ window.Rendering += (w, e) =>
         if (bounce)
         {
             rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
-            _ = Audio.Play(sound, volume: .2f);
+            Audio.Play(sound, volume: .2f);
         }
     }
 
-    rocket.Draw(e);
+    rocket.Draw(rd);
 
-    e.DrawColor = new Color(255, 255, 255);
-    e.DrawDebugText(
+    rd.DrawColor = new Color(255, 255, 255);
+    rd.DrawDebugText(
         0, 10,
-        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {e.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
+        $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 4f);
 
     w.Invalidate(); // request the next rendering

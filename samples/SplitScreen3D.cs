@@ -2,7 +2,7 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/OrbitingTetrahedra.cs
+//     dotnet run samples/SplitScreen3D.cs
 //
 // While Grape.Graphics is unpublished, build a local copy first:
 //
@@ -11,18 +11,13 @@
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
-// Two regular tetrahedra orbit a common axis in the XZ plane while
-// independently spinning. As one tetra moves behind the other (greater
-// distance from the camera) the depth buffer ensures it is correctly
-// occluded -- and they intersect when their orbits put them at the same
-// depth, with the depth buffer resolving the intersection per-pixel.
+// Two cameras rendering the same scene side-by-side, demonstrating
+// Renderer3D.Viewport. Each pane uses PushState() so its viewport
+// scope ends cleanly and the next pane's setting is independent.
 
 using System.Numerics;
 using Grape;
 
-// Regular tetrahedron with vertices on the unit cube's diagonals.
-// Each vertex carries a color so the faces show as colored gradients
-// once they are interpolated across the triangle.
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
     var v0 = new Vertex3D( 1f,  1f,  1f);
@@ -31,19 +26,13 @@ static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c
     var v3 = new Vertex3D(-1f, -1f,  1f);
 
     return Mesh.Create([
-        // face opposite v0
         new ColorVertex3D(v1, c1), new ColorVertex3D(v2, c2), new ColorVertex3D(v3, c3),
-        // face opposite v1
         new ColorVertex3D(v0, c0), new ColorVertex3D(v3, c3), new ColorVertex3D(v2, c2),
-        // face opposite v2
         new ColorVertex3D(v0, c0), new ColorVertex3D(v1, c1), new ColorVertex3D(v3, c3),
-        // face opposite v3
         new ColorVertex3D(v0, c0), new ColorVertex3D(v2, c2), new ColorVertex3D(v1, c1),
     ]);
 }
 
-// Warm-toned tetra and cool-toned tetra so it's obvious which is which
-// when they overlap.
 var tetraA = MakeTetrahedron(
     new Color(255, 64, 64),
     new Color(255, 200, 0),
@@ -58,32 +47,30 @@ var tetraB = MakeTetrahedron(
 
 var window = new Window3D
 {
-    Title = "Orbiting Tetrahedra (depth-buffer demo)",
+    Title = "Split Screen (viewport demo)",
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
 };
 
 const float OrbitRadius = 1.2f;
-const float OrbitSpeed = 0.6f;     // radians/sec
-const float SpinSpeed = 1.5f;      // self-rotation, radians/sec
+const float OrbitSpeed = 0.6f;
+const float SpinSpeed = 1.5f;
 const float TetraScale = 0.7f;
 
-// Camera at +Z looking toward the origin. With System.Numerics's
-// right-handed perspective, larger Z = closer to the camera.
-var camera = new PerspectiveCamera
+// Two cameras viewing the same scene from different angles.
+var cameraLeft = new PerspectiveCamera
 {
     Position = new Vector3(0f, 0.6f, 5f),
 };
-
-window.Rendering += (w, rd) =>
+var cameraRight = new PerspectiveCamera
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    Position = new Vector3(4f, 2f, 2f),
+    Target = Vector3.Zero,
+};
 
-    // Tetra A and B sit on opposite sides of the orbit; as `t` advances
-    // they swap places in Z, and pass through each other near the centre.
+void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
+{
     var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
     var orbitB = -orbitA;
 
@@ -95,8 +82,34 @@ window.Rendering += (w, rd) =>
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
-    rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+    r.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
+    r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+}
+
+window.Rendering += (w, rd) =>
+{
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var (width, height) = w.Size;
+
+    // Each pane is half the window's width. The aspect ratio passed to
+    // the camera also halves so the scene isn't horizontally squished.
+    var paneWidth = width / 2f;
+    var paneAspect = paneWidth / height;
+
+    // PushState() snapshots Viewport (and the rest of the renderer
+    // state) so when this scope ends Viewport reverts to its previous
+    // value. The next pane sets its own viewport independently.
+    using (rd.PushState())
+    {
+        rd.Viewport = new Rect(0, 0, paneWidth, height);
+        DrawScene(rd, cameraLeft.GetViewProjection(paneAspect), t);
+    }
+
+    using (rd.PushState())
+    {
+        rd.Viewport = new Rect(paneWidth, 0, paneWidth, height);
+        DrawScene(rd, cameraRight.GetViewProjection(paneAspect), t);
+    }
 
     w.Invalidate();
 };
