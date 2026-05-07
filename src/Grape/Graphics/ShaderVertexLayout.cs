@@ -24,6 +24,13 @@ public sealed record ShaderVertexElement(ShaderVertexElementKind Kind);
 public enum ShaderVertexElementKind
 {
     Position3,
+    /// <summary>
+    /// Three-component world-space normal vector (12 bytes). Same byte layout
+    /// as <see cref="Position3"/>; named separately so vertex types and
+    /// shaders can document intent and so future per-element validation can
+    /// distinguish them.
+    /// </summary>
+    Normal3,
     TextureCoordinate2,
     Color4,
     /// <summary>

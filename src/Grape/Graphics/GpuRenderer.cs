@@ -1884,6 +1884,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private static (SDL.GPUVertexElementFormat Format, uint Size) MapShaderVertexElement(ShaderVertexElementKind kind) => kind switch
     {
         ShaderVertexElementKind.Position3 => (SDL.GPUVertexElementFormat.Float3, 12u),
+        ShaderVertexElementKind.Normal3 => (SDL.GPUVertexElementFormat.Float3, 12u),
         ShaderVertexElementKind.TextureCoordinate2 => (SDL.GPUVertexElementFormat.Float2, 8u),
         ShaderVertexElementKind.Color4 => (SDL.GPUVertexElementFormat.Ubyte4Norm, 4u),
         ShaderVertexElementKind.Float4 => (SDL.GPUVertexElementFormat.Float4, 16u),
@@ -1957,6 +1958,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 instanceStride += element.Kind switch
                 {
                     ShaderVertexElementKind.Position3          => 12,
+                    ShaderVertexElementKind.Normal3            => 12,
                     ShaderVertexElementKind.TextureCoordinate2 => 8,
                     ShaderVertexElementKind.Color4             => 4,
                     ShaderVertexElementKind.Float4             => 16,

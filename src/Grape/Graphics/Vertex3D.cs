@@ -87,3 +87,39 @@ public readonly struct TextureVertex3D
         ShaderVertexElementKind.Position3,
         ShaderVertexElementKind.TextureCoordinate2);
 }
+
+/// <summary>
+/// A vertex that carries a position, a world-space normal, and a baked
+/// per-vertex color. Pairs with <see cref="Shaders.LitColor"/> -- the
+/// shader runs Lambertian lighting against the renderer's
+/// <see cref="Renderer3D.DirectionalLight"/> and
+/// <see cref="Renderer3D.AmbientLight"/> using the normal, then modulates
+/// the result by the per-vertex color.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public readonly struct LitVertex3D
+{
+    public readonly Vector3 Position;
+    public readonly Vector3 Normal;
+    public readonly Color Color;
+
+    public LitVertex3D(Vector3 position, Vector3 normal, Color color)
+    {
+        Position = position;
+        Normal = normal;
+        Color = color;
+    }
+
+    public LitVertex3D(Vertex3D vertex, Vector3 normal, Color color)
+        : this(vertex.Position, normal, color)
+    {
+    }
+
+    /// <summary>
+    /// The shader-side vertex layout that pairs with this vertex struct.
+    /// </summary>
+    public static ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.Normal3,
+        ShaderVertexElementKind.Color4);
+}

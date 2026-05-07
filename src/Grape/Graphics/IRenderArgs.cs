@@ -52,6 +52,11 @@ namespace Grape;
 public interface IRenderArgs<TSelf>
     where TSelf : unmanaged, IRenderArgs<TSelf>
 {
+    // ---- Transform (read-modify-write trait) -------------------------------
+    // The renderer reads the existing transform out of the args (treated as
+    // a model matrix), composes the camera view-projection onto the right,
+    // and writes the result back. Both accessors must be non-null.
+
     /// <summary>
     /// Reads the model-view-projection (or model-only) transform out
     /// of the args struct. <c>null</c> means the struct has no
@@ -66,4 +71,36 @@ public interface IRenderArgs<TSelf>
     /// be non-null for the renderer to apply the camera.
     /// </summary>
     static virtual Func<TSelf, Matrix4x4, TSelf>? SetTransform { get; } = null;
+
+    // ---- Write-only traits -------------------------------------------------
+    // The renderer pushes a value into the args struct from its own state.
+    // No corresponding Get accessor is needed because the renderer never
+    // reads the struct's existing value -- it just overwrites. Implementing
+    // structs that don't expose the field leave the setter at its null
+    // default and the renderer's apply step is a no-op.
+
+    /// <summary>
+    /// Returns a copy of the args struct with the camera's view-projection
+    /// matrix installed. Use this on lit-shader args structs that keep the
+    /// model and view-projection matrices as separate fields (so the
+    /// vertex shader can transform normals by the model matrix alone).
+    /// Args structs that pre-multiply model and VP into a single field
+    /// should use <see cref="SetTransform"/> instead.
+    /// </summary>
+    static virtual Func<TSelf, Matrix4x4, TSelf>? SetViewProjection { get; } = null;
+
+    /// <summary>
+    /// Returns a copy of the args struct with the renderer's
+    /// <see cref="Renderer3D.AmbientLight"/> installed (as a 0..1 RGBA
+    /// vector). Always fires when the setter is non-null; the default
+    /// ambient is <see cref="Color.Black"/>, which adds no contribution.
+    /// </summary>
+    static virtual Func<TSelf, Vector4, TSelf>? SetAmbientLight { get; } = null;
+
+    /// <summary>
+    /// Returns a copy of the args struct with the renderer's
+    /// <see cref="Renderer3D.DirectionalLight"/> installed. Fires only
+    /// when the renderer's directional light is non-null.
+    /// </summary>
+    static virtual Func<TSelf, DirectionalLight, TSelf>? SetDirectionalLight { get; } = null;
 }

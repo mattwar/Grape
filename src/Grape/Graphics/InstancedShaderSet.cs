@@ -79,6 +79,7 @@ public sealed class InstancedShaderSet<TVertex, TArgs, TInstance> : ShaderSet<TV
     private static int SizeOfElement(ShaderVertexElementKind kind) => kind switch
     {
         ShaderVertexElementKind.Position3          => 12,
+        ShaderVertexElementKind.Normal3            => 12,
         ShaderVertexElementKind.TextureCoordinate2 => 8,
         ShaderVertexElementKind.Color4             => 4,
         ShaderVertexElementKind.Float4             => 16,

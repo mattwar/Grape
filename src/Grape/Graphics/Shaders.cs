@@ -264,6 +264,63 @@ public static class Shaders
         }
         """;
 
+    // Lit color vertex shader. Per-vertex Lambertian shading (Gouraud):
+    // the lighting is computed at each vertex and the resulting color is
+    // interpolated across the triangle by the rasterizer; the fragment
+    // stage is just the existing SolidColorFrag passthrough.
+    //
+    // Uniform layout (matches LitArgs / LitColorArgsLayout):
+    //   b0 space1 = Model            (mat4)
+    //   b1 space1 = ViewProjection   (mat4)
+    //   b2 space1 = AmbientLight     (rgba, alpha unused)
+    //   b3 space1 = LightDirection   (xyz=direction TO light in world space; w unused)
+    //   b4 space1 = LightColor       (rgba, alpha unused)
+    //
+    // Normals are transformed by the upper-3x3 of the model matrix. This
+    // is correct for rotation + uniform scale + translation; non-uniform
+    // scale would need a true inverse-transpose. That's a fine starting
+    // assumption for the built-in lit shader -- callers that need the
+    // full treatment can author a custom shader.
+    private const string LitColorVertHlsl = """
+        cbuffer Model    : register(b0, space1) { float4x4 model;          };
+        cbuffer VP       : register(b1, space1) { float4x4 viewProjection; };
+        cbuffer Ambient  : register(b2, space1) { float4   ambient;        };
+        cbuffer LightDir : register(b3, space1) { float4   lightDir;       };
+        cbuffer LightCol : register(b4, space1) { float4   lightColor;     };
+
+        struct Input
+        {
+            float3 Position : TEXCOORD0;
+            float3 Normal   : TEXCOORD1;
+            float4 Color    : TEXCOORD2;
+        };
+
+        struct Output
+        {
+            float4 Color    : TEXCOORD0;
+            float4 Position : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            float4 worldPos    = mul(model, float4(input.Position, 1.0f));
+            output.Position    = mul(viewProjection, worldPos);
+
+            float3 worldNormal = normalize(mul((float3x3)model, input.Normal));
+            // Light direction may be zero (no light configured). Guard
+            // against the resulting NaN from normalize() by adding the
+            // contribution only when the supplied direction is non-zero.
+            float  dirLen      = length(lightDir.xyz);
+            float3 L           = dirLen > 0.0001f ? lightDir.xyz / dirLen : float3(0, 0, 0);
+            float  NdotL       = saturate(dot(worldNormal, L));
+            float3 lit         = ambient.rgb + lightColor.rgb * NdotL;
+
+            output.Color       = float4(input.Color.rgb * lit, input.Color.a);
+            return output;
+        }
+        """;
+
     // ---- Instanced shaders. Per-vertex inputs take the same TEXCOORDn
     // slots as the non-instanced variants. Per-instance inputs follow on
     // higher slots: a float4x4 transform consumes four consecutive
@@ -419,6 +476,9 @@ public static class Shaders
     private static readonly Shader WhiteFrag =
         new(ShaderKind.Fragment, WhiteFragHlsl);
 
+    private static readonly Shader LitColorVert =
+        new(ShaderKind.Vertex, LitColorVertHlsl);
+
     private static readonly Shader PositionInstancedVert =
         new(ShaderKind.Vertex, PositionInstancedVertHlsl);
 
@@ -447,6 +507,19 @@ public static class Shaders
     private static readonly ShaderArgsLayout TransformAndColorLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex,   0, ShaderArgKind.Matrix4x4),
         new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4));
+
+    /// <summary>
+    /// Five-slot layout matching <see cref="LitArgs"/>. All slots live on
+    /// the vertex stage because the built-in lit shader does Lambertian
+    /// shading per-vertex (Gouraud); a per-pixel variant would split the
+    /// lighting slots onto the fragment stage instead.
+    /// </summary>
+    private static readonly ShaderArgsLayout LitColorArgsLayout = new(
+        new ShaderArgElement(ShaderArgStage.Vertex, 0, ShaderArgKind.Matrix4x4), // Model
+        new ShaderArgElement(ShaderArgStage.Vertex, 1, ShaderArgKind.Matrix4x4), // ViewProjection
+        new ShaderArgElement(ShaderArgStage.Vertex, 2, ShaderArgKind.Float4),    // AmbientLight
+        new ShaderArgElement(ShaderArgStage.Vertex, 3, ShaderArgKind.Float4),    // LightDirection
+        new ShaderArgElement(ShaderArgStage.Vertex, 4, ShaderArgKind.Float4));   // LightColor
 
     /// <summary>
     /// Position-only vertices, no transform; emits opaque white. Positions
@@ -512,6 +585,23 @@ public static class Shaders
     /// </summary>
     public static ShaderSet<TextureVertex3D, Transform> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+
+    /// <summary>
+    /// Lit color shader: per-vertex Lambertian shading from the renderer's
+    /// <see cref="Renderer3D.AmbientLight"/> and
+    /// <see cref="Renderer3D.DirectionalLight"/>, modulated by the
+    /// per-vertex baked color. Pair with <see cref="LitVertex3D"/> and
+    /// <see cref="LitArgs"/>: callers supply <see cref="LitArgs.Model"/>;
+    /// the renderer fills in the view-projection and lighting fields
+    /// through <see cref="IRenderArgs{TSelf}"/>.
+    /// </summary>
+    /// <remarks>
+    /// Normals are transformed by the model matrix's upper-3x3 -- correct
+    /// for rotation + uniform scale + translation. Non-uniform scales need
+    /// a custom shader using a true inverse-transpose normal matrix.
+    /// </remarks>
+    public static ShaderSet<LitVertex3D, LitArgs> LitColor { get; } =
+        new(LitColorVert, SolidColorFrag, LitVertex3D.ShaderVertexLayout, LitColorArgsLayout);
 
     /// <summary>
     /// Skybox shader: samples the bound <see cref="Cubemap"/> by the

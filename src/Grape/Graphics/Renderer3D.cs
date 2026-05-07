@@ -172,6 +172,25 @@ public abstract class Renderer3D
     public Camera3D? Camera { get; set; }
 
     /// <summary>
+    /// Whole-scene ambient light, applied by lit shaders that opt in via
+    /// <see cref="IRenderArgs{TSelf}.SetAmbientLight"/>. The RGB channels
+    /// are added unconditionally to every lit fragment; the default of
+    /// <see cref="Color.Black"/> contributes nothing, so unlit shaders and
+    /// scenes that just want a directional light see no change.
+    /// </summary>
+    public Color AmbientLight { get; set; } = Color.Black;
+
+    /// <summary>
+    /// Optional infinitely-distant light. When non-null and the args
+    /// struct opts in via <see cref="IRenderArgs{TSelf}.SetDirectionalLight"/>,
+    /// lit shaders combine its contribution with <see cref="AmbientLight"/>
+    /// using a Lambertian (N·L) term. <c>null</c> (the default) skips
+    /// the directional contribution entirely; lit surfaces fall back to
+    /// just the ambient term.
+    /// </summary>
+    public DirectionalLight? DirectionalLight { get; set; }
+
+    /// <summary>
     /// Aspect ratio (width / height) used when sampling the camera's
     /// projection in scene-aware draws. Computed from the active
     /// render target's pixel dimensions; concrete renderers override
@@ -355,7 +374,8 @@ public abstract class Renderer3D
     private TArgs ApplyRenderArgs<TArgs>(TArgs args)
         where TArgs : unmanaged, IRenderArgs<TArgs>
     {
-        // Camera -> transform field (compose model * view-projection).
+        // Camera -> single MVP transform field (compose model * view-projection).
+        // Used by shaders that pack model and view-projection into one matrix.
         if (Camera is { } camera
             && TArgs.GetTransform is { } get
             && TArgs.SetTransform is { } set)
@@ -363,6 +383,33 @@ public abstract class Renderer3D
             var model = get(args);
             var vp = camera.GetViewProjection(AspectRatio);
             args = set(args, model * vp);
+        }
+
+        // Camera -> separate view-projection field. Used by shaders that
+        // keep the model matrix separate from view-projection (e.g. lit
+        // shaders that need the unmultiplied model matrix to transform
+        // normals).
+        if (Camera is { } cam2
+            && TArgs.SetViewProjection is { } setVp)
+        {
+            args = setVp(args, cam2.GetViewProjection(AspectRatio));
+        }
+
+        // Ambient light -> ambient field. Always fires when the args
+        // struct opts in; default ambient is Color.Black, which adds no
+        // visible contribution.
+        if (TArgs.SetAmbientLight is { } setAmb)
+        {
+            args = setAmb(args, AmbientLight);
+        }
+
+        // Directional light -> light field. Only fires when a light is
+        // configured; otherwise the args struct keeps whatever the user
+        // initialised (typically zero, which the shader treats as off).
+        if (DirectionalLight is { } dirLight
+            && TArgs.SetDirectionalLight is { } setDir)
+        {
+            args = setDir(args, dirLight);
         }
 
         return args;
