@@ -42,13 +42,30 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly List<GpuTexture> _pendingMipmapGeneration = new();
 
     // Depth target. Sized to match the swapchain image and recreated when
-    // the window resizes. Used purely as scratch state during a frame so
-    // overlapping triangles are resolved by camera distance rather than
-    // submission order; never sampled or read by the user.
+    // the window resizes or the antialiasing level changes. Used purely as
+    // scratch state during a frame so overlapping triangles are resolved
+    // by camera distance rather than submission order; never sampled or
+    // read by the user.
     private GpuTexture? _depthTexture;
     private uint _depthWidth;
     private uint _depthHeight;
+    private SDL.GPUSampleCount _depthSampleCount = SDL.GPUSampleCount.SampleCount1;
     private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
+
+    // Multisample color scratch target. Allocated only when the active
+    // antialiasing level is greater than 1×; the render pass writes into
+    // this texture and resolves it down to the actual color target
+    // (swapchain image, owned image, etc.) at end-of-pass.
+    private GpuTexture? _msaaColorTexture;
+    private uint _msaaWidth;
+    private uint _msaaHeight;
+    private SDL.GPUSampleCount _msaaSampleCount = SDL.GPUSampleCount.SampleCount1;
+    private SDL.GPUTextureFormat _msaaColorFormat = SDL.GPUTextureFormat.Invalid;
+
+    // Sample count latched at the start of the current frame's render
+    // pass. Reading the public Antialiasing property mid-frame won't
+    // change what the GPU is doing for that frame.
+    private SDL.GPUSampleCount _currentSampleCount = SDL.GPUSampleCount.SampleCount1;
     // One vertex buffer per DrawDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -187,13 +204,24 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height))
         {
-            EnsureDepthTexture(width, height);
+            _currentSampleCount = MapAntialiasing(Antialiasing);
+            EnsureDepthTexture(width, height, _currentSampleCount);
+            EnsureMsaaColorTexture(width, height, _colorFormat, _currentSampleCount);
         }
         else
         {
             _colorTarget = null;
         }
     }
+
+    private static SDL.GPUSampleCount MapAntialiasing(Antialiasing aa) => aa switch
+    {
+        Antialiasing.None => SDL.GPUSampleCount.SampleCount1,
+        Antialiasing.X2 => SDL.GPUSampleCount.SampleCount2,
+        Antialiasing.X4 => SDL.GPUSampleCount.SampleCount4,
+        Antialiasing.X8 => SDL.GPUSampleCount.SampleCount8,
+        _ => throw new ArgumentOutOfRangeException(nameof(aa), aa, null),
+    };
 
     /// <summary>
     /// Resolves the color target for the current frame. The default
@@ -261,13 +289,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private protected GpuTexture? CurrentColorTarget => _colorTarget;
 
     /// <summary>
-    /// (Re)allocates the depth texture so its size matches the current
-    /// swapchain image. Disposes any previous texture when the window has
-    /// been resized.
+    /// (Re)allocates the depth texture so its size and sample count match
+    /// the current frame's color target. Disposes any previous texture
+    /// when the window has been resized or the antialiasing level
+    /// changed.
     /// </summary>
-    private void EnsureDepthTexture(uint width, uint height)
+    private void EnsureDepthTexture(uint width, uint height, SDL.GPUSampleCount sampleCount)
     {
-        if (_depthTexture is { IsDisposed: false } && width == _depthWidth && height == _depthHeight)
+        if (_depthTexture is { IsDisposed: false } &&
+            width == _depthWidth && height == _depthHeight && sampleCount == _depthSampleCount)
             return;
 
         _depthTexture?.Dispose();
@@ -280,10 +310,58 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Height = height,
             LayerCountOrDepth = 1,
             NumLevels = 1,
-            SampleCount = SDL.GPUSampleCount.SampleCount1,
+            SampleCount = sampleCount,
         });
         _depthWidth = width;
         _depthHeight = height;
+        _depthSampleCount = sampleCount;
+    }
+
+    /// <summary>
+    /// (Re)allocates the multisample color scratch target when MSAA is
+    /// active. Releases it when antialiasing is disabled. The texture's
+    /// format and dimensions must match the resolve target (i.e. the
+    /// frame's actual color target).
+    /// </summary>
+    private void EnsureMsaaColorTexture(uint width, uint height, SDL.GPUTextureFormat format, SDL.GPUSampleCount sampleCount)
+    {
+        if (sampleCount == SDL.GPUSampleCount.SampleCount1)
+        {
+            // No MSAA this frame; release any cached scratch target so
+            // we don't keep its memory pinned indefinitely.
+            if (_msaaColorTexture is not null)
+            {
+                _msaaColorTexture.Dispose();
+                _msaaColorTexture = null;
+                _msaaWidth = 0;
+                _msaaHeight = 0;
+                _msaaColorFormat = SDL.GPUTextureFormat.Invalid;
+                _msaaSampleCount = SDL.GPUSampleCount.SampleCount1;
+            }
+            return;
+        }
+
+        if (_msaaColorTexture is { IsDisposed: false } &&
+            width == _msaaWidth && height == _msaaHeight &&
+            format == _msaaColorFormat && sampleCount == _msaaSampleCount)
+            return;
+
+        _msaaColorTexture?.Dispose();
+        _msaaColorTexture = _device.CreateTexture(new GpuTextureCreateInfo
+        {
+            Type = SDL.GPUTextureType.Texturetype2D,
+            Format = format,
+            Usage = SDL.GPUTextureUsageFlags.ColorTarget,
+            Width = width,
+            Height = height,
+            LayerCountOrDepth = 1,
+            NumLevels = 1,
+            SampleCount = sampleCount,
+        });
+        _msaaWidth = width;
+        _msaaHeight = height;
+        _msaaColorFormat = format;
+        _msaaSampleCount = sampleCount;
     }
 
     /// <summary>
@@ -861,13 +939,34 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 _pendingMipmapGeneration.Clear();
             }
 
-            var colorTargets = ImmutableArray.Create(new GpuColorTargetInfo
+            // Wire up the color attachment. With no MSAA, we render
+            // straight into the resolved color target. With MSAA, we
+            // render into a multisample scratch texture and tell SDL to
+            // resolve it down into the actual target at end-of-pass --
+            // the multisample contents are then discarded (StoreOp.Resolve).
+            GpuColorTargetInfo colorTargetInfo;
+            if (_msaaColorTexture is not null)
             {
-                Texture = _colorTarget,
-                ClearColor = _clearColor,
-                LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
-                StoreOp = SDL.GPUStoreOp.Store,
-            });
+                colorTargetInfo = new GpuColorTargetInfo
+                {
+                    Texture = _msaaColorTexture,
+                    ClearColor = _clearColor,
+                    LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
+                    StoreOp = SDL.GPUStoreOp.Resolve,
+                    ResolveTexture = _colorTarget,
+                };
+            }
+            else
+            {
+                colorTargetInfo = new GpuColorTargetInfo
+                {
+                    Texture = _colorTarget,
+                    ClearColor = _clearColor,
+                    LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
+                    StoreOp = SDL.GPUStoreOp.Store,
+                };
+            }
+            var colorTargets = ImmutableArray.Create(colorTargetInfo);
 
             // Clear depth to 1.0 (the far plane in normalized device
             // coordinates) at the start of every frame and discard the
@@ -917,7 +1016,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         command.Command.DepthMode,
                         command.Command.BlendMode,
                         command.Command.CullMode,
-                        command.Command.Topology);
+                        command.Command.Topology,
+                        _currentSampleCount);
                     renderPass!.BindGraphicsPipeline(pipeline);
                     if (command.Instance is { Buffer: not null } instance)
                     {
@@ -1301,12 +1401,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
         DepthMode depthMode,
         BlendMode blendMode,
         CullMode cullMode,
-        Topology topology)
+        Topology topology,
+        SDL.GPUSampleCount sampleCount)
     {
-        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology);
+        var key = new PipelineKey(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology, sampleCount);
         if (!_pipelines.TryGetValue(key, out var pipeline))
         {
-            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology);
+            pipeline = CreatePipeline(vertexShader, fragmentShader, colorFormat, layout, instanceLayout, depthMode, blendMode, cullMode, topology, sampleCount);
             _pipelines[key] = pipeline;
         }
 
@@ -1444,7 +1545,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         DepthMode depthMode,
         BlendMode blendMode,
         CullMode cullMode,
-        Topology topology)
+        Topology topology,
+        SDL.GPUSampleCount sampleCount)
     {
         var attributes = ImmutableArray.CreateBuilder<SDL.GPUVertexAttribute>();
         uint location = 0;
@@ -1545,6 +1647,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             },
             RasterizerState = rasterizerState,
             DepthStencilState = depthState,
+            MultisampleState = new SDL.GPUMultisampleState
+            {
+                SampleCount = sampleCount,
+            },
             TargetInfo = new GpuPipelineTargetInfo
             {
                 ColorTargetDescriptions = colorTargets,
@@ -1719,7 +1825,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         DepthMode DepthMode,
         BlendMode BlendMode,
         CullMode CullMode,
-        Topology Topology);
+        Topology Topology,
+        SDL.GPUSampleCount SampleCount);
 
     private record DrawCommand(
         Mesh Mesh,

@@ -146,6 +146,22 @@ public abstract class Renderer3D
     public Rect? ClipRect { get; set; } = null;
 
     /// <summary>
+    /// Anti-aliasing level for triangle silhouettes. Latched at the
+    /// start of each frame's render pass; changing it between
+    /// <c>DrawMesh</c> calls within one frame has no effect on that
+    /// frame -- the new value applies to the next frame.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see cref="Antialiasing.None"/>. <see cref="Antialiasing.X4"/>
+    /// is a good baseline upgrade. Memory and fill-rate cost scale
+    /// linearly with the sample count; fragment shading cost stays the
+    /// same (one shader invocation per pixel, regardless of MSAA level).
+    /// MSAA does not help with texture aliasing inside surfaces — use
+    /// mipmaps (<see cref="Image.Mipmaps"/>) for that.
+    /// </remarks>
+    public Antialiasing Antialiasing { get; set; } = Antialiasing.None;
+
+    /// <summary>
     /// Saves the current renderer state and returns a scope whose
     /// disposal restores it. Intended for use with a <c>using</c>
     /// statement so callers can change state for a sub-region of drawing
