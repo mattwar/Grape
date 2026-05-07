@@ -7,7 +7,7 @@ namespace Grape;
 /// <summary>
 /// A high-level renderer for drawing a scene using the GPU pipeline.
 /// </summary>
-internal sealed class GpuRenderer : Renderer3D, IDisposable
+internal class GpuRenderer : Renderer3D, IDisposable
 {
     /// <summary>
     /// Number of frames a cached mesh or texture upload may go unused
@@ -16,7 +16,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     private const int IdleEvictionFrames = 120;
 
     private readonly GpuDevice _device;
-    private readonly Window3D _window;
+    private readonly Window3D? _window;
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
@@ -58,6 +58,18 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
+    /// Constructor for subclasses that own their own color target (no
+    /// window/swapchain). They must override <see cref="TryAcquireColorTarget"/>
+    /// and <see cref="PresentFrame"/>; <see cref="ApplySyncMode"/> becomes a
+    /// no-op (sync mode is meaningful only for swapchain presentation).
+    /// </summary>
+    private protected GpuRenderer(GpuDevice device)
+    {
+        _device = device;
+        _window = null;
+    }
+
+    /// <summary>
     /// The <see cref="GpuDevice"/> this renderer draws through.
     /// </summary>
     internal GpuDevice Device => _device;
@@ -75,6 +87,9 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
     private void ApplySyncMode(SyncMode mode)
     {
+        if (_window is null)
+            return;
+
         // Map the requested mode to the closest supported SDL_GPU
         // present mode. WaitForSync (FIFO) is always supported, so it's
         // the universal fallback. Hint -> first supported in priority
@@ -141,25 +156,82 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
             A = bg.A / 255f,
         };
 
-        _colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, _window.WindowId);
-
         _renderFrame = _device.BeginFrame();
 
-        if (SDL.WaitAndAcquireGPUSwapchainTexture(
-                _renderFrame.CommandBuffer.CommandBufferId,
-                _window.WindowId,
-                out var swapchainTextureId,
-                out var swapchainWidth,
-                out var swapchainHeight) && swapchainTextureId != 0)
+        if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height))
         {
-            _colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
-            EnsureDepthTexture(swapchainWidth, swapchainHeight);
+            EnsureDepthTexture(width, height);
         }
         else
         {
             _colorTarget = null;
         }
     }
+
+    /// <summary>
+    /// Resolves the color target for the current frame. The default
+    /// implementation acquires the next swapchain image of the bound
+    /// window. Subclasses that own their target (e.g. an image-bound
+    /// renderer) override this to return their owned texture.
+    /// </summary>
+    protected virtual bool TryAcquireColorTarget(
+        GpuRenderFrame frame,
+        out GpuTexture? colorTarget,
+        out SDL.GPUTextureFormat colorFormat,
+        out uint width,
+        out uint height)
+    {
+        colorTarget = null;
+        colorFormat = SDL.GPUTextureFormat.Invalid;
+        width = 0;
+        height = 0;
+
+        if (_window is null)
+            return false;
+
+        colorFormat = SDL.GetGPUSwapchainTextureFormat(_device.GpuDeviceID, _window.WindowId);
+
+        if (SDL.WaitAndAcquireGPUSwapchainTexture(
+                frame.CommandBuffer.CommandBufferId,
+                _window.WindowId,
+                out var swapchainTextureId,
+                out width,
+                out height) && swapchainTextureId != 0)
+        {
+            colorTarget = GpuTexture.WrapBorrowed(swapchainTextureId);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Finalises the current frame's command buffer. The default just
+    /// submits it (the swapchain present is implied). Subclasses that
+    /// render into their own target override this to also queue a
+    /// download copy pass and read pixels back to the CPU.
+    /// </summary>
+    protected virtual void PresentFrame()
+    {
+        _renderFrame!.Submit();
+    }
+
+    /// <summary>
+    /// Hook invoked at the start of the frame's main copy pass, before
+    /// any mesh/texture uploads. The default does nothing. Subclasses
+    /// override this to stage extra uploads into their target -- for
+    /// example, copying an image's existing CPU pixels into the GPU
+    /// color target so subsequent draws compose on top of them.
+    /// </summary>
+    protected virtual void OnBeforeUploads(GpuCopyPass copyPass)
+    {
+    }
+
+    /// <summary>The frame currently being recorded, or null between frames.</summary>
+    private protected GpuRenderFrame? CurrentFrame => _renderFrame;
+
+    /// <summary>The color target for the current frame, or null if acquisition failed.</summary>
+    private protected GpuTexture? CurrentColorTarget => _colorTarget;
 
     /// <summary>
     /// (Re)allocates the depth texture so its size matches the current
@@ -543,6 +615,8 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
 
             using (copyPass)
             {
+                OnBeforeUploads(copyPass!);
+
                 foreach (var command in prepared)
                 {
                     var mesh = command.Command.Mesh;
@@ -742,7 +816,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
                 }
             }
 
-            _renderFrame.Submit();
+            PresentFrame();
         }
         finally
         {
@@ -756,7 +830,7 @@ internal sealed class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         Render();
     }

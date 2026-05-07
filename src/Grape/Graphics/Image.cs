@@ -60,16 +60,116 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
-    /// Render into this image using a 2D renderer abstraction.
+    /// Render into this image using a 2D renderer abstraction. The
+    /// image's existing pixels are preserved as a backdrop and draws
+    /// compose on top of them.
     /// </summary>
-    public void Render(Action<Renderer2D> renderAction)
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    public void Render2D(Action<Renderer2D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         ThrowIfDisposed();
         using var renderer = Renderer.Create(this);
+
+        // Skip the implicit clear so existing surface pixels stay
+        // visible underneath the new draws.
+        renderer.AutoClear = false;
+
         renderAction(renderer);
         renderer.Render();
         Invalidate();
+    }
+
+    /// <summary>
+    /// Render into this image using a 2D renderer abstraction, painting
+    /// <paramref name="backgroundColor"/> behind the draws.
+    /// </summary>
+    /// <param name="backgroundColor">
+    /// The background painted behind the draws. An opaque alpha (255)
+    /// replaces the prior content (cheapest); a translucent alpha
+    /// blends over the prior content using standard source-over
+    /// compositing.
+    /// </param>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    public void Render2D(Color backgroundColor, Action<Renderer2D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        ThrowIfDisposed();
+        using var renderer = Renderer.Create(this);
+
+        if (backgroundColor.A == 255)
+        {
+            // Opaque background: replace prior content via the
+            // built-in clear -- cheaper than a full-surface FillRect
+            // and produces an identical result.
+            renderer.BackgroundColor = backgroundColor;
+            renderer.AutoClear = true;
+        }
+        else
+        {
+            // Translucent background: blend the color over the
+            // existing surface using SrcOver. AutoClear stays off so
+            // the prior pixels survive into the FillRect.
+            renderer.AutoClear = false;
+            var savedBlend = renderer.BlendMode;
+            var savedColor = renderer.DrawColor;
+            renderer.BlendMode = SDL.BlendMode.Blend;
+            renderer.DrawColor = backgroundColor;
+            var (w, h) = Size;
+            renderer.DrawFillRect(new Rect(0, 0, w, h));
+            renderer.DrawColor = savedColor;
+            renderer.BlendMode = savedBlend;
+        }
+
+        renderAction(renderer);
+        renderer.Render();
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Render into this image using a 3D renderer. The image's
+    /// existing pixels are preserved as a backdrop and new draws
+    /// compose on top of them; depth is per-call, so the wallpaper
+    /// itself never occludes new draws. The call is synchronous:
+    /// when it returns, the image's pixels reflect the final GPU
+    /// output. Intended for screenshot- and thumbnail-shaped use
+    /// cases, not per-frame readback.
+    /// </summary>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    /// <remarks>
+    /// Images in <see cref="PixelFormat.ABGR8888"/> take a fast path
+    /// that memcpys pixels between the GPU target and the surface.
+    /// Other formats fall back to a per-pixel conversion loop.
+    /// </remarks>
+    public void Render3D(Action<Renderer3D> renderAction)
+        => Render3DCore(null, renderAction);
+
+    /// <summary>
+    /// Render into this image using a 3D renderer, painting
+    /// <paramref name="backgroundColor"/> behind the draws. The call
+    /// is synchronous: when it returns, the image's pixels reflect
+    /// the final GPU output.
+    /// </summary>
+    /// <param name="backgroundColor">The background painted behind the draws.</param>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    /// <remarks>
+    /// Translucent alpha values are currently treated as opaque on
+    /// the 3D path (the alpha channel is honored in the cleared
+    /// buffer but does not blend over prior pixels). Blending a
+    /// translucent background over the wallpaper will be supported
+    /// once the GPU renderer gains a full-surface tint pass.
+    /// </remarks>
+    public void Render3D(Color backgroundColor, Action<Renderer3D> renderAction)
+        => Render3DCore(backgroundColor, renderAction);
+
+    private void Render3DCore(Color? backgroundColor, Action<Renderer3D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        ThrowIfDisposed();
+        using var renderer = new ImageGpuRenderer(GpuDevice.Default, this);
+        renderer.Configure(backgroundColor);
+        renderAction(renderer);
+        renderer.Render();
     }
 
     public void Dispose()
@@ -277,6 +377,21 @@ public sealed class Image : IDisposable
         ThrowIfDisposed();
         SDL.Surface* s = (SDL.Surface*)_imageId;
         return new ReadOnlySpan<byte>((void*)s->Pixels, s->Height * s->Pitch);
+    }
+
+    /// <summary>
+    /// Internal writable view over the surface's pixel bytes, used by
+    /// renderers that copy GPU-side results back into the image. Callers
+    /// are responsible for invalidating the image after writing.
+    /// </summary>
+    internal unsafe Span<byte> WritablePixels
+    {
+        get
+        {
+            ThrowIfDisposed();
+            SDL.Surface* s = (SDL.Surface*)_imageId;
+            return new Span<byte>((void*)s->Pixels, s->Height * s->Pitch);
+        }
     }
 
     /// <summary>
