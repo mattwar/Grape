@@ -95,8 +95,8 @@ window.Rendering += (w, rd) =>
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
-    rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+    rd.DrawMesh(tetraA, ShaderSets.PositionColorWithTransform, modelA * viewProjection);
+    rd.DrawMesh(tetraB, ShaderSets.PositionColorWithTransform, modelB * viewProjection);
 
     w.Invalidate();
 };

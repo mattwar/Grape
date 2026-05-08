@@ -2,24 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.2.0] - 2026-05-07
 
 ### Added
 - `Image.Load(path, mipmaps)` -- single entry point for image files.
 - `Image.Decode(ReadOnlySpan<byte>, mipmaps)` for in-memory image bytes.
 - `Model.Load(path)` and `.obj` / `.mtl` loaders.
 - OBJ loader smooths per-position normals when `vn` is absent.
+- Depth buffer + per-draw `DepthMode` (`Default`/`Transparent`/`Overlay`).
+- Index buffers via `Mesh.Create(verts, indices)` (transparent indexed draws).
+- Backface culling: `Renderer3D.CullMode` (`None`/`Back`/`Front`).
+- Per-mesh `Topology` (`TriangleList`/`Strip`/`LineList`/`LineStrip`/`Points`).
+- `Renderer3D.Wireframe` toggle deriving deduped edge indices on demand.
+- Per-draw `BlendMode` (`Alpha`/`Opaque`/`Additive`/`Multiply`).
+- `Renderer3D.Viewport` and `ClipRect` (scissor).
+- Hardware instancing via `InstancedShaderSet<TVertex,TArgs,TInstance>` and `Renderer3D.DrawMesh(... instances)`.
+- Built-in instanced shaders: `PositionInstanced`, `PositionColorInstanced`, `PositionTextureInstanced`.
+- Mipmap chains + anisotropic filtering via `Image.Mipmaps` flag (auto-generated on the GPU).
+- `Cubemap` type + `Image.Flip` / `Image.Rotate` helpers + `Shaders.Skybox` shader set.
+- MSAA via `Renderer3D.Antialiasing` (`None`/`X2`/`X4`/`X8`).
+- `Camera3D` (`PerspectiveCamera`, `OrthographicCamera`) integrated as `Renderer3D.Camera`.
+- Lighting: `Renderer3D.AmbientLight`, `DirectionalLight`, `PointLights` consumed via `IUniformArgs<TSelf>`.
+- Built-in lit shaders: `ShaderSets.LitColor`, `ShaderSets.LitTexture` with `LitArgs`.
+- `PushState()` returning a scoped `StateScope` snapshotting all renderer state.
+- New samples: `OrbitingTetrahedra`, `OverlayTetrahedron`, `CullingComparison`, `IndexedCube`, `LinesAndTriangles`, `WireframeCube`, `TriangleSwarm`, `TriangleSwarmInstanced`, `MipmapsAnimated`, `Skybox`, `Antialiasing`, `BlendModes`, `SplitScreen3D`, `ClippedScene`, `LitCube`, `OrbitingLight`, `PointLights`, `LoadObjModel`, `StanfordBunny`.
 
 ### Changed
 - Folded `Grape.SkiaSharp` into `Grape`; SkiaSharp is now a core dep.
 - `Image.Load` dispatches by extension: `.bmp` via SDL, others via SkiaSharp.
 - `Image.Save` dispatches by extension: `.bmp` via SDL, `.png`/`.jpg`/`.webp` via SkiaSharp.
+- Reorganised source into `Grape.Devices`, `Grape.Events`, `Grape.Shaders` namespaces.
+- Split monolithic `Events.cs`, `GpuDevice.cs`, and `Shader.cs` into per-type files.
+- Flattened `Graphics/` and `System/` subfolders into the project root.
 
 ### Removed
 - `Image.LoadBitmap` (use `Image.Load` instead).
 - Standalone `Grape.SkiaSharp` project (its types live in `Grape` now).
 
-## [0.1.0] - 2026-05-04
+## [0.1.1] - 2026-05-04
 
 ### Added
 - Initial release of `Grape.Graphics` NuGet package.
@@ -47,4 +67,5 @@ All notable changes to this project will be documented in this file.
 - `AsyncPeriodicTimer` now uses `Stopwatch` for monotonic cadence.
 - `AsyncPeriodicTimer` gained a `Reset()` method.
 
-[0.1.0]: https://github.com/mattwar/Grape/releases/tag/v0.1.0
+[0.2.0]: https://github.com/mattwar/Grape/releases/tag/v0.2.0
+[0.1.1]: https://github.com/mattwar/Grape/releases/tag/v0.1.1

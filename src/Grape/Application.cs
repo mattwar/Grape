@@ -1,6 +1,9 @@
 using System.Collections.Immutable;
 using Nito.AsyncEx;
 
+using Grape.Devices;
+using Grape.Events;
+
 namespace Grape;
 
 /// <summary>
@@ -32,9 +35,10 @@ public class Application : IDisposable
     /// types that need them (creating a <see cref="Window"/> brings up
     /// video, touching <see cref="Audio"/> brings up audio, and so on).
     /// </summary>
-    public static Application Current => _current ??= Start();
+    public static Application Current => _current ?? Start();
 
     private static Application? _current;
+    private static readonly object _startLock = new();
 
     /// <summary>
     /// The thread the application was created on.
@@ -157,7 +161,7 @@ public class Application : IDisposable
     /// <summary>
     /// The displays available to the application.
     /// </summary>
-    public ImmutableList<Display> Displays => Display.Displays;
+    public ImmutableList<DisplayDevice> Displays => Display.Displays;
     #endregion
 
     #region Event Loop and threading
@@ -166,31 +170,38 @@ public class Application : IDisposable
     /// </summary>
     public static Application Start()
     {
-        var application = _current;
-
-        if (application == null)
+        // Serialize start so concurrent Application.Current accesses
+        // (e.g. parallel xUnit test classes touching Image/Model) don't
+        // both spawn an app thread and race the singleton check in the
+        // constructor.
+        lock (_startLock)
         {
-            var tcs = new TaskCompletionSource<Application>();
-            var appThread = new Thread(_ =>
-            {
-                application = new Application();
-                application.Run(() => tcs.SetResult(application));
-                application.Dispose();
-            })
-            {
-                // Background so a headless caller (e.g. Image.Render3D
-                // with no window ever opened) doesn't keep the process
-                // alive after the main thread exits. Windowed apps still
-                // shut down cleanly via _quitRequested when the last
-                // window closes; this only changes the no-window case.
-                IsBackground = true,
-                Name = "Grape.Application",
-            };
-            appThread.Start();
-            application = tcs.Task.Result;
-        }
+            var application = _current;
 
-        return application;
+            if (application == null)
+            {
+                var tcs = new TaskCompletionSource<Application>();
+                var appThread = new Thread(_ =>
+                {
+                    application = new Application();
+                    application.Run(() => tcs.SetResult(application));
+                    application.Dispose();
+                })
+                {
+                    // Background so a headless caller (e.g. Image.Render3D
+                    // with no window ever opened) doesn't keep the process
+                    // alive after the main thread exits. Windowed apps still
+                    // shut down cleanly via _quitRequested when the last
+                    // window closes; this only changes the no-window case.
+                    IsBackground = true,
+                    Name = "Grape.Application",
+                };
+                appThread.Start();
+                application = tcs.Task.Result;
+            }
+
+            return application;
+        }
     }
 
     /// <summary>
@@ -411,7 +422,7 @@ public class Application : IDisposable
                 this.OnWindowDestroyed(window, default);
                 break;
             case SDL.EventType.WindowDisplayChanged:
-                Display.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
+                DisplayDevice.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
                 this.OnWindowDisplayChanged(window, new WindowDisplayChangedEventArgs(newDisplay));
                 break;
             case SDL.EventType.WindowDisplayScaleChanged:
@@ -657,43 +668,3 @@ public class Application : IDisposable
 
     #endregion
 }
-
-/// <summary>
-/// Handler for application-wide events that have no associated window.
-/// </summary>
-public delegate void ApplicationEventHandler<T>(Application sender, T args);
-
-/// <summary>
-/// Handler for window-targeted events raised at the application level.
-/// </summary>
-public delegate void ApplicationWindowEventHandler<T>(Application sender, Window window, T args);
-
-/// <summary>
-/// Handler for window-targeted events raised by a single window.
-/// </summary>
-public delegate void WindowEventHandler<T>(Window sender, T args);
-
-/// <summary>
-/// Handler for the per-frame <c>Rendering</c> event on a window. The
-/// concrete window and its renderer are passed directly so handlers
-/// don't have to cast.
-/// </summary>
-public delegate void WindowRenderingEventHandler<TWindow, TRenderer>(TWindow window, TRenderer renderer)
-    where TWindow : Window;
-
-// Application-only event arg records. Currently empty markers; signatures are
-// stable so payload can be added later without breaking handlers.
-public readonly record struct QuittingEventArgs;
-public readonly record struct TerminatingEventArgs;
-public readonly record struct LowMemoryEventArgs;
-public readonly record struct EnteringBackgroundEventArgs;
-public readonly record struct EnteredBackgroundEventArgs;
-public readonly record struct EnteringForegroundEventArgs;
-public readonly record struct EnteredForegroundEventArgs;
-public readonly record struct LocaleChangedEventArgs;
-
-/// <summary>
-/// A mouse device was added or removed at the application level.
-/// </summary>
-/// <param name="MouseId">The instance id of the mouse that was added or removed.</param>
-public readonly record struct MouseDeviceEventArgs(uint MouseId);

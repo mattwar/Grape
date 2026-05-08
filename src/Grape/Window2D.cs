@@ -1,3 +1,5 @@
+using Grape.Events;
+
 namespace Grape;
 
 /// <summary>

@@ -32,7 +32,7 @@ var mesh = Mesh.Create(triangle.AsSpan());
 
 // Reusable instance buffer -- updated in place each frame to avoid
 // allocating a fresh array.
-var instances = new TransformAndColor[Count];
+var instances = new TransformAndColorInstance[Count];
 
 var window = new Window3D
 {
@@ -68,13 +68,13 @@ window.Rendering += (w, rd) =>
             aspectScale;
 
         // White tint -- pass the mesh's baked vertex colors through unchanged.
-        instances[i] = new TransformAndColor(transform, Color.White);
+        instances[i] = new TransformAndColorInstance(transform, Color.White);
     }
 
     // Per-call uniform: identity view-projection -- the per-instance
     // transforms above already place each triangle directly in clip
     // space.
-    rd.DrawMeshRaw(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
+    rd.DrawMeshRaw(mesh, ShaderSets.PositionColorInstanced, Matrix4x4.Identity, instances);
 
     w.Invalidate(); // schedule the next frame
 };

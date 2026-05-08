@@ -1,3 +1,5 @@
+using Grape.Shaders;
+
 namespace Grape.Tests;
 
 public class ShaderArgsLayoutTests

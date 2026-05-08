@@ -1,6 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices.Marshalling;
 
+using Grape.Events;
+
 namespace Grape;
 
 /// <summary>

@@ -12,7 +12,7 @@
 //
 // A skybox is a cubemap (six square images arranged as the inside of
 // a cube) sampled by a 3D direction vector instead of a 2D UV. The
-// renderer ships a built-in `Shaders.Skybox` and `Camera3D` exposes
+// renderer ships a built-in `ShaderSets.Skybox` and `Camera3D` exposes
 // `GetSkyboxViewProjection` -- which strips the camera's translation
 // so the sky always stays centred on the player no matter where the
 // camera moves.
@@ -115,7 +115,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.None;
-        rd.DrawMeshRaw(skyboxMesh, cubemap, Shaders.Skybox,
+        rd.DrawMeshRaw(skyboxMesh, cubemap, ShaderSets.Skybox,
             camera.GetSkyboxViewProjection(aspect));
     }
 
@@ -130,7 +130,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(innerCube, Shaders.PositionColorWithTransform,
+        rd.DrawMesh(innerCube, ShaderSets.PositionColorWithTransform,
             model * viewProjection);
     }
 

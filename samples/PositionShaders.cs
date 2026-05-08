@@ -16,9 +16,9 @@ using System.Numerics;
 using Grape;
 
 // Exercises every position-only built-in shader in `Shaders`:
-//   - Shaders.Position                       (white, no transform)
-//   - Shaders.PositionWithTransform          (white, transformed)
-//   - Shaders.PositionWithTransformAndColor  (per-draw fragment color, transformed)
+//   - ShaderSets.Position                       (white, no transform)
+//   - ShaderSets.PositionWithTransform          (white, transformed)
+//   - ShaderSets.PositionWithTransformAndColor  (per-draw fragment color, transformed)
 // All three draw the same triangle mesh in different quadrants of the window
 // so the visual result tells you at a glance whether each shader pipeline
 // survives the runtime HLSL -> shadercross path.
@@ -33,7 +33,7 @@ var triangle = new Mesh<Vertex3D>(
     indices: ImmutableArray<uint>.Empty);
 
 // A static triangle whose positions are already in NDC inside the top-left
-// quadrant. Used to exercise Shaders.Position, which takes no transform.
+// quadrant. Used to exercise ShaderSets.Position, which takes no transform.
 var staticTopLeft = Mesh.Create([
     new Vertex3D(-0.5f,  0.7f, 0f),
     new Vertex3D(-0.3f,  0.3f, 0f),
@@ -57,28 +57,28 @@ window.Rendering += (w, rd) =>
     var fit  = Matrix4x4.CreateScale(0.35f) * Matrix4x4.CreateScale(aspect, 1f, 1f);
     var spin = Matrix4x4.CreateRotationZ(seconds);
 
-    // Top-left: Shaders.Position (no transform).
-    rd.DrawMesh(staticTopLeft, Shaders.Position);
+    // Top-left: ShaderSets.Position (no transform).
+    rd.DrawMesh(staticTopLeft, ShaderSets.Position);
 
-    // Top-right: Shaders.PositionWithTransform (white, spinning, translated).
+    // Top-right: ShaderSets.PositionWithTransform (white, spinning, translated).
     var topRight = spin * fit * Matrix4x4.CreateTranslation(0.5f, 0.5f, 0f);
-    rd.DrawMesh(triangle, Shaders.PositionWithTransform, topRight);
+    rd.DrawMesh(triangle, ShaderSets.PositionWithTransform, topRight);
 
-    // Bottom-left: Shaders.PositionWithTransformAndColor with red.
+    // Bottom-left: ShaderSets.PositionWithTransformAndColor with red.
     var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
-    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColor
+    rd.DrawMesh(triangle, ShaderSets.PositionWithTransformAndColor, new TransformAndFColorArgs
     {
         Transform = bottomLeft,
         FColor = new Vector4(1f, 0.2f, 0.2f, 1f),
     });
 
-    // Bottom-right: Shaders.PositionWithTransformAndColor with hue-cycling color
+    // Bottom-right: ShaderSets.PositionWithTransformAndColor with hue-cycling color
     // and counter-rotation.
     var bottomRight =
         Matrix4x4.CreateRotationZ(-seconds) * fit *
         Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
 
-    rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColor
+    rd.DrawMesh(triangle, ShaderSets.PositionWithTransformAndColor, new TransformAndFColorArgs
     {
         Transform = bottomRight,
         FColor = HueToRgb(seconds * 0.25f),

@@ -97,17 +97,17 @@ window.Rendering += (w, rd) =>
     plot.Reset(plotVertices, ReadOnlySpan<uint>.Empty);
 
     // Axes at the world origin.
-    rd.DrawMesh(axes, Shaders.PositionColorWithTransform, viewProjection);
+    rd.DrawMesh(axes, ShaderSets.PositionColorWithTransform, viewProjection);
 
     // Sine plot, lifted slightly so it doesn't sit on the X axis.
     var plotModel = Matrix4x4.CreateTranslation(0f, 0.3f, 0f);
-    rd.DrawMesh(plot, Shaders.PositionColorWithTransform, plotModel * viewProjection);
+    rd.DrawMesh(plot, ShaderSets.PositionColorWithTransform, plotModel * viewProjection);
 
     // Filled triangle, parked above and to the right.
     var triModel =
         Matrix4x4.CreateScale(0.6f) *
         Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
-    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
+    rd.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, triModel * viewProjection);
 
     w.Invalidate();
 };

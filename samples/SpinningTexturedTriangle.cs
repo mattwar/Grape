@@ -49,7 +49,7 @@ window.Rendering += (w, rd) =>
     rd.DrawMesh(
         triangle,
         checker,
-        Shaders.PositionTextureWithTransform,
+        ShaderSets.PositionTextureWithTransform,
         transform);
 
     w.Invalidate(); // schedule the next frame
