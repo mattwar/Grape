@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Grape.Shaders;
 
 namespace Grape;
 
@@ -90,7 +91,7 @@ public readonly struct TextureVertex3D
 
 /// <summary>
 /// A vertex that carries a position, a world-space normal, and a baked
-/// per-vertex color. Pairs with <see cref="Shaders.LitColor"/> -- the
+/// per-vertex color. Pairs with <see cref="ShaderSets.LitColor"/> -- the
 /// shader runs Lambertian lighting against the renderer's
 /// <see cref="Renderer3D.DirectionalLight"/> and
 /// <see cref="Renderer3D.AmbientLight"/> using the normal, then modulates

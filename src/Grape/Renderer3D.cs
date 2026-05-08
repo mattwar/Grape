@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using Grape.Shaders;
 
 namespace Grape;
 
@@ -173,7 +174,7 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Whole-scene ambient light, applied by lit shaders that opt in via
-    /// <see cref="IRenderArgs{TSelf}.SetAmbientLight"/>. The RGB channels
+    /// <see cref="IUniformArgs{TSelf}.SetAmbientLight"/>. The RGB channels
     /// are added unconditionally to every lit fragment; the default of
     /// <see cref="Color.Black"/> contributes nothing, so unlit shaders and
     /// scenes that just want a directional light see no change.
@@ -182,7 +183,7 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Optional infinitely-distant light. When non-null and the args
-    /// struct opts in via <see cref="IRenderArgs{TSelf}.SetDirectionalLight"/>,
+    /// struct opts in via <see cref="IUniformArgs{TSelf}.SetDirectionalLight"/>,
     /// lit shaders combine its contribution with <see cref="AmbientLight"/>
     /// using a Lambertian (N·L) term. <c>null</c> (the default) skips
     /// the directional contribution entirely; lit surfaces fall back to
@@ -260,7 +261,7 @@ public abstract class Renderer3D
     /// with the given per-draw arguments. The args struct is forwarded to the
     /// shader unchanged -- no renderer state (camera, lights, ...) is composed
     /// into it. This is the escape hatch for shaders whose arg layout doesn't
-    /// fit <see cref="IRenderArgs{TSelf}"/>; prefer
+    /// fit <see cref="IUniformArgs{TSelf}"/>; prefer
     /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
     /// when your args struct can opt in.
     /// </summary>
@@ -292,7 +293,7 @@ public abstract class Renderer3D
     /// Cubemap variant of the textured draw overload. The shader's
     /// fragment-stage texture binding (slot 0) must declare a
     /// <c>TextureCube</c> rather than a <c>Texture2D</c>; pair this
-    /// with <see cref="Shaders.Skybox"/> or another cubemap shader.
+    /// with <see cref="ShaderSets.Skybox"/> or another cubemap shader.
     /// </summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
@@ -303,7 +304,7 @@ public abstract class Renderer3D
     /// <summary>
     /// Raw cubemap draw with no scene composition. See
     /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
-    /// Used by <see cref="Shaders.Skybox"/>, which needs a translation-stripped
+    /// Used by <see cref="ShaderSets.Skybox"/>, which needs a translation-stripped
     /// view-projection that the regular camera composition can't supply.
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
@@ -319,7 +320,7 @@ public abstract class Renderer3D
     /// with the given per-draw arguments, composing the renderer's
     /// <see cref="Camera"/> view-projection (and, in the future, lights,
     /// ambient, time, ...) into the args struct via
-    /// <see cref="IRenderArgs{TSelf}"/> accessors before forwarding to the
+    /// <see cref="IUniformArgs{TSelf}"/> accessors before forwarding to the
     /// underlying draw path.
     /// </summary>
     /// <remarks>
@@ -331,12 +332,12 @@ public abstract class Renderer3D
     /// </para>
     /// <para>
     /// New traits (lights, ambient, etc.) appear as additional accessor pairs
-    /// on <see cref="IRenderArgs{TSelf}"/> with corresponding apply steps in
+    /// on <see cref="IUniformArgs{TSelf}"/> with corresponding apply steps in
     /// this overload. Args structs that don't opt in to a given trait are
     /// unaffected.
     /// </para>
     /// <para>
-    /// For args layouts that <em>can't</em> implement <see cref="IRenderArgs{TSelf}"/>
+    /// For args layouts that <em>can't</em> implement <see cref="IUniformArgs{TSelf}"/>
     /// (e.g. a bare <see cref="System.Numerics.Matrix4x4"/>), use
     /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
     /// </para>
@@ -346,7 +347,7 @@ public abstract class Renderer3D
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         var resolved = ApplyRenderArgs(args);
         DrawMeshRaw(mesh, shader, in resolved);
@@ -363,7 +364,7 @@ public abstract class Renderer3D
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         var resolved = ApplyRenderArgs(args);
         DrawMeshRaw(mesh, texture, shader, in resolved);
@@ -380,7 +381,7 @@ public abstract class Renderer3D
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         var resolved = ApplyRenderArgs(args);
         DrawMeshRaw(mesh, cubemap, shader, in resolved);
@@ -391,7 +392,7 @@ public abstract class Renderer3D
     // checks; an args struct that doesn't expose a given accessor is
     // unaffected.
     private TArgs ApplyRenderArgs<TArgs>(TArgs args)
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         // Camera -> single MVP transform field (compose model * view-projection).
         // Used by shaders that pack model and view-projection into one matrix.

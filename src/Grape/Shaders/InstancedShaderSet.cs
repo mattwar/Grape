@@ -1,6 +1,5 @@
-using System.Runtime.CompilerServices;
-
-namespace Grape;
+﻿using System.Runtime.CompilerServices;
+namespace Grape.Shaders;
 
 /// <summary>
 /// A shader pair used for instanced drawing. Like

@@ -97,7 +97,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, model);
+        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, model);
     }
 
     // Caption sits in front of everything regardless of depth.

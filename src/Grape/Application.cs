@@ -1,6 +1,9 @@
 using System.Collections.Immutable;
 using Nito.AsyncEx;
 
+using Grape.Devices;
+using Grape.Events;
+
 namespace Grape;
 
 /// <summary>
@@ -157,7 +160,7 @@ public class Application : IDisposable
     /// <summary>
     /// The displays available to the application.
     /// </summary>
-    public ImmutableList<Display> Displays => Display.Displays;
+    public ImmutableList<DisplayDevice> Displays => Display.Displays;
     #endregion
 
     #region Event Loop and threading
@@ -411,7 +414,7 @@ public class Application : IDisposable
                 this.OnWindowDestroyed(window, default);
                 break;
             case SDL.EventType.WindowDisplayChanged:
-                Display.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
+                DisplayDevice.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
                 this.OnWindowDisplayChanged(window, new WindowDisplayChangedEventArgs(newDisplay));
                 break;
             case SDL.EventType.WindowDisplayScaleChanged:
@@ -657,43 +660,3 @@ public class Application : IDisposable
 
     #endregion
 }
-
-/// <summary>
-/// Handler for application-wide events that have no associated window.
-/// </summary>
-public delegate void ApplicationEventHandler<T>(Application sender, T args);
-
-/// <summary>
-/// Handler for window-targeted events raised at the application level.
-/// </summary>
-public delegate void ApplicationWindowEventHandler<T>(Application sender, Window window, T args);
-
-/// <summary>
-/// Handler for window-targeted events raised by a single window.
-/// </summary>
-public delegate void WindowEventHandler<T>(Window sender, T args);
-
-/// <summary>
-/// Handler for the per-frame <c>Rendering</c> event on a window. The
-/// concrete window and its renderer are passed directly so handlers
-/// don't have to cast.
-/// </summary>
-public delegate void WindowRenderingEventHandler<TWindow, TRenderer>(TWindow window, TRenderer renderer)
-    where TWindow : Window;
-
-// Application-only event arg records. Currently empty markers; signatures are
-// stable so payload can be added later without breaking handlers.
-public readonly record struct QuittingEventArgs;
-public readonly record struct TerminatingEventArgs;
-public readonly record struct LowMemoryEventArgs;
-public readonly record struct EnteringBackgroundEventArgs;
-public readonly record struct EnteredBackgroundEventArgs;
-public readonly record struct EnteringForegroundEventArgs;
-public readonly record struct EnteredForegroundEventArgs;
-public readonly record struct LocaleChangedEventArgs;
-
-/// <summary>
-/// A mouse device was added or removed at the application level.
-/// </summary>
-/// <param name="MouseId">The instance id of the mouse that was added or removed.</param>
-public readonly record struct MouseDeviceEventArgs(uint MouseId);

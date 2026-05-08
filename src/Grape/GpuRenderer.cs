@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
+using Grape.Shaders;
 
 namespace Grape;
 
@@ -805,11 +806,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
             mesh.Reset(span, ReadOnlySpan<uint>.Empty);
         }
 
-        Transform argsTransform = transform;
+        TransformArgs argsTransform = transform;
         DrawTexturedMeshCore(
             mesh,
             atlas,
-            Shaders.PositionTextureWithTransform,
+            ShaderSets.PositionTextureWithTransform,
             sampler,
             in argsTransform);
     }

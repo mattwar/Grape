@@ -6,7 +6,7 @@ namespace Grape;
 /// An infinitely-distant light source that illuminates every point in
 /// the scene from the same direction with the same color (think:
 /// sunlight). Set on <see cref="Renderer3D.DirectionalLight"/>; lit
-/// shaders pick it up automatically through <see cref="IRenderArgs{TSelf}"/>.
+/// shaders pick it up automatically through <see cref="IUniformArgs{TSelf}"/>.
 /// </summary>
 public readonly struct DirectionalLight
 {

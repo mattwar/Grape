@@ -39,7 +39,7 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+    rd.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
 
     w.Invalidate(); // schedule the next frame
 };

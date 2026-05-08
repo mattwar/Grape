@@ -8,7 +8,7 @@ namespace Grape;
 /// equally in every direction, fading out smoothly to nothing at
 /// <see cref="Range"/>. Add to <see cref="Renderer3D.PointLights"/>; lit
 /// shaders pick the whole list up automatically through
-/// <see cref="IRenderArgs{TSelf}"/> and the renderer's storage buffer
+/// <see cref="IUniformArgs{TSelf}"/> and the renderer's storage buffer
 /// binding.
 /// </summary>
 /// <remarks>

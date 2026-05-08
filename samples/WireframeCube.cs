@@ -81,7 +81,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right cube: wireframe. The renderer builds a deduped edge index
@@ -93,7 +93,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.Wireframe = true;
-        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels.

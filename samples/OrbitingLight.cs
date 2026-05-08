@@ -114,7 +114,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(bigCube, Shaders.LitColor, new LitArgs(bigModel));
+        rd.DrawMesh(bigCube, ShaderSets.LitColor, new LitArgs(bigModel));
     }
 
     // Marker: small unlit white cube parked at the light's orbit
@@ -127,7 +127,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(marker, Shaders.PositionColorWithTransform, markerModel);
+        rd.DrawMesh(marker, ShaderSets.PositionColorWithTransform, markerModel);
     }
 
     w.Invalidate();

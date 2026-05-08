@@ -88,14 +88,14 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.Viewport = new Rect(0, 0, paneWidth, height);
-        rd.DrawMesh(quad, noMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
+        rd.DrawMesh(quad, noMips, ShaderSets.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "No Mipmaps", paneAspect);
     }
 
     using (rd.PushState())
     {
         rd.Viewport = new Rect(paneWidth, 0, paneWidth, height);
-        rd.DrawMesh(quad, withMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
+        rd.DrawMesh(quad, withMips, ShaderSets.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "Mipmaps", paneAspect);
     }
 

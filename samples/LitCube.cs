@@ -16,7 +16,7 @@
 //
 // Lighting is composed automatically: the renderer's Camera,
 // AmbientLight, and DirectionalLight properties feed the LitColor
-// shader through the IRenderArgs trait mechanism, so the per-draw
+// shader through the IUniformArgs trait mechanism, so the per-draw
 // arguments only carry the user-supplied model matrix.
 
 using System.Numerics;
@@ -99,7 +99,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(model));
+        rd.DrawMesh(cube, ShaderSets.LitColor, new LitArgs(model));
     }
 
     w.Invalidate();

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Grape.Shaders;
 
 namespace Grape;
 
@@ -87,42 +88,42 @@ public static class Renderer3DExtensions
     public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, Shaders.Position);
+        renderer.DrawMesh(mesh, ShaderSets.Position);
     }
 
     /// <summary>Draws a position-only mesh with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh, Transform transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, Shaders.PositionWithTransform, in transform);
+        renderer.DrawMesh(mesh, ShaderSets.PositionWithTransform, in transform);
     }
 
     /// <summary>Draws a position &amp; color mesh.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, Shaders.PositionColor);
+        renderer.DrawMesh(mesh, ShaderSets.PositionColor);
     }
 
     /// <summary>Draws a position &amp; color mesh with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh, Transform transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, Shaders.PositionColorWithTransform, in transform);
+        renderer.DrawMesh(mesh, ShaderSets.PositionColorWithTransform, in transform);
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, texture, Shaders.PositionTexture);
+        renderer.DrawMesh(mesh, texture, ShaderSets.PositionTexture);
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, Transform transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, texture, Shaders.PositionTextureWithTransform, in transform);
+        renderer.DrawMesh(mesh, texture, ShaderSets.PositionTextureWithTransform, in transform);
     }
 
     // ---- Plain (non-textured) array overloads ------------------------------
@@ -164,7 +165,7 @@ public static class Renderer3DExtensions
         in TArgs args,
         int? vertexCount = null)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(vertices);
@@ -181,7 +182,7 @@ public static class Renderer3DExtensions
     /// <summary>
     /// Raw version of <see cref="DrawMesh{TVertex,TArgs}(Renderer3D, TVertex[],
     /// ShaderSet{TVertex,TArgs}, in TArgs, int?)"/> for args structs that don't
-    /// implement <see cref="IRenderArgs{TSelf}"/>; bypasses scene composition.
+    /// implement <see cref="IUniformArgs{TSelf}"/>; bypasses scene composition.
     /// </summary>
     public static void DrawMeshRaw<TVertex, TArgs>(
         this Renderer3D renderer,
@@ -232,7 +233,7 @@ public static class Renderer3DExtensions
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(shader);
@@ -301,7 +302,7 @@ public static class Renderer3DExtensions
         in TArgs args,
         int? vertexCount = null)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(vertices);
@@ -372,7 +373,7 @@ public static class Renderer3DExtensions
         ShaderSet<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
-        where TArgs : unmanaged, IRenderArgs<TArgs>
+        where TArgs : unmanaged, IUniformArgs<TArgs>
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(shader);
@@ -412,52 +413,52 @@ public static class Renderer3DExtensions
 
     /// <summary>Draws a position-only mesh from an array.</summary>
     public static void DrawMesh(this Renderer3D renderer, Vertex3D[] vertices, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, Shaders.Position, vertexCount);
+        => renderer.DrawMesh(vertices, ShaderSets.Position, vertexCount);
 
     /// <summary>Draws a position-only mesh from an array with the given position transform.</summary>
     /// <summary>Draws a position-only mesh from an array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Vertex3D[] vertices, Transform transform, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, Shaders.PositionWithTransform, in transform, vertexCount);
+    public static void DrawMesh(this Renderer3D renderer, Vertex3D[] vertices, TransformArgs transform, int? vertexCount = null)
+        => renderer.DrawMesh(vertices, ShaderSets.PositionWithTransform, in transform, vertexCount);
 
     /// <summary>Draws a position &amp; color mesh from an array.</summary>
     public static void DrawMesh(this Renderer3D renderer, ColorVertex3D[] vertices, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, Shaders.PositionColor, vertexCount);
+        => renderer.DrawMesh(vertices, ShaderSets.PositionColor, vertexCount);
 
     /// <summary>Draws a position &amp; color mesh from an array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ColorVertex3D[] vertices, Transform transform, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, Shaders.PositionColorWithTransform, in transform, vertexCount);
+    public static void DrawMesh(this Renderer3D renderer, ColorVertex3D[] vertices, TransformArgs transform, int? vertexCount = null)
+        => renderer.DrawMesh(vertices, ShaderSets.PositionColorWithTransform, in transform, vertexCount);
 
     /// <summary>Draws a position &amp; texture mesh from an array with the given texture.</summary>
     public static void DrawMesh(this Renderer3D renderer, TextureVertex3D[] vertices, Image texture, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, texture, Shaders.PositionTexture, vertexCount);
+        => renderer.DrawMesh(vertices, texture, ShaderSets.PositionTexture, vertexCount);
 
     /// <summary>Draws a position &amp; texture mesh from an array with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, TextureVertex3D[] vertices, Image texture, Transform transform, int? vertexCount = null)
-        => renderer.DrawMesh(vertices, texture, Shaders.PositionTextureWithTransform, in transform, vertexCount);
+    public static void DrawMesh(this Renderer3D renderer, TextureVertex3D[] vertices, Image texture, TransformArgs transform, int? vertexCount = null)
+        => renderer.DrawMesh(vertices, texture, ShaderSets.PositionTextureWithTransform, in transform, vertexCount);
 
     // ---- Shader-defaulting ImmutableArray overloads ------------------------
 
     /// <summary>Draws a position-only mesh from an immutable array.</summary>
     public static void DrawMesh(this Renderer3D renderer, ImmutableArray<Vertex3D> vertices)
-        => renderer.DrawMesh(vertices, Shaders.Position);
+        => renderer.DrawMesh(vertices, ShaderSets.Position);
 
     /// <summary>Draws a position-only mesh from an immutable array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<Vertex3D> vertices, Transform transform)
-        => renderer.DrawMesh(vertices, Shaders.PositionWithTransform, in transform);
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<Vertex3D> vertices, TransformArgs transform)
+        => renderer.DrawMesh(vertices, ShaderSets.PositionWithTransform, in transform);
 
     /// <summary>Draws a position &amp; color mesh from an immutable array.</summary>
     public static void DrawMesh(this Renderer3D renderer, ImmutableArray<ColorVertex3D> vertices)
-        => renderer.DrawMesh(vertices, Shaders.PositionColor);
+        => renderer.DrawMesh(vertices, ShaderSets.PositionColor);
 
     /// <summary>Draws a position &amp; color mesh from an immutable array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<ColorVertex3D> vertices, Transform transform)
-        => renderer.DrawMesh(vertices, Shaders.PositionColorWithTransform, in transform);
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<ColorVertex3D> vertices, TransformArgs transform)
+        => renderer.DrawMesh(vertices, ShaderSets.PositionColorWithTransform, in transform);
 
     /// <summary>Draws a position &amp; texture mesh from an immutable array with the given texture.</summary>
     public static void DrawMesh(this Renderer3D renderer, ImmutableArray<TextureVertex3D> vertices, Image texture)
-        => renderer.DrawMesh(vertices, texture, Shaders.PositionTexture);
+        => renderer.DrawMesh(vertices, texture, ShaderSets.PositionTexture);
 
     /// <summary>Draws a position &amp; texture mesh from an immutable array with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<TextureVertex3D> vertices, Image texture, Transform transform)
-        => renderer.DrawMesh(vertices, texture, Shaders.PositionTextureWithTransform, in transform);
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<TextureVertex3D> vertices, Image texture, TransformArgs transform)
+        => renderer.DrawMesh(vertices, texture, ShaderSets.PositionTextureWithTransform, in transform);
 }

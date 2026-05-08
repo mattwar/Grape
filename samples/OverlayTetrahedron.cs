@@ -89,8 +89,8 @@ window.Rendering += (w, rd) =>
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
-    rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
+    rd.DrawMesh(tetraA, ShaderSets.PositionColorWithTransform, modelA * viewProjection);
+    rd.DrawMesh(tetraB, ShaderSets.PositionColorWithTransform, modelB * viewProjection);
 
     // The indicator orbits faster, on a tilted ring that passes through
     // the centre of the scene -- which means at some moments its true 3D
@@ -110,7 +110,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;
-        rd.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
+        rd.DrawMesh(indicator, ShaderSets.PositionColorWithTransform, indicatorModel * viewProjection);
     } // DepthMode automatically restored to Default here.
 
     w.Invalidate();

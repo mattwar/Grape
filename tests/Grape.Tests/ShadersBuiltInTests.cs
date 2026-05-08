@@ -11,7 +11,7 @@ public class ShadersBuiltInTests
         // as a storage buffer, the GpuRenderer will silently fail to
         // bind anything, the shader will read garbage, and lit scenes
         // will look wrong without an obvious cause -- catch it here.
-        var f = Shaders.LitColor.Fragment.GetResources();
+        var f = ShaderSets.LitColor.Fragment.GetResources();
 
         Assert.Equal(1u, f.NumStorageBuffers);
         Assert.Equal(0u, f.NumSamplers);
@@ -23,7 +23,7 @@ public class ShadersBuiltInTests
     [Fact]
     public void LitColor_VertexShader_HasNoTexturesOrStorage()
     {
-        var v = Shaders.LitColor.Vertex.GetResources();
+        var v = ShaderSets.LitColor.Vertex.GetResources();
 
         Assert.Equal(0u, v.NumStorageBuffers);
         Assert.Equal(0u, v.NumSamplers);

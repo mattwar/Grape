@@ -69,7 +69,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.Wireframe = true;
-        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.DrawMesh(tetra, ShaderSets.PositionColorWithTransform, transform);
     }
 
     // The "porthole" slides horizontally across the window. ClipRect is
@@ -83,7 +83,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.ClipRect = porthole;
-        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.DrawMesh(tetra, ShaderSets.PositionColorWithTransform, transform);
     }
 
     w.Invalidate();

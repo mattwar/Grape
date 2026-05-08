@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 namespace Grape;
 
 /// <summary>
-/// Per-draw arguments for <see cref="Shaders.LitColor"/>. Carries the
+/// Per-draw arguments for <see cref="ShaderSets.LitColor"/>. Carries the
 /// model matrix the user supplies and lighting fields that the renderer
 /// fills in from <see cref="Renderer3D.Camera"/>,
 /// <see cref="Renderer3D.AmbientLight"/>,
 /// <see cref="Renderer3D.DirectionalLight"/>, and
-/// <see cref="Renderer3D.PointLights"/> via <see cref="IRenderArgs{TSelf}"/>.
+/// <see cref="Renderer3D.PointLights"/> via <see cref="IUniformArgs{TSelf}"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -25,7 +25,7 @@ namespace Grape;
 /// </para>
 /// </remarks>
 [StructLayout(LayoutKind.Sequential)]
-public struct LitArgs : IRenderArgs<LitArgs>
+public struct LitArgs : IUniformArgs<LitArgs>
 {
     /// <summary>Per-draw world transform. Caller-supplied.</summary>
     public Matrix4x4 Model;
@@ -65,15 +65,15 @@ public struct LitArgs : IRenderArgs<LitArgs>
 
     public static implicit operator LitArgs(Matrix4x4 model) => new(model);
 
-    /// <inheritdoc cref="IRenderArgs{TSelf}.SetViewProjection"/>
+    /// <inheritdoc cref="IUniformArgs{TSelf}.SetViewProjection"/>
     public static Func<LitArgs, Matrix4x4, LitArgs>? SetViewProjection { get; } =
         (a, vp) => { a.ViewProjection = vp; return a; };
 
-    /// <inheritdoc cref="IRenderArgs{TSelf}.SetAmbientLight"/>
+    /// <inheritdoc cref="IUniformArgs{TSelf}.SetAmbientLight"/>
     public static Func<LitArgs, Vector4, LitArgs>? SetAmbientLight { get; } =
         (a, amb) => { a.AmbientLight = amb; return a; };
 
-    /// <inheritdoc cref="IRenderArgs{TSelf}.SetDirectionalLight"/>
+    /// <inheritdoc cref="IUniformArgs{TSelf}.SetDirectionalLight"/>
     public static Func<LitArgs, DirectionalLight, LitArgs>? SetDirectionalLight { get; } =
         (a, light) =>
         {
@@ -82,7 +82,7 @@ public struct LitArgs : IRenderArgs<LitArgs>
             return a;
         };
 
-    /// <inheritdoc cref="IRenderArgs{TSelf}.SetPointLightCount"/>
+    /// <inheritdoc cref="IUniformArgs{TSelf}.SetPointLightCount"/>
     public static Func<LitArgs, int, LitArgs>? SetPointLightCount { get; } =
         (a, count) => { a.PointLightCount = new Vector4(count, 0f, 0f, 0f); return a; };
 }

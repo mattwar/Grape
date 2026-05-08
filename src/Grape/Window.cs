@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
+using Grape.Devices;
+using Grape.Events;
 using Grape.Utilities;
 
 namespace Grape;
@@ -161,13 +163,13 @@ public abstract class Window : IDisposable
     /// <summary>
     /// The display that the window is currently on.
     /// </summary>
-    public Display Display
+    public DisplayDevice Display
     {
         get
         {
             ThrowIfDisposed();
             var displayId = SDL.GetDisplayForWindow(_window);
-            if (Display.TryGetDisplay(displayId, out var display))
+            if (DisplayDevice.TryGetDisplay(displayId, out var display))
                 return display;
             throw new InvalidOperationException("Display not found");
         }
@@ -880,7 +882,7 @@ public abstract class Window : IDisposable
                 this.OnWindowDestroyed(window, default);
                 break;
             case SDL.EventType.WindowDisplayChanged:
-                Display.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
+                DisplayDevice.TryGetDisplay((uint)e.Window.Data1, out var newDisplay);
                 this.OnWindowDisplayChanged(window, new WindowDisplayChangedEventArgs(newDisplay));
                 break;
             case SDL.EventType.WindowDisplayScaleChanged:
@@ -1105,7 +1107,3 @@ public abstract class Window : IDisposable
 
 #endregion
 }
-
-public delegate void HeartBeatEventHandler(Window sender, HeartBeatEventArgs args);
-
-public record struct HeartBeatEventArgs(TimeSpan ElapsedSinceStart, TimeSpan ElapsedSinceLastBeat);

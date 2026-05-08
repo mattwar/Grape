@@ -99,13 +99,13 @@ window.Rendering += (w, rd) =>
     // everything else. When the right quad's back face is culled, the
     // missing pixels reveal this gradient.
     var modelBackdrop = Matrix4x4.CreateTranslation(0f, 0f, -1f);
-    rd.DrawMesh(backdrop, Shaders.PositionColorWithTransform, modelBackdrop * viewProjection);
+    rd.DrawMesh(backdrop, ShaderSets.PositionColorWithTransform, modelBackdrop * viewProjection);
 
     // Left: CullMode.None. Both faces drawn, quad always visible.
     using (rd.PushState())
     {
         rd.CullMode = CullMode.None;
-        rd.DrawMesh(quadLeft, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
+        rd.DrawMesh(quadLeft, ShaderSets.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right: CullMode.Back. Front face only; the quad disappears when
@@ -113,7 +113,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(quadRight, Shaders.PositionColorWithTransform, modelRight * viewProjection);
+        rd.DrawMesh(quadRight, ShaderSets.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels. Debug text uses textured quads, so we draw them as
