@@ -69,4 +69,25 @@ public abstract class Camera3D
     /// </summary>
     public Matrix4x4 GetViewProjection(float aspectRatio) =>
         GetView() * GetProjection(aspectRatio);
+
+    /// <summary>
+    /// View-projection for drawing a skybox: the same as
+    /// <see cref="GetViewProjection"/> but with the camera's
+    /// translation stripped out so the skybox stays centred on the
+    /// camera regardless of where the camera moves. Pair with
+    /// <see cref="Shaders.Skybox"/> and a unit cube mesh.
+    /// </summary>
+    public Matrix4x4 GetSkyboxViewProjection(float aspectRatio)
+    {
+        // Zero the translation row of the view matrix. The result is
+        // the same orientation as GetView() but anchored at the origin
+        // -- so the cube the skybox is drawn on is always centred on
+        // the camera and the player can never "reach the edge" of the
+        // sky.
+        var view = GetView();
+        view.M41 = 0f;
+        view.M42 = 0f;
+        view.M43 = 0f;
+        return view * GetProjection(aspectRatio);
+    }
 }

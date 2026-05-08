@@ -91,7 +91,7 @@ public static class Renderer3DExtensions
     }
 
     /// <summary>Draws a position-only mesh with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh, Transform transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         renderer.DrawMesh(mesh, Shaders.PositionWithTransform, in transform);
@@ -105,7 +105,7 @@ public static class Renderer3DExtensions
     }
 
     /// <summary>Draws a position &amp; color mesh with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh, Transform transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         renderer.DrawMesh(mesh, Shaders.PositionColorWithTransform, in transform);
@@ -119,7 +119,7 @@ public static class Renderer3DExtensions
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, Transform transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         renderer.DrawMesh(mesh, texture, Shaders.PositionTextureWithTransform, in transform);
@@ -151,9 +151,39 @@ public static class Renderer3DExtensions
 
     /// <summary>
     /// Draws a mesh from a caller-owned array using a shader that takes a
-    /// typed per-draw arguments value.
+    /// typed per-draw arguments value. Goes through the scene-aware
+    /// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// ShaderSet{TVertex,TArgs}, in TArgs)"/> path -- the renderer composes
+    /// its <see cref="Renderer3D.Camera"/> into the args struct's transform
+    /// field if it has one.
     /// </summary>
     public static void DrawMesh<TVertex, TArgs>(
+        this Renderer3D renderer,
+        TVertex[] vertices,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args,
+        int? vertexCount = null)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = renderer.GetOrCreateMesh(vertices, count);
+        renderer.DrawMesh(mesh, shader, in args);
+    }
+
+    /// <summary>
+    /// Raw version of <see cref="DrawMesh{TVertex,TArgs}(Renderer3D, TVertex[],
+    /// ShaderSet{TVertex,TArgs}, in TArgs, int?)"/> for args structs that don't
+    /// implement <see cref="IRenderArgs{TSelf}"/>; bypasses scene composition.
+    /// </summary>
+    public static void DrawMeshRaw<TVertex, TArgs>(
         this Renderer3D renderer,
         TVertex[] vertices,
         ShaderSet<TVertex, TArgs> shader,
@@ -171,7 +201,7 @@ public static class Renderer3DExtensions
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
         var mesh = renderer.GetOrCreateMesh(vertices, count);
-        renderer.DrawMesh(mesh, shader, in args);
+        renderer.DrawMeshRaw(mesh, shader, in args);
     }
 
     /// <summary>
@@ -194,9 +224,31 @@ public static class Renderer3DExtensions
 
     /// <summary>
     /// Draws a mesh from an <see cref="ImmutableArray{T}"/> using a shader
-    /// that takes a typed per-draw arguments value.
+    /// that takes a typed per-draw arguments value. Scene-aware path.
     /// </summary>
     public static void DrawMesh<TVertex, TArgs>(
+        this Renderer3D renderer,
+        ImmutableArray<TVertex> vertices,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(shader);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = renderer.GetOrCreateMesh(vertices);
+        renderer.DrawMesh(mesh, shader, in args);
+    }
+
+    /// <summary>
+    /// Raw version of <see cref="DrawMesh{TVertex,TArgs}(Renderer3D,
+    /// ImmutableArray{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>;
+    /// bypasses scene composition.
+    /// </summary>
+    public static void DrawMeshRaw<TVertex, TArgs>(
         this Renderer3D renderer,
         ImmutableArray<TVertex> vertices,
         ShaderSet<TVertex, TArgs> shader,
@@ -210,7 +262,7 @@ public static class Renderer3DExtensions
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
         var mesh = renderer.GetOrCreateMesh(vertices);
-        renderer.DrawMesh(mesh, shader, in args);
+        renderer.DrawMeshRaw(mesh, shader, in args);
     }
 
     // ---- Textured array overloads ------------------------------------------
@@ -239,9 +291,36 @@ public static class Renderer3DExtensions
 
     /// <summary>
     /// Draws a textured mesh from a caller-owned vertex array using a shader
-    /// with typed per-draw args.
+    /// with typed per-draw args. Scene-aware path.
     /// </summary>
     public static void DrawMesh<TVertex, TArgs>(
+        this Renderer3D renderer,
+        TVertex[] vertices,
+        Image texture,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args,
+        int? vertexCount = null)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(vertices);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+
+        var count = vertexCount ?? vertices.Length;
+        if ((uint)count > (uint)vertices.Length)
+            throw new ArgumentOutOfRangeException(nameof(vertexCount));
+
+        var mesh = renderer.GetOrCreateMesh(vertices, count);
+        renderer.DrawMesh(mesh, texture, shader, in args);
+    }
+
+    /// <summary>
+    /// Raw version of <see cref="DrawMesh{TVertex,TArgs}(Renderer3D, TVertex[], Image, ShaderSet{TVertex,TArgs}, in TArgs, int?)"/>; 
+    /// Does not modify shader args with render state.
+    /// </summary>
+    public static void DrawMeshRaw<TVertex, TArgs>(
         this Renderer3D renderer,
         TVertex[] vertices,
         Image texture,
@@ -261,7 +340,7 @@ public static class Renderer3DExtensions
             throw new ArgumentOutOfRangeException(nameof(vertexCount));
 
         var mesh = renderer.GetOrCreateMesh(vertices, count);
-        renderer.DrawMesh(mesh, texture, shader, in args);
+        renderer.DrawMeshRaw(mesh, texture, shader, in args);
     }
 
     /// <summary>Draws a textured mesh from an <see cref="ImmutableArray{T}"/>.</summary>
@@ -284,9 +363,33 @@ public static class Renderer3DExtensions
 
     /// <summary>
     /// Draws a textured mesh from an <see cref="ImmutableArray{T}"/> using a
-    /// shader with typed per-draw args.
+    /// shader with typed per-draw args. Scene-aware path.
     /// </summary>
     public static void DrawMesh<TVertex, TArgs>(
+        this Renderer3D renderer,
+        ImmutableArray<TVertex> vertices,
+        Image texture,
+        ShaderSet<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IRenderArgs<TArgs>
+    {
+        ArgumentNullException.ThrowIfNull(renderer);
+        ArgumentNullException.ThrowIfNull(shader);
+        ArgumentNullException.ThrowIfNull(texture);
+        if (vertices.IsDefault)
+            throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
+
+        var mesh = renderer.GetOrCreateMesh(vertices);
+        renderer.DrawMesh(mesh, texture, shader, in args);
+    }
+
+    /// <summary>
+    /// Raw version of <see cref="DrawMesh{TVertex,TArgs}(Renderer3D,
+    /// ImmutableArray{TVertex}, Image, ShaderSet{TVertex,TArgs}, in TArgs)"/>;
+    /// bypasses scene composition.
+    /// </summary>
+    public static void DrawMeshRaw<TVertex, TArgs>(
         this Renderer3D renderer,
         ImmutableArray<TVertex> vertices,
         Image texture,
@@ -302,7 +405,7 @@ public static class Renderer3DExtensions
             throw new ArgumentException("ImmutableArray must be initialised.", nameof(vertices));
 
         var mesh = renderer.GetOrCreateMesh(vertices);
-        renderer.DrawMesh(mesh, texture, shader, in args);
+        renderer.DrawMeshRaw(mesh, texture, shader, in args);
     }
 
     // ---- Shader-defaulting array overloads ---------------------------------
@@ -312,7 +415,8 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, Shaders.Position, vertexCount);
 
     /// <summary>Draws a position-only mesh from an array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Vertex3D[] vertices, in Matrix4x4 transform, int? vertexCount = null)
+    /// <summary>Draws a position-only mesh from an array with the given position transform.</summary>
+    public static void DrawMesh(this Renderer3D renderer, Vertex3D[] vertices, Transform transform, int? vertexCount = null)
         => renderer.DrawMesh(vertices, Shaders.PositionWithTransform, in transform, vertexCount);
 
     /// <summary>Draws a position &amp; color mesh from an array.</summary>
@@ -320,7 +424,7 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, Shaders.PositionColor, vertexCount);
 
     /// <summary>Draws a position &amp; color mesh from an array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ColorVertex3D[] vertices, in Matrix4x4 transform, int? vertexCount = null)
+    public static void DrawMesh(this Renderer3D renderer, ColorVertex3D[] vertices, Transform transform, int? vertexCount = null)
         => renderer.DrawMesh(vertices, Shaders.PositionColorWithTransform, in transform, vertexCount);
 
     /// <summary>Draws a position &amp; texture mesh from an array with the given texture.</summary>
@@ -328,7 +432,7 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, texture, Shaders.PositionTexture, vertexCount);
 
     /// <summary>Draws a position &amp; texture mesh from an array with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, TextureVertex3D[] vertices, Image texture, in Matrix4x4 transform, int? vertexCount = null)
+    public static void DrawMesh(this Renderer3D renderer, TextureVertex3D[] vertices, Image texture, Transform transform, int? vertexCount = null)
         => renderer.DrawMesh(vertices, texture, Shaders.PositionTextureWithTransform, in transform, vertexCount);
 
     // ---- Shader-defaulting ImmutableArray overloads ------------------------
@@ -338,7 +442,7 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, Shaders.Position);
 
     /// <summary>Draws a position-only mesh from an immutable array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<Vertex3D> vertices, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<Vertex3D> vertices, Transform transform)
         => renderer.DrawMesh(vertices, Shaders.PositionWithTransform, in transform);
 
     /// <summary>Draws a position &amp; color mesh from an immutable array.</summary>
@@ -346,7 +450,7 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, Shaders.PositionColor);
 
     /// <summary>Draws a position &amp; color mesh from an immutable array with the given position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<ColorVertex3D> vertices, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<ColorVertex3D> vertices, Transform transform)
         => renderer.DrawMesh(vertices, Shaders.PositionColorWithTransform, in transform);
 
     /// <summary>Draws a position &amp; texture mesh from an immutable array with the given texture.</summary>
@@ -354,6 +458,6 @@ public static class Renderer3DExtensions
         => renderer.DrawMesh(vertices, texture, Shaders.PositionTexture);
 
     /// <summary>Draws a position &amp; texture mesh from an immutable array with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<TextureVertex3D> vertices, Image texture, in Matrix4x4 transform)
+    public static void DrawMesh(this Renderer3D renderer, ImmutableArray<TextureVertex3D> vertices, Image texture, Transform transform)
         => renderer.DrawMesh(vertices, texture, Shaders.PositionTextureWithTransform, in transform);
 }

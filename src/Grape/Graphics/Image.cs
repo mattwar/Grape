@@ -9,15 +9,28 @@ public sealed class Image : IDisposable
     internal nint _imageId;
     private int _version;
 
-    private Image(nint imageId)
+    private Image(nint imageId, bool mipmaps = false)
     {
         _imageId = imageId;
         _application = Application.Current;
         _application.AddResource(this);
         _version = 1;
+        Mipmaps = mipmaps;
     }
 
-    public static Image Create(int width, int height, PixelFormat format)
+    /// <summary>
+    /// When <c>true</c>, hints to renderers that they should produce a
+    /// full mipmap chain for this image's GPU texture and re-generate
+    /// it whenever <see cref="Version"/> bumps. Costs ~33% extra GPU
+    /// memory and a one-time generation step per upload, but eliminates
+    /// shimmering / aliasing when the texture is minified (drawn small
+    /// or at distance) and unlocks anisotropic filtering. Defaults to
+    /// <c>false</c>; set when creating images that will be sampled at
+    /// arbitrary scales.
+    /// </summary>
+    public bool Mipmaps { get; }
+
+    public static Image Create(int width, int height, PixelFormat format, bool mipmaps = false)
     {
         // SDL must be initialised before any SDL.* call. Touching
         // Application.Current starts the app on demand.
@@ -26,7 +39,7 @@ public sealed class Image : IDisposable
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
             throw new InvalidOperationException("Cannot create image");
-        return new Image(imageId);
+        return new Image(imageId, mipmaps);
     }
 
     public bool IsDisposed => _imageId == 0;
@@ -194,14 +207,14 @@ public sealed class Image : IDisposable
     /// <summary>
     /// Loads a bitmap from the specified file path.
     /// </summary>
-    public static Image LoadBitmap(string filePath)
+    public static Image LoadBitmap(string filePath, bool mipmaps = false)
     {
         _ = Application.Current;
 
         var imageId = SDL.LoadBMP(filePath);
         if (imageId == 0)
             throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
-        return new Image(imageId);
+        return new Image(imageId, mipmaps);
     }
 
     /// <summary>
@@ -543,6 +556,72 @@ public sealed class Image : IDisposable
                 action(new PixelContext(this, x, y));
             }
         }
+    }
+
+    /// <summary>
+    /// Returns a new image with the pixels flipped along the requested
+    /// axis. The source image is unchanged. The new image inherits the
+    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
+    /// flag. <see cref="FlipMode.None"/> still allocates a fresh copy.
+    /// </summary>
+    public Image Flip(FlipMode mode)
+    {
+        ThrowIfDisposed();
+        var (width, height) = Size;
+        var result = Image.Create(width, height, PixelFormat, Mipmaps);
+        // Pixel-by-pixel via GetPixel/SetPixel so this works for every
+        // PixelFormat we support (including indexed and packed formats)
+        // without per-format byte arithmetic. Future optimisation: a
+        // per-format byte-stride memcpy path for Horizontal+Vertical
+        // on the common 32-bit RGBA formats.
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int srcX = mode == FlipMode.Horizontal ? width - 1 - x : x;
+                int srcY = mode == FlipMode.Vertical ? height - 1 - y : y;
+                result.SetPixel(x, y, GetPixel(srcX, srcY));
+            }
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Returns a new image rotated by the requested right angle. The
+    /// source image is unchanged. For <see cref="Rotation.Clockwise90"/>
+    /// and <see cref="Rotation.Counterclockwise90"/> the result's
+    /// width and height are swapped. The new image inherits the
+    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
+    /// flag. <see cref="Rotation.None"/> still allocates a fresh copy.
+    /// </summary>
+    public Image Rotate(Rotation rotation)
+    {
+        ThrowIfDisposed();
+        var (width, height) = Size;
+        var (resultWidth, resultHeight) = rotation switch
+        {
+            Rotation.Clockwise90 or Rotation.Counterclockwise90 => (height, width),
+            _ => (width, height),
+        };
+        var result = Image.Create(resultWidth, resultHeight, PixelFormat, Mipmaps);
+        // Pixel-by-pixel via GetPixel/SetPixel for the same reasons as
+        // Flip. Future optimisation: row-stride memcpy for Half on the
+        // common 32-bit formats; transposed strided copy for the 90s.
+        for (int y = 0; y < resultHeight; y++)
+        {
+            for (int x = 0; x < resultWidth; x++)
+            {
+                var (srcX, srcY) = rotation switch
+                {
+                    Rotation.Clockwise90 => (y, resultWidth - 1 - x),
+                    Rotation.Counterclockwise90 => (resultHeight - 1 - y, x),
+                    Rotation.Half => (width - 1 - x, height - 1 - y),
+                    _ => (x, y),
+                };
+                result.SetPixel(x, y, GetPixel(srcX, srcY));
+            }
+        }
+        return result;
     }
 
     /// <summary>
