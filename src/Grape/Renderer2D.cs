@@ -68,6 +68,23 @@ public abstract class Renderer2D
         _lastRenderTs = Stopwatch.GetTimestamp();
     }
 
+    /// <summary>
+    /// Builds a per-frame <see cref="UpdateContext2D"/> snapshotting this
+    /// renderer's clock and target bounds. Convenience for the common
+    /// case where one loop drives both update and render; standalone
+    /// simulations should build their own context from their own clock.
+    /// </summary>
+    public UpdateContext2D GetUpdateContext()
+    {
+        var (w, h) = OutputSize;
+        return new UpdateContext2D
+        {
+            ElapsedSinceStart = ElapsedSinceStart,
+            ElapsedSinceLastUpdate = ElapsedSinceLastRender,
+            Bounds = new Rect(0, 0, w, h),
+        };
+    }
+
     #region State
 
     /// <summary>Clipping rectangle for subsequent draws.</summary>

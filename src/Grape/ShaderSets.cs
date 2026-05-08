@@ -820,7 +820,7 @@ public static class ShaderSets
     /// behind everything else. Pair with a unit cube mesh whose
     /// vertices span [-1, 1] on each axis (e.g. the cube from
     /// <c>samples/IndexedCube.cs</c>) and pass
-    /// <see cref="Camera3D.GetSkyboxViewProjection(float)"/> as the
+    /// <see cref="Camera.GetSkyboxViewProjection(float)"/> as the
     /// per-draw transform so the skybox follows the camera. Use
     /// <see cref="DepthMode.Default"/> -- the shader's depth output of
     /// 1.0 ensures the skybox draws behind opaque geometry without

@@ -2,13 +2,13 @@ namespace Grape.Jelly.Tests;
 
 public class SpriteTests
 {
-    private static UpdateContext Context(double seconds) =>
-        new() { ElaspsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
+    private static UpdateContext2D Context(double seconds) =>
+        new() { ElapsedSinceLastUpdate = TimeSpan.FromSeconds(seconds) };
 
     [Fact]
     public void Update_WithNoMotion_AfterFirstFrame_ReturnsFalse()
     {
-        var sprite = new Sprite { CenterX = 100, CenterY = 100 };
+        var sprite = new Sprite2D { CenterX = 100, CenterY = 100 };
 
         // First frame (zero elapsed) is treated as "changed" so the sprite renders initially.
         Assert.True(sprite.Update(Context(0)));
@@ -23,7 +23,7 @@ public class SpriteTests
     public void Update_HeadingZero_MovesUp()
     {
         // Heading 0 = up (negative Y), per GetVelocity (heading - 90 → cos/sin).
-        var sprite = new Sprite { CenterX = 0, CenterY = 0, Heading = 0f, Speed = 100f };
+        var sprite = new Sprite2D { CenterX = 0, CenterY = 0, Heading = 0f, Speed = 100f };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0));
@@ -34,7 +34,7 @@ public class SpriteTests
     [Fact]
     public void Update_Heading90_MovesRight()
     {
-        var sprite = new Sprite { CenterX = 0, CenterY = 0, Heading = 90f, Speed = 50f };
+        var sprite = new Sprite2D { CenterX = 0, CenterY = 0, Heading = 90f, Speed = 50f };
         sprite.Update(Context(0));
 
         sprite.Update(Context(2.0));
@@ -45,7 +45,7 @@ public class SpriteTests
     [Fact]
     public void Update_Heading180_MovesDown()
     {
-        var sprite = new Sprite { CenterX = 0, CenterY = 0, Heading = 180f, Speed = 10f };
+        var sprite = new Sprite2D { CenterX = 0, CenterY = 0, Heading = 180f, Speed = 10f };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0));
@@ -56,7 +56,7 @@ public class SpriteTests
     [Fact]
     public void Update_AccumulatesRotation_AndWrapsAt360()
     {
-        var sprite = new Sprite { Rotation = 350f, RotationSpeed = 30f };
+        var sprite = new Sprite2D { Rotation = 350f, RotationSpeed = 30f };
         sprite.Update(Context(0));
 
         sprite.Update(Context(1.0)); // +30° → 380 % 360 → 20
@@ -66,7 +66,7 @@ public class SpriteTests
     [Fact]
     public void Update_ReturnsTrue_WhenPositionChanges()
     {
-        var sprite = new Sprite { Heading = 90f, Speed = 1f };
+        var sprite = new Sprite2D { Heading = 90f, Speed = 1f };
         sprite.Update(Context(0));            // first-frame change
         Assert.True(sprite.Update(Context(1.0))); // moved
     }
@@ -78,7 +78,7 @@ public class SpriteTests
     [InlineData(270f, -1f,   0f)]    // left
     public void GetVelocity_MatchesCardinalDirections(float heading, float expectedVx, float expectedVy)
     {
-        var (vx, vy) = Sprite.GetVelocity(1f, heading);
+        var (vx, vy) = Sprite2D.GetVelocity(1f, heading);
         Assert.Equal(expectedVx, vx, 3);
         Assert.Equal(expectedVy, vy, 3);
     }
@@ -86,7 +86,7 @@ public class SpriteTests
     [Fact]
     public void GetVelocity_ScalesWithSpeed()
     {
-        var (vx, vy) = Sprite.GetVelocity(25f, 90f);
+        var (vx, vy) = Sprite2D.GetVelocity(25f, 90f);
         Assert.Equal(25f, vx, 3);
         Assert.Equal(0f, vy, 3);
     }
@@ -98,7 +98,7 @@ public class SpriteTests
     [InlineData(0f, -1f, 1f, 0f)]    // north
     public void GetSpeedAndHeading_RecoversCardinals(float vx, float vy, float expectedSpeed, float expectedHeading)
     {
-        var (speed, heading) = Sprite.GetSpeedAndHeading(vx, vy);
+        var (speed, heading) = Sprite2D.GetSpeedAndHeading(vx, vy);
         Assert.Equal(expectedSpeed, speed, 3);
         Assert.Equal(expectedHeading, heading, 3);
     }
@@ -109,8 +109,8 @@ public class SpriteTests
     [InlineData(270f,  100f)]
     public void GetVelocity_And_GetSpeedAndHeading_AreInverses(float heading, float speed)
     {
-        var (vx, vy) = Sprite.GetVelocity(speed, heading);
-        var (s, h)   = Sprite.GetSpeedAndHeading(vx, vy);
+        var (vx, vy) = Sprite2D.GetVelocity(speed, heading);
+        var (s, h)   = Sprite2D.GetSpeedAndHeading(vx, vy);
         Assert.Equal(speed, s, 2);
         Assert.Equal(heading, h, 2);
     }
@@ -118,7 +118,7 @@ public class SpriteTests
     [Fact]
     public void ChangeVelocity_AppliesTransform()
     {
-        var sprite = new Sprite { Heading = 90f, Speed = 10f };
+        var sprite = new Sprite2D { Heading = 90f, Speed = 10f };
         // Negate velocity → reversed heading, same speed.
         sprite.ChangeVelocity((vx, vy) => (-vx, -vy));
         Assert.Equal(10f, sprite.Speed, 2);

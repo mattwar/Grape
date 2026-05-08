@@ -2,13 +2,13 @@ namespace Grape.Jelly.Tests;
 
 public class SceneTests
 {
-    private sealed class FakeProp : Prop
+    private sealed class FakeProp : Prop2D
     {
         public bool ShouldReportChanged { get; set; }
         public int UpdateCount { get; private set; }
         public int RenderCount { get; private set; }
 
-        public override bool Update(in UpdateContext context)
+        public override bool Update(in UpdateContext2D context)
         {
             UpdateCount++;
             return ShouldReportChanged;
@@ -25,9 +25,9 @@ public class SceneTests
     {
         var a = new FakeProp();
         var b = new FakeProp();
-        var scene = new Scene(ImmutableList.Create<Prop>(a, b));
+        var scene = new Scene2D(ImmutableList.Create<Prop2D>(a, b));
 
-        scene.Update(new UpdateContext());
+        scene.Update(new UpdateContext2D());
 
         Assert.Equal(1, a.UpdateCount);
         Assert.Equal(1, b.UpdateCount);
@@ -38,18 +38,18 @@ public class SceneTests
     {
         var a = new FakeProp { ShouldReportChanged = false };
         var b = new FakeProp { ShouldReportChanged = true };
-        var scene = new Scene(ImmutableList.Create<Prop>(a, b));
+        var scene = new Scene2D(ImmutableList.Create<Prop2D>(a, b));
 
-        Assert.True(scene.Update(new UpdateContext()));
+        Assert.True(scene.Update(new UpdateContext2D()));
     }
 
     [Fact]
     public void Update_ReturnsFalse_IfNoPropChanged()
     {
         var a = new FakeProp { ShouldReportChanged = false };
-        var scene = new Scene(ImmutableList.Create<Prop>(a));
+        var scene = new Scene2D(ImmutableList.Create<Prop2D>(a));
 
-        Assert.False(scene.Update(new UpdateContext()));
+        Assert.False(scene.Update(new UpdateContext2D()));
     }
 
     [Fact]
@@ -57,11 +57,11 @@ public class SceneTests
     {
         var a = new FakeProp { ShouldReportChanged = true };
         var b = new FakeProp { ShouldReportChanged = true };
-        var scene = new Scene(ImmutableList.Create<Prop>(a, b));
+        var scene = new Scene2D(ImmutableList.Create<Prop2D>(a, b));
 
         var cts = new CancellationTokenSource();
         cts.Cancel();
-        var changed = scene.Update(new UpdateContext(), cts.Token);
+        var changed = scene.Update(new UpdateContext2D(), cts.Token);
 
         Assert.False(changed);
         Assert.Equal(0, a.UpdateCount);
@@ -72,12 +72,12 @@ public class SceneTests
     public void AddProp_ExposesAddedPropToFutureUpdates()
     {
         var initial = new FakeProp();
-        var scene = new Scene(ImmutableList.Create<Prop>(initial));
+        var scene = new Scene2D(ImmutableList.Create<Prop2D>(initial));
 
         var added = new FakeProp();
         scene.AddProp(added);
 
-        scene.Update(new UpdateContext());
+        scene.Update(new UpdateContext2D());
 
         Assert.Equal(1, initial.UpdateCount);
         Assert.Equal(1, added.UpdateCount);

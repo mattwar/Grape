@@ -170,7 +170,7 @@ public abstract class Renderer3D
     /// projection transform -- the args struct's transform field, if
     /// any, is sent to the GPU unchanged.
     /// </summary>
-    public Camera3D? Camera { get; set; }
+    public Camera? Camera { get; set; }
 
     /// <summary>
     /// Whole-scene ambient light, applied by lit shaders that opt in via
@@ -226,6 +226,18 @@ public abstract class Renderer3D
     /// automatically.
     /// </summary>
     protected virtual float GetTargetAspectRatio() => 16f / 9f;
+
+    /// <summary>
+    /// Builds a per-frame <see cref="UpdateContext3D"/> snapshotting this
+    /// renderer's clock. Convenience for the common case where one loop
+    /// drives both update and render; standalone simulations should
+    /// build their own context from their own clock.
+    /// </summary>
+    public UpdateContext3D GetUpdateContext() => new()
+    {
+        ElapsedSinceStart = ElapsedSinceStart,
+        ElapsedSinceLastUpdate = ElapsedSinceLastRender,
+    };
 
     /// <summary>
     /// Saves the current renderer state and returns a scope whose

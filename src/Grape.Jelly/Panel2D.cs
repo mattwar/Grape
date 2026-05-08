@@ -2,15 +2,15 @@ using System.Collections.Immutable;
 
 namespace Grape.Jelly;
 
-public class Panel
+public class Panel2D
 {
-    public Panel(Prop prop)
+    public Panel2D(Prop2D prop)
     {
         this.Prop = prop;
         this.Prop = prop;
     }
 
-    public Prop Prop { get; }
+    public Prop2D Prop { get; }
 
     /// <summary>
     /// The computed bounds of the panel within the window.
@@ -38,9 +38,9 @@ public class Panel
     public float Height { get; set; } = 100f;
 
     /// <summary>
-    /// Converts a <see cref="Prop"/> to a <see cref="Panel"/>.
+    /// Converts a <see cref="Prop"/> to a <see cref="Panel2D"/>.
     /// </summary>
-    public static implicit operator Panel(Prop prop) => new Panel(prop);
+    public static implicit operator Panel2D(Prop2D prop) => new Panel2D(prop);
 }
 
 public enum Measure
@@ -59,11 +59,11 @@ public enum Measure
 /// <summary>
 /// Stacks multiple props either vertically or horizontally.
 /// </summary>
-public class StackPanel : Prop
+public class StackPanel2D : Prop2D
 {
-    private ImmutableList<Panel> _panels = ImmutableList<Panel>.Empty;
+    private ImmutableList<Panel2D> _panels = ImmutableList<Panel2D>.Empty;
     
-    public StackPanel(ImmutableList<Panel> panels)
+    public StackPanel2D(ImmutableList<Panel2D> panels)
     {
         _panels = panels;
     }
@@ -114,7 +114,7 @@ public class StackPanel : Prop
         }
     }
 
-    public override bool Update(in UpdateContext context)
+    public override bool Update(in UpdateContext2D context)
     {
         ComputeLayout(context.Bounds);
 
@@ -123,9 +123,10 @@ public class StackPanel : Prop
 
         foreach (var panel in panels)
         {
-            var panelContext = new UpdateContext
+            var panelContext = new UpdateContext2D
             {
                 ElapsedSinceStart = context.ElapsedSinceStart,
+                ElapsedSinceLastUpdate = context.ElapsedSinceLastUpdate,
                 Bounds = panel.Bounds
             };
 
@@ -152,28 +153,28 @@ public class StackPanel : Prop
 /// <summary>
 /// Overlays multiple props on top of each other.
 /// </summary>
-public class OverlayPanel : Prop
+public class OverlayPanel2D : Prop2D
 {
-    private ImmutableList<Prop> _layers = ImmutableList<Prop>.Empty;
+    private ImmutableList<Prop2D> _layers = ImmutableList<Prop2D>.Empty;
 
-    public OverlayPanel(ImmutableList<Prop> layers)
+    public OverlayPanel2D(ImmutableList<Prop2D> layers)
     {
         _layers = layers;
     }
 
-    public ImmutableList<Prop> Layers => _layers;
+    public ImmutableList<Prop2D> Layers => _layers;
 
-    public void AddLayer(Prop layer)
+    public void AddLayer(Prop2D layer)
     {
         ImmutableInterlocked.Update(ref _layers, _layers => _layers.Add(layer));
     }
 
-    public void RemoveLayer(Prop layer)
+    public void RemoveLayer(Prop2D layer)
     {
         ImmutableInterlocked.Update(ref _layers, _layers => _layers.Remove(layer));
     }
 
-    public override bool Update(in UpdateContext context)
+    public override bool Update(in UpdateContext2D context)
     {
         var panels = _layers;
         bool changed = false;

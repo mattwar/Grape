@@ -3,12 +3,12 @@ using System.Collections.Immutable;
 
 namespace Grape.Jelly;
 
-public class Scene //: IDisposable
+public class Scene2D //: IDisposable
 {
-    private ImmutableList<Prop> _props = ImmutableList<Prop>.Empty;
+    private ImmutableList<Prop2D> _props = ImmutableList<Prop2D>.Empty;
     //private readonly AsyncPeriodicEvent _updateEvent;
 
-    public Scene(ImmutableList<Prop> props)
+    public Scene2D(ImmutableList<Prop2D> props)
     {
         _props = props;
         //_updateEvent = new AsyncPeriodicEvent(TimeSpan.FromMicroseconds(100), this.Update);
@@ -50,7 +50,7 @@ public class Scene //: IDisposable
     /// Updates the scene state.
     /// Returns true if the scene changed.
     /// </summary>
-    public bool Update(UpdateContext context, CancellationToken cancellationToken = default)
+    public bool Update(UpdateContext2D context, CancellationToken cancellationToken = default)
     {
         var changed = false;
 
@@ -86,7 +86,7 @@ public class Scene //: IDisposable
         }
     }
 
-    public void AddProp(Prop prop)
+    public void AddProp(Prop2D prop)
     {
         ImmutableInterlocked.Update(ref _props, (list) => list.Add(prop));
     }

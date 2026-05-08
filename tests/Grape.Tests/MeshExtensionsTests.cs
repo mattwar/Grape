@@ -9,7 +9,7 @@ public class MeshExtensionsTests
 
     private static Vector3[] PositionsOfLit(Mesh<LitVertex3D> mesh)
     {
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         var p = new Vector3[span.Length];
         for (int i = 0; i < span.Length; i++) p[i] = span[i].Position;
         return p;
@@ -17,7 +17,7 @@ public class MeshExtensionsTests
 
     private static Vector3[] NormalsOfLit(Mesh<LitVertex3D> mesh)
     {
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         var n = new Vector3[span.Length];
         for (int i = 0; i < span.Length; i++) n[i] = span[i].Normal;
         return n;
@@ -107,7 +107,7 @@ public class MeshExtensionsTests
         var b = Meshes.Cube(Color.Black);
         var combined = a.Concat(b);
 
-        var indices = combined.GetIndices();
+        var indices = combined.Indices;
         // First half indices < a.VertexCount; second half >= a.VertexCount.
         for (int i = 0; i < a.IndexCount; i++)
             Assert.True(indices[i] < a.VertexCount);

@@ -5,7 +5,7 @@ namespace Grape.Jelly;
 /// <summary>
 /// A prop that moves itself.
 /// </summary>
-public class Sprite : Prop
+public class Sprite2D : Prop2D
 {
     /// <summary>
     /// The image to render.
@@ -65,11 +65,11 @@ public class Sprite : Prop
     // MinUpdateInterval; carried forward to the next Update.
     private TimeSpan _pendingDelta;
 
-    public Sprite()
+    public Sprite2D()
     {
     }
 
-    public Sprite(Image image, float centerX, float centerY, float scale = 1f)
+    public Sprite2D(Image image, float centerX, float centerY, float scale = 1f)
     {
         this.Image = image;
         this.CenterX = centerX;
@@ -77,15 +77,15 @@ public class Sprite : Prop
         this.Scale = scale;
     }
 
-    public override bool Update(in UpdateContext context)
+    public override bool Update(in UpdateContext2D context)
     {
         // First call: nothing has happened yet, so just confirm initial state.
-        if (context.ElaspsedSinceLastUpdate == TimeSpan.Zero)
+        if (context.ElapsedSinceLastUpdate == TimeSpan.Zero)
             return true;
 
         // Buffer small deltas so motion isn't lost to float rounding when
         // the host renders far faster than physics needs.
-        _pendingDelta += context.ElaspsedSinceLastUpdate;
+        _pendingDelta += context.ElapsedSinceLastUpdate;
         if (_pendingDelta < MinUpdateInterval)
             return false;
 

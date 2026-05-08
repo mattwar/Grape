@@ -2,16 +2,16 @@ using System.Collections.Immutable;
 
 namespace Grape.Jelly;
 
-public abstract class Container : Prop
+public abstract class Container2D : Prop2D
 {
-    private ImmutableList<Prop> _props = ImmutableList<Prop>.Empty;
+    private ImmutableList<Prop2D> _props = ImmutableList<Prop2D>.Empty;
 
-    public Container(ImmutableList<Prop> props)
+    public Container2D(ImmutableList<Prop2D> props)
     {
         _props = props;
     }
 
-    public override bool Update(in UpdateContext context)
+    public override bool Update(in UpdateContext2D context)
     {
         var changed = false;
         var props = _props;
@@ -37,7 +37,7 @@ public abstract class Container : Prop
         }
     }
 
-    public void Add(Prop prop)
+    public void Add(Prop2D prop)
     {
         ImmutableInterlocked.Update(ref _props, (list) => list.Add(prop));
     }

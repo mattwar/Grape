@@ -23,7 +23,7 @@ public class MeshesTests
 
     private static Vector3[] PositionsOfLit(Mesh<LitVertex3D> mesh)
     {
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         var p = new Vector3[span.Length];
         for (int i = 0; i < span.Length; i++) p[i] = span[i].Position;
         return p;
@@ -31,7 +31,7 @@ public class MeshesTests
 
     private static Vector3[] NormalsOfLit(Mesh<LitVertex3D> mesh)
     {
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         var n = new Vector3[span.Length];
         for (int i = 0; i < span.Length; i++) n[i] = span[i].Normal;
         return n;
@@ -39,7 +39,7 @@ public class MeshesTests
 
     private static Vector3[] PositionsOfColor(Mesh<ColorVertex3D> mesh)
     {
-        var span = MemoryMarshal.Cast<byte, ColorVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         var p = new Vector3[span.Length];
         for (int i = 0; i < span.Length; i++) p[i] = span[i].Position;
         return p;
@@ -78,7 +78,7 @@ public class MeshesTests
     public void TexturedRectangle_UvsCoverFullRangeWithTopLeftOrigin()
     {
         var mesh = Meshes.TexturedRectangle();
-        var span = MemoryMarshal.Cast<byte, TextureVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         // The vertex at the top-left of the quad (-0.5, +0.5) should have UV (0,0).
         foreach (var v in span)
         {
@@ -167,7 +167,7 @@ public class MeshesTests
     public void Cube_NormalsAreUnitLengthAndPointOutward()
     {
         var mesh = Meshes.Cube(Color.White);
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         foreach (var v in span)
         {
             Assert.Equal(1f, v.Normal.Length(), Epsilon);
@@ -182,8 +182,8 @@ public class MeshesTests
     public void Cube_FaceWindingMatchesStoredNormal()
     {
         var mesh = Meshes.Cube(Color.White);
-        var verts = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
-        var idx = mesh.GetIndices();
+        var verts = mesh.Vertices;
+        var idx = mesh.Indices;
         for (int i = 0; i < idx.Length; i += 3)
         {
             var a = verts[(int)idx[i]];
@@ -220,7 +220,7 @@ public class MeshesTests
     {
         const float r = 0.7f;
         var mesh = Meshes.Sphere(Color.White, radius: r, latitudeSegments: 8, longitudeSegments: 12);
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         foreach (var v in span)
         {
             Assert.Equal(r, v.Position.Length(), 1e-3f);
@@ -237,7 +237,7 @@ public class MeshesTests
         var mesh = Meshes.Icosphere(Color.White, radius: 1f, subdivisions: 0);
         Assert.Equal(12, mesh.VertexCount);
         Assert.Equal(60, mesh.IndexCount); // 20 faces * 3
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         foreach (var v in span)
             Assert.Equal(1f, v.Position.Length(), 1e-4f);
     }
@@ -314,7 +314,7 @@ public class MeshesTests
     {
         var mesh = Meshes.Tetrahedron(Color.White, radius: 1f);
         Assert.Equal(12, mesh.VertexCount); // flat-shaded: 3 verts per face, 4 faces
-        var span = MemoryMarshal.Cast<byte, LitVertex3D>(mesh.GetVertexBytes());
+        var span = mesh.Vertices;
         foreach (var v in span)
             Assert.Equal(1f, v.Position.Length(), 1e-3f);
     }
