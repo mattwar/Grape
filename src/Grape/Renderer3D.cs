@@ -228,6 +228,18 @@ public abstract class Renderer3D
     protected virtual float GetTargetAspectRatio() => 16f / 9f;
 
     /// <summary>
+    /// Builds a per-frame <see cref="UpdateContext3D"/> snapshotting this
+    /// renderer's clock. Convenience for the common case where one loop
+    /// drives both update and render; standalone simulations should
+    /// build their own context from their own clock.
+    /// </summary>
+    public UpdateContext3D GetUpdateContext() => new()
+    {
+        ElapsedSinceStart = ElapsedSinceStart,
+        ElapsedSinceLastUpdate = ElapsedSinceLastRender,
+    };
+
+    /// <summary>
     /// Saves the current renderer state and returns a scope whose
     /// disposal restores it. Intended for use with a <c>using</c>
     /// statement so callers can change state for a sub-region of drawing

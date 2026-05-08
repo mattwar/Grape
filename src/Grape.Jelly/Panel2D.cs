@@ -59,11 +59,11 @@ public enum Measure
 /// <summary>
 /// Stacks multiple props either vertically or horizontally.
 /// </summary>
-public class StackPanel : Prop2D
+public class StackPanel2D : Prop2D
 {
     private ImmutableList<Panel2D> _panels = ImmutableList<Panel2D>.Empty;
     
-    public StackPanel(ImmutableList<Panel2D> panels)
+    public StackPanel2D(ImmutableList<Panel2D> panels)
     {
         _panels = panels;
     }
@@ -153,11 +153,11 @@ public class StackPanel : Prop2D
 /// <summary>
 /// Overlays multiple props on top of each other.
 /// </summary>
-public class OverlayPanel : Prop2D
+public class OverlayPanel2D : Prop2D
 {
     private ImmutableList<Prop2D> _layers = ImmutableList<Prop2D>.Empty;
 
-    public OverlayPanel(ImmutableList<Prop2D> layers)
+    public OverlayPanel2D(ImmutableList<Prop2D> layers)
     {
         _layers = layers;
     }

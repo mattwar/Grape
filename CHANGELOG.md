@@ -18,6 +18,13 @@ All notable changes to this project will be documented in this file.
   meshes into one for static-batching / mesh composition.
 - `Mesh<T>.Update(vertices)` replaces vertex data while keeping the
   existing index buffer; bumps `Version` so the renderer re-uploads.
+- `IUpdateContext` / `IUpdateContext2D` / `IUpdateContext3D` interfaces
+  with matching `UpdateContext` / `UpdateContext2D` / `UpdateContext3D`
+  structs for typed per-frame inputs.
+- `IUpdatable<TCtx>` and `IDrawable2D` / `IDrawable3D` contracts for
+  stateful objects that participate in update/render loops.
+- `Renderer2D.GetUpdateContext()` returns an `UpdateContext2D`;
+  `Renderer3D.GetUpdateContext()` returns an `UpdateContext3D`.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
@@ -27,6 +34,9 @@ All notable changes to this project will be documented in this file.
   for upload instead of throwing, with a one-time warning per format.
 - `Image.Decode` now allocates surfaces in `ABGR8888` (the GPU fast
   format) regardless of the source bitmap's color type.
+- Jelly `Prop` now implements `IUpdatable<UpdateContext2D>` and
+  `IDrawable2D`; `Update` takes `UpdateContext2D` instead of
+  `UpdateContext`.
 
 ### Fixed
 - Texture upload failures no longer tear down the entire frame: the

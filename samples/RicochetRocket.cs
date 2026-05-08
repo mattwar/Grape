@@ -64,14 +64,7 @@ window.KeyDown += (_, e) =>
 
 window.Rendering += (w, rd) =>
 {
-    var updateContext = new UpdateContext
-    {
-        ElapsedSinceStart = rd.ElapsedSinceStart,
-        ElaspsedSinceLastUpdate = rd.ElapsedSinceLastRender,
-        Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height)
-    };
-
-    if (rocket.Update(updateContext))
+    if (rocket.Update(rd.GetUpdateContext()))
     {
         var bounce = false;
 
