@@ -7,7 +7,7 @@ namespace Grape;
 /// perspective foreshortening: things farther from the camera appear
 /// smaller. The right choice for most 3D scenes.
 /// </summary>
-public sealed class PerspectiveCamera : Camera3D
+public sealed class PerspectiveCamera : Camera
 {
     /// <summary>
     /// Vertical field of view, in radians. Defaults to 45° (<c>π/4</c>).

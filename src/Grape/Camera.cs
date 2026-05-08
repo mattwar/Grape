@@ -17,15 +17,9 @@ namespace Grape;
 /// view-projection matrix -- is what produces the picture you see.
 /// </para>
 /// <para>
-/// A camera is a CPU-side helper -- it doesn't interact with the GPU
-/// directly. Sample code typically calls <see cref="GetViewProjection"/>
-/// each frame and passes the resulting matrix to a shader that accepts
-/// a transform. <see cref="GetView"/> and <see cref="GetProjection"/>
-/// are exposed for advanced cases that need to operate between the two
-/// stages (e.g. view-space lighting, frustum extraction, picking).
-/// </para>
+/// A camera is a CPU-side helper -- it doesn't interact with the GPU directly.
 /// </remarks>
-public abstract class Camera3D
+public abstract class Camera
 {
     /// <summary>
     /// World-space position the camera is looking from.

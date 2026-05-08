@@ -27,7 +27,6 @@
 
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Grape;
 
 //const string ModelFile = "teapot.obj";
@@ -65,9 +64,19 @@ var camera = new PerspectiveCamera
     Target = Vector3.Zero,
 };
 
+// Drag the left mouse button to orbit; scroll to zoom.
+var orbiter = new CameraOrbiter(window)
+{
+    Camera = camera,
+    Distance = 2.6f,
+    Pitch = 0.15f,
+};
+
 window.Rendering += (w, rd) =>
 {
-    rd.Camera = camera;
+    orbiter.Update(rd.GetUpdateContext());
+    orbiter.Draw(rd);
+
     rd.AmbientLight = new Color(40, 40, 60);
 
     // Slow-orbiting key light so the silhouette and faceting both get
@@ -77,12 +86,10 @@ window.Rendering += (w, rd) =>
         Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
         Color.White);
 
-    var transform = fitTransform * Matrix4x4.CreateRotationY(t * 0.6f);
-
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        model.Draw(rd, transform);
+        model.Draw(rd, fitTransform);
     }
 
     w.Invalidate();
@@ -98,11 +105,8 @@ static (Vector3 Center, float Radius) ComputeBounds(Model model)
     var max = new Vector3(float.NegativeInfinity);
     foreach (var sub in model.Submeshes)
     {
-        // Mesh exposes its raw bytes; OBJ-loaded submeshes are always
-        // LitTextureVertex3D, so we can reinterpret the span and read
-        // each vertex's Position field.
-        var verts = MemoryMarshal.Cast<byte, LitTextureVertex3D>(sub.Mesh.GetVertexBytes());
-        foreach (ref readonly var v in verts)
+        // use the vertices to determine the bounding box
+        foreach (var v in sub.Mesh.Vertices)
         {
             min = Vector3.Min(min, v.Position);
             max = Vector3.Max(max, v.Position);

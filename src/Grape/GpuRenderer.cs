@@ -970,7 +970,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // drawing later.
                     if (mesh.IndexCount > 0)
                     {
-                        var indexBytes = MemoryMarshal.AsBytes(mesh.GetIndices());
+                        var indexBytes = MemoryMarshal.AsBytes(mesh.Indices);
                         if (needsUpload || resources.IndexBuffer is null || resources.IndexBufferBytes != indexBytes.Length)
                         {
                             if (resources.IndexBuffer is null ||
@@ -998,7 +998,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         resources.LastWireframeUploadedVersion != mesh.Version)
                     {
                         var edges = BuildWireframeIndices(
-                            mesh.GetIndices(),
+                            mesh.Indices,
                             mesh.VertexCount,
                             mesh.Topology);
                         var edgeBytes = MemoryMarshal.AsBytes(edges.AsSpan());

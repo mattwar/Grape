@@ -13,8 +13,8 @@ public abstract class Mesh
 
     public abstract int VertexCount { get; }
     public abstract int IndexCount { get; }
-    public abstract ReadOnlySpan<byte> GetVertexBytes();
-    public abstract ReadOnlySpan<uint> GetIndices();
+    internal abstract ReadOnlySpan<byte> GetVertexBytes();
+    public abstract ReadOnlySpan<uint> Indices { get; }
 
     /// <summary>
     /// How the mesh's vertices are grouped into rendered shapes
@@ -93,10 +93,17 @@ public class Mesh<TVertex> : Mesh
 
     public override Topology Topology { get; }
 
-    public override ReadOnlySpan<byte> GetVertexBytes() =>
+    /// <summary>
+    /// Read-only view over the mesh's vertex data as the strongly-typed
+    /// <typeparamref name="TVertex"/>. Cheap (no copy); the span is valid
+    /// until the next <see cref="Update(ReadOnlySpan{TVertex})"/>.
+    /// </summary>
+    public ReadOnlySpan<TVertex> Vertices => _vertices.AsSpan(0, _vertexCount);
+
+    internal override ReadOnlySpan<byte> GetVertexBytes() =>
         MemoryMarshal.AsBytes(_vertices.AsSpan(0, _vertexCount));
 
-    public override ReadOnlySpan<uint> GetIndices() =>
+    public override ReadOnlySpan<uint> Indices =>
         _indices.AsSpan(0, _indexCount);
 
     /// <summary>

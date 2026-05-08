@@ -27,7 +27,7 @@ public static class MeshExtensions
         var dst = new Vertex3D[src.Length];
         for (int i = 0; i < src.Length; i++)
             dst[i] = new Vertex3D(Vector3.Transform(src[i].Position, matrix));
-        return Mesh.Create<Vertex3D>(dst, mesh.GetIndices(), mesh.Topology);
+        return Mesh.Create<Vertex3D>(dst, mesh.Indices, mesh.Topology);
     }
 
     public static Mesh<ColorVertex3D> Transform(this Mesh<ColorVertex3D> mesh, Matrix4x4 matrix)
@@ -36,7 +36,7 @@ public static class MeshExtensions
         var dst = new ColorVertex3D[src.Length];
         for (int i = 0; i < src.Length; i++)
             dst[i] = new ColorVertex3D(Vector3.Transform(src[i].Position, matrix), src[i].Color);
-        return Mesh.Create<ColorVertex3D>(dst, mesh.GetIndices(), mesh.Topology);
+        return Mesh.Create<ColorVertex3D>(dst, mesh.Indices, mesh.Topology);
     }
 
     public static Mesh<TextureVertex3D> Transform(this Mesh<TextureVertex3D> mesh, Matrix4x4 matrix)
@@ -45,7 +45,7 @@ public static class MeshExtensions
         var dst = new TextureVertex3D[src.Length];
         for (int i = 0; i < src.Length; i++)
             dst[i] = new TextureVertex3D(Vector3.Transform(src[i].Position, matrix), src[i].TextureCoordinate);
-        return Mesh.Create<TextureVertex3D>(dst, mesh.GetIndices(), mesh.Topology);
+        return Mesh.Create<TextureVertex3D>(dst, mesh.Indices, mesh.Topology);
     }
 
     public static Mesh<LitVertex3D> Transform(this Mesh<LitVertex3D> mesh, Matrix4x4 matrix)
@@ -60,7 +60,7 @@ public static class MeshExtensions
                 Vector3.Normalize(Vector3.TransformNormal(src[i].Normal, nm)),
                 src[i].Color);
         }
-        return Mesh.Create<LitVertex3D>(dst, mesh.GetIndices(), mesh.Topology);
+        return Mesh.Create<LitVertex3D>(dst, mesh.Indices, mesh.Topology);
     }
 
     public static Mesh<LitTextureVertex3D> Transform(this Mesh<LitTextureVertex3D> mesh, Matrix4x4 matrix)
@@ -76,7 +76,7 @@ public static class MeshExtensions
                 src[i].TextureCoordinate,
                 src[i].Color);
         }
-        return Mesh.Create<LitTextureVertex3D>(dst, mesh.GetIndices(), mesh.Topology);
+        return Mesh.Create<LitTextureVertex3D>(dst, mesh.Indices, mesh.Topology);
     }
 
     // ---------------- Concat ----------------
@@ -176,11 +176,8 @@ public static class MeshExtensions
 
     // ---------------- helpers ----------------
 
-    private static ReadOnlySpan<TVertex> AsSpan<TVertex>(Mesh<TVertex> mesh) where TVertex : unmanaged
-    {
-        var bytes = mesh.GetVertexBytes();
-        return System.Runtime.InteropServices.MemoryMarshal.Cast<byte, TVertex>(bytes);
-    }
+    private static ReadOnlySpan<TVertex> AsSpan<TVertex>(Mesh<TVertex> mesh) where TVertex : unmanaged =>
+        mesh.Vertices;
 
     private static void ValidateConcat<TVertex>(Mesh<TVertex> a, Mesh<TVertex> b) where TVertex : unmanaged
     {
@@ -196,8 +193,8 @@ public static class MeshExtensions
 
     private static uint[] BuildConcatIndices<TVertex>(Mesh<TVertex> a, Mesh<TVertex> b) where TVertex : unmanaged
     {
-        var aIdx = a.GetIndices();
-        var bIdx = b.GetIndices();
+        var aIdx = a.Indices;
+        var bIdx = b.Indices;
         bool aIndexed = aIdx.Length > 0;
         bool bIndexed = bIdx.Length > 0;
 

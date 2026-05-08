@@ -82,11 +82,7 @@ public class ObjLoaderTests
             using var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
 
-            // Pull the bytes back out -- the public API doesn't
-            // expose a typed accessor, but reinterpreting the byte
-            // span is safe because LitTextureVertex3D is unmanaged.
-            var bytes = sub.Mesh.GetVertexBytes();
-            var verts = MemoryMarshal.Cast<byte, LitTextureVertex3D>(bytes);
+            var verts = sub.Mesh.Vertices;
             foreach (var v in verts)
             {
                 // Cross of (1,0,0) and (0,0,1) is (0,-1,0); the
@@ -120,8 +116,7 @@ public class ObjLoaderTests
         {
             using var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
-            var bytes = sub.Mesh.GetVertexBytes();
-            var verts = MemoryMarshal.Cast<byte, LitTextureVertex3D>(bytes).ToArray();
+            var verts = sub.Mesh.Vertices.ToArray();
             // Original (0,0) -> (0,1), (1,0) -> (1,1), (0,1) -> (0,0)
             Assert.Contains(verts, v => v.TextureCoordinate == new Vector2(0, 1));
             Assert.Contains(verts, v => v.TextureCoordinate == new Vector2(1, 1));

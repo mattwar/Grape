@@ -25,6 +25,15 @@ All notable changes to this project will be documented in this file.
   stateful objects that participate in update/render loops.
 - `Renderer2D.GetUpdateContext()` returns an `UpdateContext2D`;
   `Renderer3D.GetUpdateContext()` returns an `UpdateContext3D`.
+- `CameraController` abstract base for camera-driving controllers;
+  implements `IUpdatable<UpdateContext3D>` + `IDrawable3D` and owns a
+  `Camera` property.
+- `CameraOrbiter` — mouse-drag yaw/pitch + scroll zoom around a target.
+- `CameraFlyer` — WASD + Q/E + mouse-look free 6-DOF camera.
+- `CameraWalker` — first-person ground-walker (WASD + mouse-look,
+  movement on the horizontal plane).
+- `CameraFollower` — exponentially-smoothed follow camera tracking a
+  moving target.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
