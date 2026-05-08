@@ -35,9 +35,10 @@ public class Application : IDisposable
     /// types that need them (creating a <see cref="Window"/> brings up
     /// video, touching <see cref="Audio"/> brings up audio, and so on).
     /// </summary>
-    public static Application Current => _current ??= Start();
+    public static Application Current => _current ?? Start();
 
     private static Application? _current;
+    private static readonly object _startLock = new();
 
     /// <summary>
     /// The thread the application was created on.
@@ -169,31 +170,38 @@ public class Application : IDisposable
     /// </summary>
     public static Application Start()
     {
-        var application = _current;
-
-        if (application == null)
+        // Serialize start so concurrent Application.Current accesses
+        // (e.g. parallel xUnit test classes touching Image/Model) don't
+        // both spawn an app thread and race the singleton check in the
+        // constructor.
+        lock (_startLock)
         {
-            var tcs = new TaskCompletionSource<Application>();
-            var appThread = new Thread(_ =>
-            {
-                application = new Application();
-                application.Run(() => tcs.SetResult(application));
-                application.Dispose();
-            })
-            {
-                // Background so a headless caller (e.g. Image.Render3D
-                // with no window ever opened) doesn't keep the process
-                // alive after the main thread exits. Windowed apps still
-                // shut down cleanly via _quitRequested when the last
-                // window closes; this only changes the no-window case.
-                IsBackground = true,
-                Name = "Grape.Application",
-            };
-            appThread.Start();
-            application = tcs.Task.Result;
-        }
+            var application = _current;
 
-        return application;
+            if (application == null)
+            {
+                var tcs = new TaskCompletionSource<Application>();
+                var appThread = new Thread(_ =>
+                {
+                    application = new Application();
+                    application.Run(() => tcs.SetResult(application));
+                    application.Dispose();
+                })
+                {
+                    // Background so a headless caller (e.g. Image.Render3D
+                    // with no window ever opened) doesn't keep the process
+                    // alive after the main thread exits. Windowed apps still
+                    // shut down cleanly via _quitRequested when the last
+                    // window closes; this only changes the no-window case.
+                    IsBackground = true,
+                    Name = "Grape.Application",
+                };
+                appThread.Start();
+                application = tcs.Task.Result;
+            }
+
+            return application;
+        }
     }
 
     /// <summary>
