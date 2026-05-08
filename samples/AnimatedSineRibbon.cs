@@ -25,6 +25,10 @@ const float Speed = 2f;          // travel speed
 
 // Two triangles per segment, six vertices each.
 var vertices = new ColorVertex3D[Segments * 6];
+// Reusable mesh -- we mutate the vertex array in-place each frame and
+// call mesh.Update(...) so the renderer re-uploads only the changed
+// contents (Mesh's Version bump triggers that).
+var mesh = Mesh.Create<ColorVertex3D>(vertices);
 
 var window = new Window3D
 {
@@ -66,11 +70,13 @@ window.Rendering += (w, rd) =>
         vertices[v + 5] = topRight;
     }
 
+    mesh.Update(vertices);
+
     var (width, height) = w.Size;
     var aspect = (float)height / width;
     var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    rd.DrawMesh(vertices, transform);
+    rd.DrawMesh(mesh, transform);
 
     w.Invalidate(); // schedule the next render
 };

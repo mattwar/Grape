@@ -803,7 +803,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
         else
         {
-            mesh.Reset(span, ReadOnlySpan<uint>.Empty);
+            mesh.Update(span);
         }
 
         TransformArgs argsTransform = transform;
@@ -919,7 +919,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     var resources = command.Resources;
 
                     // Skip the upload entirely when the mesh hasn't changed
-                    // since we last sent it to the GPU. Reset(...) on Mesh<T>
+                    // since we last sent it to the GPU. Update(...) on Mesh<T>
                     // bumps Version so this picks up edits automatically.
                     var needsUpload =
                         resources.VertexBuffer is null ||

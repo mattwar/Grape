@@ -1,5 +1,3 @@
-using System.Collections.Immutable;
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Grape;
@@ -56,33 +54,23 @@ public abstract class Mesh
 
 /// <summary>
 /// CPU-side mesh data used by <see cref="Renderer3D"/>. Can be updated with
-/// fresh vertex/index data.
+/// fresh vertex/index data via <see cref="Update(ReadOnlySpan{TVertex})"/>.
 /// </summary>
 public class Mesh<TVertex> : Mesh
     where TVertex : unmanaged
 {
-    // Either an array we own (writable) or one borrowed from an
-    // ImmutableArray (must not be mutated). _ownsVertices/_ownsIndices
-    // tells which.
     private TVertex[] _vertices;
     private int _vertexCount;
-    private bool _ownsVertices;
 
     private uint[] _indices;
     private int _indexCount;
-    private bool _ownsIndices;
 
-    public Mesh(ReadOnlySpan<TVertex> vertices)
+    internal Mesh(ReadOnlySpan<TVertex> vertices)
         : this(vertices, ReadOnlySpan<uint>.Empty, Topology.TriangleList)
     {
     }
 
-    public Mesh(ImmutableArray<TVertex> vertices)
-        : this(vertices, ImmutableArray<uint>.Empty, Topology.TriangleList)
-    {
-    }
-
-    public Mesh(
+    internal Mesh(
         ReadOnlySpan<TVertex> vertices,
         ReadOnlySpan<uint> indices,
         Topology topology = Topology.TriangleList)
@@ -90,35 +78,10 @@ public class Mesh<TVertex> : Mesh
         _vertices = vertices.Length == 0 ? Array.Empty<TVertex>() : new TVertex[vertices.Length];
         vertices.CopyTo(_vertices);
         _vertexCount = vertices.Length;
-        _ownsVertices = true;
 
         _indices = indices.Length == 0 ? Array.Empty<uint>() : new uint[indices.Length];
         indices.CopyTo(_indices);
         _indexCount = indices.Length;
-        _ownsIndices = true;
-
-        Topology = topology;
-        Version = 1;
-    }
-
-    public Mesh(
-        ImmutableArray<TVertex> vertices,
-        ImmutableArray<uint> indices,
-        Topology topology = Topology.TriangleList)
-    {
-        ThrowIfDefault(vertices, nameof(vertices));
-        ThrowIfDefault(indices, nameof(indices));
-
-        // Borrow the immutable arrays' backing storage directly. Immutable
-        // arrays guarantee their contents won't change, so we can safely
-        // read from them without copying.
-        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
-        _vertexCount = vertices.Length;
-        _ownsVertices = false;
-
-        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
-        _indexCount = indices.Length;
-        _ownsIndices = false;
 
         Topology = topology;
         Version = 1;
@@ -137,65 +100,44 @@ public class Mesh<TVertex> : Mesh
         _indices.AsSpan(0, _indexCount);
 
     /// <summary>
-    /// Replaces the vertex and index data with new contents copied from the
-    /// supplied spans. Bumps <see cref="Mesh.Version"/> so the renderer
-    /// re-uploads the GPU buffer on the next draw.
+    /// Replaces the vertex data with new contents copied from the supplied
+    /// span; the index buffer is left unchanged. Bumps <see cref="Mesh.Version"/>
+    /// so the renderer re-uploads the GPU buffer on the next draw.
     /// </summary>
-    public void Reset(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    public void Update(ReadOnlySpan<TVertex> vertices)
     {
-        EnsureOwnedVertexCapacity(vertices.Length);
+        EnsureVertexCapacity(vertices.Length);
+        vertices.CopyTo(_vertices);
+        _vertexCount = vertices.Length;
+        unchecked { Version++; }
+    }
+
+    /// <summary>
+    /// Replaces both vertex and index data with new contents copied from the
+    /// supplied spans. Bumps <see cref="Mesh.Version"/>.
+    /// </summary>
+    public void Update(ReadOnlySpan<TVertex> vertices, ReadOnlySpan<uint> indices)
+    {
+        EnsureVertexCapacity(vertices.Length);
         vertices.CopyTo(_vertices);
         _vertexCount = vertices.Length;
 
-        EnsureOwnedIndexCapacity(indices.Length);
+        EnsureIndexCapacity(indices.Length);
         indices.CopyTo(_indices);
         _indexCount = indices.Length;
 
         unchecked { Version++; }
     }
 
-    /// <summary>
-    /// Replaces the vertex and index data with the supplied immutable arrays.
-    /// The arrays' underlying storage is borrowed in-place (zero copy).
-    /// Bumps <see cref="Mesh.Version"/>.
-    /// </summary>
-    public void Reset(ImmutableArray<TVertex> vertices, ImmutableArray<uint> indices)
+    private void EnsureVertexCapacity(int count)
     {
-        ThrowIfDefault(vertices, nameof(vertices));
-        ThrowIfDefault(indices, nameof(indices));
-
-        _vertices = ImmutableCollectionsMarshal.AsArray(vertices) ?? Array.Empty<TVertex>();
-        _vertexCount = vertices.Length;
-        _ownsVertices = false;
-
-        _indices = ImmutableCollectionsMarshal.AsArray(indices) ?? Array.Empty<uint>();
-        _indexCount = indices.Length;
-        _ownsIndices = false;
-
-        unchecked { Version++; }
+        if (_vertices.Length < count)
+            _vertices = new TVertex[count];
     }
 
-    private void EnsureOwnedVertexCapacity(int count)
+    private void EnsureIndexCapacity(int count)
     {
-        if (!_ownsVertices || _vertices.Length < count)
-        {
-            _vertices = count == 0 ? Array.Empty<TVertex>() : new TVertex[count];
-            _ownsVertices = true;
-        }
-    }
-
-    private void EnsureOwnedIndexCapacity(int count)
-    {
-        if (!_ownsIndices || _indices.Length < count)
-        {
-            _indices = count == 0 ? Array.Empty<uint>() : new uint[count];
-            _ownsIndices = true;
-        }
-    }
-
-    private static void ThrowIfDefault<T>(ImmutableArray<T> array, string paramName)
-    {
-        if (array.IsDefault)
-            throw new ArgumentException("ImmutableArray must be initialised.", paramName);
+        if (_indices.Length < count)
+            _indices = new uint[count];
     }
 }

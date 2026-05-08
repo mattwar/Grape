@@ -83,7 +83,7 @@ window.Rendering += (w, rd) =>
         byte b = (byte)(220 - 60 * u);
         plotVertices[i] = new ColorVertex3D(new Vertex3D(x, y, 0f), new Color(r, g, b));
     }
-    plot.Reset(plotVertices, ReadOnlySpan<uint>.Empty);
+    plot.Update(plotVertices);
 
     // Axes at the world origin.
     rd.DrawMesh(axes, ShaderSets.PositionColorWithTransform, viewProjection);

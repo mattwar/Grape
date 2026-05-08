@@ -12,6 +12,23 @@ All notable changes to this project will be documented in this file.
   (and properly transforms normals via the inverse-transpose).
 - `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
   meshes into one for static-batching / mesh composition.
+- `Mesh<T>.Update(vertices)` replaces vertex data while keeping the
+  existing index buffer; bumps `Version` so the renderer re-uploads.
+
+### Changed
+- Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
+
+### Removed
+- `Mesh<T>` constructors and `Reset` overload that took
+  `ImmutableArray<T>`. Build the mesh once with `Mesh.Create(...)` and,
+  if dynamic, call `mesh.Update(vertices)` to push new contents.
+- `Mesh<T>` constructors are now `internal`. Construct meshes via
+  `Mesh.Create(...)`; this also gets type-inference from collection
+  expressions.
+- `Renderer3D.DrawMesh` extension overloads that took raw vertex arrays
+  / `ImmutableArray<T>`. Wrap your vertices in a `Mesh<T>` once via
+  `Mesh.Create(...)` and pass the mesh; this keeps the renderer's
+  GPU-buffer cache working across frames.
 
 ## [0.2.0] - 2026-05-07
 
