@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 - `Meshes` class with built-in mesh generators for cubes, planes, spheres,
   cylinders, cones, capsules, tori, platonic solids, axes, grids,
   rectangles, circles, and ellipses.
+- `Mesh<T>.Transform(matrix)` bakes a transform into vertex positions
+  (and properly transforms normals via the inverse-transpose).
+- `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
+  meshes into one for static-batching / mesh composition.
 
 ## [0.2.0] - 2026-05-07
 
