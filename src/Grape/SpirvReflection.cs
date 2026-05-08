@@ -9,7 +9,7 @@ namespace Grape;
 /// Result of reflecting a SPIR-V module: the shader stage, the entry-point
 /// name, and the resource counts SDL3 GPU needs to create the shader.
 /// </summary>
-public sealed record SpirvShaderInfo(
+internal sealed record SpirvShaderInfo(
     ShaderKind Stage,
     string Entrypoint,
     ShaderResourceCounts Resources);
@@ -43,7 +43,7 @@ public sealed record SpirvShaderInfo(
 ///         <c>Block</c> (and not <c>BufferBlock</c>) decoration.</item>
 /// </list>
 /// </remarks>
-public static class SpirvReflection
+internal static class SpirvReflection
 {
     private const uint SpvMagic = 0x07230203u;
     private const int  HeaderWords = 5;

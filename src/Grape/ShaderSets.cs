@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using Grape.Shaders;
 
 namespace Grape;
@@ -388,7 +388,118 @@ public static class ShaderSets
         }
         """;
 
-    // ---- Instanced shaders. Per-vertex inputs take the same TEXCOORDn
+    // Lit + textured shader. Same lighting math as LitColor; the base
+    // surface color is `diffuseTexture(uv) * vertexColor` instead of
+    // just the vertex color. This is the unified rendering path the
+    // OBJ loader produces: a material's diffuse color goes into the
+    // vertex tint slot, a 1x1 white texture stands in when no diffuse
+    // map is supplied, so a single shader covers all four
+    // {color Ã— texture, no color Ã— texture, color, plain} cases.
+    //
+    // Uniform layout: identical to LitColor. Vertex stage:
+    //   b0 space1 = Model, b1 space1 = ViewProjection
+    // Fragment stage:
+    //   b0..b3 space3 = ambient/dirDir/dirColor/pointCount (matches LitColor)
+    //   t0 space2 = sampled diffuse texture (Texture2D<float4>)
+    //   s0 space2 = sampler for that texture
+    //   t1 space2 = StructuredBuffer<PointLight>
+    // The storage buffer slot bumps from t0 to t1 because SDL_shadercross
+    // packs storage buffers AFTER sampled + storage textures within
+    // space2 -- 1 sampled texture pushes the structured buffer to t1.
+    private const string LitTextureVertHlsl = """
+        cbuffer Model : register(b0, space1) { float4x4 model;          };
+        cbuffer VP    : register(b1, space1) { float4x4 viewProjection; };
+
+        struct Input
+        {
+            float3 Position : TEXCOORD0;
+            float3 Normal   : TEXCOORD1;
+            float2 TexCoord : TEXCOORD2;
+            float4 Color    : TEXCOORD3;
+        };
+
+        struct Output
+        {
+            float3 WorldPos  : TEXCOORD0;
+            float3 WorldNorm : TEXCOORD1;
+            float2 TexCoord  : TEXCOORD2;
+            float4 Color     : TEXCOORD3;
+            float4 Position  : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            float4 worldPos    = mul(model, float4(input.Position, 1.0f));
+            output.WorldPos    = worldPos.xyz;
+            output.WorldNorm   = mul((float3x3)model, input.Normal);
+            output.TexCoord    = input.TexCoord;
+            output.Color       = input.Color;
+            output.Position    = mul(viewProjection, worldPos);
+            return output;
+        }
+        """;
+
+    private const string LitTextureFragHlsl = """
+        struct PointLight
+        {
+            float4 PositionRange;
+            float4 ColorIntensity;
+        };
+
+        Texture2D<float4> diffuseTex : register(t0, space2);
+        SamplerState      diffuseSmp : register(s0, space2);
+        StructuredBuffer<PointLight> pointLights : register(t1, space2);
+
+        cbuffer Ambient    : register(b0, space3) { float4 ambient;         };
+        cbuffer LightDir   : register(b1, space3) { float4 dirLightDir;     };
+        cbuffer LightCol   : register(b2, space3) { float4 dirLightColor;   };
+        cbuffer LightCount : register(b3, space3) { float4 pointLightCount; };
+
+        struct Input
+        {
+            float3 WorldPos  : TEXCOORD0;
+            float3 WorldNorm : TEXCOORD1;
+            float2 TexCoord  : TEXCOORD2;
+            float4 Color     : TEXCOORD3;
+        };
+
+        float4 main(Input input) : SV_Target0
+        {
+            float3 N = normalize(input.WorldNorm);
+            float4 baseColor = diffuseTex.Sample(diffuseSmp, input.TexCoord) * input.Color;
+
+            float3 lit = ambient.rgb;
+
+            float dirLen = length(dirLightDir.xyz);
+            if (dirLen > 0.0001f)
+            {
+                float3 L = dirLightDir.xyz / dirLen;
+                float NdotL = saturate(dot(N, L));
+                lit += dirLightColor.rgb * NdotL;
+            }
+
+            int count = (int)pointLightCount.x;
+            for (int i = 0; i < count; i++)
+            {
+                PointLight pl = pointLights[i];
+                float3 toLight = pl.PositionRange.xyz - input.WorldPos;
+                float dist = length(toLight);
+                float range = pl.PositionRange.w;
+                if (range <= 0.0001f || dist >= range)
+                    continue;
+                float3 L = toLight / dist;
+                float NdotL = saturate(dot(N, L));
+                float t = saturate(1.0f - dist / range);
+                float atten = t * t;
+                lit += pl.ColorIntensity.rgb * pl.ColorIntensity.a * NdotL * atten;
+            }
+
+            return float4(baseColor.rgb * lit, baseColor.a);
+        }
+        """;
+
+    // ---- Instanced ShaderSets. Per-vertex inputs take the same TEXCOORDn
     // slots as the non-instanced variants. Per-instance inputs follow on
     // higher slots: a float4x4 transform consumes four consecutive
     // semantic indices (one per row), then the float4 tint. The per-call
@@ -549,6 +660,12 @@ public static class ShaderSets
     private static readonly Shader LitColorFrag =
         new(ShaderKind.Fragment, LitColorFragHlsl);
 
+    private static readonly Shader LitTextureVert =
+        new(ShaderKind.Vertex, LitTextureVertHlsl);
+
+    private static readonly Shader LitTextureFrag =
+        new(ShaderKind.Fragment, LitTextureFragHlsl);
+
     private static readonly Shader PositionInstancedVert =
         new(ShaderKind.Vertex, PositionInstancedVertHlsl);
 
@@ -585,7 +702,7 @@ public static class ShaderSets
     /// point light count -- the actual point light data lives in a
     /// storage buffer the renderer binds separately.
     /// </summary>
-    private static readonly ShaderArgsLayout LitColorArgsLayout = new(
+    private static readonly ShaderArgsLayout LightingArgsLayout = new(
         new ShaderArgElement(ShaderArgStage.Vertex,   0, ShaderArgKind.Matrix4x4), // Model
         new ShaderArgElement(ShaderArgStage.Vertex,   1, ShaderArgKind.Matrix4x4), // ViewProjection
         new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4),    // AmbientLight
@@ -636,7 +753,7 @@ public static class ShaderSets
     /// ShaderSet{TVertex,TArgs}, in TArgs)"/>: pass a model matrix and
     /// the renderer composes <see cref="Renderer3D.Camera"/> into it.
     /// Existing callers passing <c>model * viewProjection</c> continue
-    /// to work via the implicit <see cref="Matrix4x4"/> → <see
+    /// to work via the implicit <see cref="Matrix4x4"/> â†’ <see
     /// cref="TransformArgs"/> conversion.
     /// </remarks>
     public static ShaderSet<ColorVertex3D, TransformArgs> PositionColorWithTransform { get; } =
@@ -674,7 +791,27 @@ public static class ShaderSets
     /// a custom shader using a true inverse-transpose normal matrix.
     /// </remarks>
     public static ShaderSet<LitVertex3D, LitArgs> LitColor { get; } =
-        new(LitColorVert, LitColorFrag, LitVertex3D.ShaderVertexLayout, LitColorArgsLayout);
+        new(LitColorVert, LitColorFrag, LitVertex3D.ShaderVertexLayout, LightingArgsLayout);
+
+    /// <summary>
+    /// Lit + textured shader: per-pixel Lambertian shading using the
+    /// renderer's <see cref="Renderer3D.AmbientLight"/>,
+    /// <see cref="Renderer3D.DirectionalLight"/>, and every entry in
+    /// <see cref="Renderer3D.PointLights"/>, applied to a base color of
+    /// <c>diffuseTexture(uv) * vertexColor</c>. Pair with
+    /// <see cref="LitTextureVertex3D"/> and <see cref="LitArgs"/>; bind
+    /// the diffuse texture through the standard textured
+    /// <c>DrawMesh(mesh, texture, shader, args)</c> overload.
+    /// </summary>
+    /// <remarks>
+    /// The arg layout is identical to <see cref="LitColor"/>, so any
+    /// caller that already uses LitColor can reuse the same args struct.
+    /// Setting the vertex tint to white falls back to "texture only";
+    /// supplying a 1x1 white texture falls back to "vertex tint only";
+    /// both white = unlit-looking flat white surface lit only by ambient.
+    /// </remarks>
+    public static ShaderSet<LitTextureVertex3D, LitArgs> LitTexture { get; } =
+        new(LitTextureVert, LitTextureFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout);
 
     /// <summary>
     /// Skybox shader: samples the bound <see cref="Cubemap"/> by the

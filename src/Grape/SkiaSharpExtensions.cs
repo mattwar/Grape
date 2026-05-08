@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace Grape;
 
-public static class ModelExtensions
+public static class SkiaSharpExtensions
 {
     extension(Image image)
     {
@@ -176,30 +176,6 @@ public static class ModelExtensions
             var image = Image.Create(bitmap.Width, bitmap.Height, format ?? bitmap.PixelFormat);
             image.CopyFromBitmap(bitmap);
             return image;
-        }
-    }
-
-    extension(Image)
-    {
-        /// <summary>
-        /// Creates an <see cref="Image"/> from an image file (.png, .jpg, etc)
-        /// </summary>
-        public static Image LoadImage(string filename, Grape.PixelFormat? format = null)
-        {
-            var bytes = File.ReadAllBytes(filename);
-            return Decode(bytes, format);
-        }
-
-        /// <summary>
-        /// Decodes an <see cref="Image"/> from a byte span containing encoded image data (.png, .jpg, etc)
-        /// </summary>
-        public static Image Decode(Span<byte> bytes, Grape.PixelFormat? format = null)
-        {
-            using var skBitmap = SKBitmap.Decode(bytes);
-            if (skBitmap == null)
-                throw new InvalidOperationException("Cannot decode image from bytes");
-
-            return skBitmap.ToImage(format);
         }
     }
 
