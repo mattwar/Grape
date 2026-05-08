@@ -45,11 +45,6 @@ var fitTransform =
     Matrix4x4.CreateTranslation(-center) *
     Matrix4x4.CreateScale(1f / radius);
 
-Console.WriteLine(
-    $"Loaded {model.SourcePath}: {model.Submeshes.Count} submesh(es), " +
-    $"{model.Submeshes.Sum(s => s.Mesh.VertexCount)} verts; " +
-    $"centered at {center}, fit radius {radius:F3}.");
-
 var window = new Window3D
 {
     Title = $"Loaded model: {ModelFile}",
