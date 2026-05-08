@@ -44,180 +44,77 @@ The native SDL3 binaries are pulled in automatically via the `SDL3-CS.Native` an
 
 Targets **.NET 9**.
 
-## Hello, Window
+## A 2D example
+
+A bouncing red square. The `Rendering` event fires when the window needs to repaint; calling `Invalidate()` schedules the next frame.
 
 ```csharp
 using Grape;
 
 var window = new Window2D(800, 600)
 {
-    Title = "Hello, Grape",
+    Title = "Bouncing Square",
     BackgroundColor = new Color(20, 20, 40),
-    CloseKey = Key.Esc
+    CloseKey = Key.Escape
+};
+
+float x = 0, vx = 200; // pixels per second
+
+window.Rendering += (w, rd) =>
+{
+    var dt = (float)rd.ElapsedSinceLastRender.TotalSeconds;
+    x += vx * dt;
+    if (x < 0 || x > w.Size.Width - 100) vx = -vx;
+
+    rd.DrawColor = new Color(220, 60, 60);
+    rd.DrawFillRect(new Rect(x, 250, 100, 100));
+
+    w.Invalidate(); // queue next render to cause animation
 };
 
 await window.WaitForCloseAsync();
 ```
 
-## Animating with `Rendering` event
+## A 3D example (manual render loop)
 
-Grape allows you to drive animation through the `Rendering` event. Call `Invalidate()` from your handler to schedule the next frame; the window paces frames at `MinRenderInterval` (default ~60 Hz).
-
-The handler receives the window and its renderer. Queue draws on the renderer; the window flushes the frame for you when the handler returns.
-
-```csharp
-using Grape;
-
-var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
-
-window.Rendering += (w, renderer) =>
-{
-    // update simulation, then queue draws on the renderer
-    renderer.DrawColor = new Color(255, 0, 0);
-    renderer.DrawFillRect(new Rect(10, 10, 100, 100));
-
-    w.Invalidate(); // schedule the next frame
-};
-
-await window.WaitForCloseAsync();
-```
-
-## Animating with a manual rendering loop
-
-Grape also allows you to take control and drive frames yourself. Use
-`window.Renderer` to queue draws and `Renderer.Render()` to flush; pace
-the loop with `window.NextFrameAsync()`.
-
-```csharp
-using Grape;
-
-var window = new Window2D(800, 600) { Title = "Animation", CloseKey = Key.Esc };
-
-while (!window.IsClosed)
-{
-    var renderer = window.Renderer;
-
-    // update simulation, then queue draws
-    renderer.DrawColor = new Color(0, 255, 0);
-    renderer.DrawFillRect(new Rect(10, 10, 100, 100));
-    renderer.Render();
-
-    await window.NextFrameAsync();
-}
-```
-
-## Subscribe to events to handle input
-
-```csharp
-var window = new Window2D(800, 600);
-
-window.KeyDown += (w, e) =>
-{
-    switch (e.Key)
-    {
-        case Key.Left:
-            ...;
-            break;
-        case Key.Right:
-            ...;
-            break;
-        case Key.Esc:
-            window.Close();
-            break;
-    }
-};
-
-await window.WaitForCloseAsync();
-```
-
-## Poll for input directly
-
-```csharp
-var window = new Window2D(800, 600);
-
-while (!window.IsClosed)
-{
-    if (Keyboard.IsDown(Key.Left))
-    {
-        ...
-    }
-    else if (Keyboard.IsDown(Key.Right))
-    {
-        ...
-    }
-    else if (Keyboard.IsDown(Key.Esc))
-    {
-        window.Close();
-        continue;
-    }
-}
-```
-
-## A Spinning 3D Triangle
+A spinning, colored triangle rendered with a built-in shader. Instead of using `Rendering` event, this version drives frames itself: queue draws on `window.Renderer`, call `Render()` to flush, and `await window.NextFrameAsync()` to pace the loop.
 
 ```csharp
 using System.Numerics;
 using Grape;
 
-var triangle = Mesh.Create([
-    new ColorVertex3D(new Vertex3D( 0.0f,   0.12f, 0f), new Color(255,   0,   0)),
-    new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
-    new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)),
+var triangle = Mesh.Create<ColorVertex3D>(
+[
+    new(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
+    new(new Vertex3D( 0.5f, -0.5f, 0f), new Color(0,   255, 0)),
+    new(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255)),
 ]);
 
-var window = new Window3D(800, 600) { Title = "Spinning Triangle", CloseKey = Key.Esc };
-
-window.Rendering += (w, renderer) =>
+var window = new Window3D
 {
-    var t = (float)renderer.ElapsedSinceStart.TotalSeconds;
-    var transform = Matrix4x4.CreateRotationZ(t);
-    renderer.DrawMesh(triangle, transform);
-    w.Invalidate();
+    Title = "Spinning Triangle",
+    BackgroundColor = new Color(0, 0, 32),
+    FullScreen = true,
+    CloseKey = Key.Escape
 };
 
-await window.WaitForCloseAsync();
+while (!window.IsClosed)
+{
+    var rd = window.Renderer;
+    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var (width, height) = window.Size;
+    var aspect = (float)height / width;
+    var transform =
+        Matrix4x4.CreateRotationZ(t) *
+        Matrix4x4.CreateScale(0.8f) *
+        Matrix4x4.CreateScale(aspect, 1f, 1f);
+
+    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+    rd.Render();
+
+    await window.NextFrameAsync();
+}
 ```
-
-## A 2D Sprite (using Grape.Jelly)
-
-Grape.Jelly defines some higher level concepts like sprites, panels and scenes 
-that let you compose and layer graphic elements together.
-
-The sprite implements its own update and draw logic and moves itself across frames.
-
-```csharp
-using Grape;
-using Grape.Jelly;
-
-var window = new Window2D(800, 600) { Title = "Rocket", CloseKey = Key.Esc };
-
-var image = Image.LoadImage("rocket.png");
-image.SetAlpha(0, image.GetPixel(0, 0)); // color-key the background
-
-var rocket = new Sprite(image, 400, 300, 0.2f)
-{
-    Speed = 600f,
-    Heading = 45f
-};
-
-window.Rendering += (w, renderer) =>
-{
-    var ctx = new UpdateContext
-    {
-        ElapsedSinceStart = renderer.ElapsedSinceStart,
-        ElaspsedSinceLastUpdate = renderer.ElapsedSinceLastRender,
-        Bounds = new Rect(0, 0, w.Size.Width, w.Size.Height),
-    };
-    rocket.Update(ctx);
-    rocket.Draw(renderer);
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-```
-
-See [samples/RicochetRocket.cs](samples/RicochetRocket.cs) for the full version.
-
 
 More examples live in [samples/](samples/) — each is a single `.cs` file you can run directly with `dotnet run samples/<name>.cs` (.NET 10+).
 
@@ -226,8 +123,7 @@ More examples live in [samples/](samples/) — each is a single `.cs` file you c
 | Project | What it is |
 | --- | --- |
 | `Grape` | Core library: windows, rendering (BMP), input, audio. |
-| `Grape.SkiaSharp` | SkiaSharp integration: PNG/JPEG/etc. image loading, Skia canvas drawing into Grape images. |
-| `Grape.Graphics` | Packaging project — bundles `Grape`, `Grape.SkiaSharp`, and `Grape.Jelly` into a single NuGet package. |
+| `Grape.Graphics` | Packaging project — bundles `Grape` and `Grape.Jelly` into a single NuGet package. |
 | `Grape.Jelly` | Scene-graph helpers (sprites, scenes, panels) on top of `Grape`. |
 
 ## Building from Source
@@ -255,7 +151,7 @@ Grape stands on the shoulders of some excellent open-source projects:
 
 - [SDL3](https://www.libsdl.org/) by Sam Lantinga and the SDL contributors — the cross-platform foundation for windowing, GPU, input, and audio.
 - [SDL_shadercross](https://github.com/libsdl-org/SDL_shadercross) — runtime HLSL/SPIR-V shader translation used by `Window3D`.
-- [SDL3-CS](https://github.com/flibitijibibo/SDL3-CS) by Colin Jackson — the C# bindings for SDL3.
+- [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) by Edward Gushchin — the C# bindings for SDL3.
 - [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Grape bridges those bitmaps onto the screen.
 - [Nito.AsyncEx](https://github.com/StephenCleary/AsyncEx) by Stephen Cleary — async coordination primitives.
 
