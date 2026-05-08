@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `Meshes` class with built-in mesh generators for cubes, planes, spheres,
+  cylinders, cones, capsules, tori, platonic solids, axes, grids,
+  rectangles, circles, and ellipses.
+
 ## [0.2.0] - 2026-05-07
 
 ### Added

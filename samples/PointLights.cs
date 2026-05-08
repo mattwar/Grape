@@ -1,4 +1,4 @@
-﻿#:package Grape.Graphics@*-*
+#:package Grape.Graphics@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -24,35 +24,6 @@ using System.Numerics;
 using Grape;
 
 // ---- Geometry helpers --------------------------------------------------------
-
-static (LitVertex3D[] V, uint[] I) BuildLitCube(Vector3 size, Color color)
-{
-    var hx = size.X * 0.5f;
-    var hy = size.Y * 0.5f;
-    var hz = size.Z * 0.5f;
-    var faces = new (Vector3 N, Vector3 A, Vector3 B, Vector3 C, Vector3 D)[]
-    {
-        (new( 1, 0, 0), new( hx,-hy,-hz), new( hx, hy,-hz), new( hx, hy, hz), new( hx,-hy, hz)),
-        (new(-1, 0, 0), new(-hx,-hy, hz), new(-hx, hy, hz), new(-hx, hy,-hz), new(-hx,-hy,-hz)),
-        (new( 0, 1, 0), new(-hx, hy, hz), new( hx, hy, hz), new( hx, hy,-hz), new(-hx, hy,-hz)),
-        (new( 0,-1, 0), new(-hx,-hy,-hz), new( hx,-hy,-hz), new( hx,-hy, hz), new(-hx,-hy, hz)),
-        (new( 0, 0, 1), new(-hx,-hy, hz), new( hx,-hy, hz), new( hx, hy, hz), new(-hx, hy, hz)),
-        (new( 0, 0,-1), new( hx,-hy,-hz), new(-hx,-hy,-hz), new(-hx, hy,-hz), new( hx, hy,-hz)),
-    };
-    var v = new List<LitVertex3D>();
-    var i = new List<uint>();
-    foreach (var (n, a, b, c, d) in faces)
-    {
-        uint b0 = (uint)v.Count;
-        v.Add(new LitVertex3D(a, n, color));
-        v.Add(new LitVertex3D(b, n, color));
-        v.Add(new LitVertex3D(c, n, color));
-        v.Add(new LitVertex3D(d, n, color));
-        i.Add(b0 + 0); i.Add(b0 + 1); i.Add(b0 + 2);
-        i.Add(b0 + 0); i.Add(b0 + 2); i.Add(b0 + 3);
-    }
-    return (v.ToArray(), i.ToArray());
-}
 
 static (ColorVertex3D[] V, uint[] I) BuildSolidCube(float size, Color color)
 {
@@ -86,48 +57,10 @@ static (ColorVertex3D[] V, uint[] I) BuildSolidCube(float size, Color color)
     return (v.ToArray(), i.ToArray());
 }
 
-// Tessellated ground plane: NxN quads in the XZ plane, normal +Y. The
-// tessellation matters -- a single big quad would interpolate the
-// world-space position and normal across enormous triangles, but the
-// per-pixel shader is exact regardless of tessellation, so even a
-// 1x1 plane works. Tessellation is here to make the wireframe (if you
-// toggle it on) more interesting, not for shading quality.
-static (LitVertex3D[] V, uint[] I) BuildGround(float size, int subdivisions, Color color)
-{
-    int n = subdivisions + 1;
-    var verts = new LitVertex3D[n * n];
-    for (int z = 0; z < n; z++)
-    {
-        for (int x = 0; x < n; x++)
-        {
-            float fx = (x / (float)subdivisions - 0.5f) * size;
-            float fz = (z / (float)subdivisions - 0.5f) * size;
-            verts[z * n + x] = new LitVertex3D(new Vector3(fx, 0f, fz), Vector3.UnitY, color);
-        }
-    }
-    var idx = new List<uint>(subdivisions * subdivisions * 6);
-    for (int z = 0; z < subdivisions; z++)
-    {
-        for (int x = 0; x < subdivisions; x++)
-        {
-            uint a = (uint)(z * n + x);
-            uint b = a + 1;
-            uint c = (uint)((z + 1) * n + x);
-            uint d = c + 1;
-            idx.Add(a); idx.Add(c); idx.Add(b);
-            idx.Add(b); idx.Add(c); idx.Add(d);
-        }
-    }
-    return (verts, idx.ToArray());
-}
-
 // ---- Build meshes ------------------------------------------------------------
 
-var (groundV, groundI) = BuildGround(20f, 1, new Color(220, 220, 220));
-var ground = Mesh.Create(groundV, groundI);
-
-var (boxV, boxI) = BuildLitCube(new Vector3(0.6f, 1.2f, 0.6f), new Color(200, 200, 210));
-var box = Mesh.Create(boxV, boxI);
+var ground = Meshes.Plane(new Color(220, 220, 220), size: new Vector2(20f));
+var box = Meshes.Cube(new Color(200, 200, 210), size: new Vector3(0.6f, 1.2f, 0.6f));
 
 // Layout for the boxes: a loose grid, slightly jittered so it doesn't
 // look like a chess board. Stationary across frames so the lights are

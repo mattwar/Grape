@@ -1,4 +1,4 @@
-﻿#:package Grape.Graphics@*-*
+#:package Grape.Graphics@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -21,38 +21,14 @@
 using System.Numerics;
 using Grape;
 
-// ---- Big cube: per-face normals, flat coloured faces ---------------------
-var faces = new (Vector3 Normal, Color Color, Vector3 A, Vector3 B, Vector3 C, Vector3 D)[]
-{
-    (new( 1, 0, 0), new Color(220,  60,  60),
-        new( 1,-1,-1), new( 1, 1,-1), new( 1, 1, 1), new( 1,-1, 1)),
-    (new(-1, 0, 0), new Color( 60, 200, 220),
-        new(-1,-1, 1), new(-1, 1, 1), new(-1, 1,-1), new(-1,-1,-1)),
-    (new( 0, 1, 0), new Color( 80, 200,  80),
-        new(-1, 1, 1), new( 1, 1, 1), new( 1, 1,-1), new(-1, 1,-1)),
-    (new( 0,-1, 0), new Color(220, 200,  60),
-        new(-1,-1,-1), new( 1,-1,-1), new( 1,-1, 1), new(-1,-1, 1)),
-    (new( 0, 0, 1), new Color(220,  80, 200),
-        new(-1,-1, 1), new( 1,-1, 1), new( 1, 1, 1), new(-1, 1, 1)),
-    (new( 0, 0,-1), new Color( 80,  80, 220),
-        new( 1,-1,-1), new(-1,-1,-1), new(-1, 1,-1), new( 1, 1,-1)),
-};
+// Big lit cube: per-face normals so each face shades uniformly under
+// the directional light.
+var bigCube = Meshes.Cube(new Color(220, 100, 80), size: new Vector3(2f));
 
-var litVerts = new List<LitVertex3D>();
-var litIdx   = new List<uint>();
-foreach (var (n, c, a, b, cc, d) in faces)
-{
-    uint baseIndex = (uint)litVerts.Count;
-    litVerts.Add(new LitVertex3D(a,  n, c));
-    litVerts.Add(new LitVertex3D(b,  n, c));
-    litVerts.Add(new LitVertex3D(cc, n, c));
-    litVerts.Add(new LitVertex3D(d,  n, c));
-    litIdx.Add(baseIndex + 0); litIdx.Add(baseIndex + 1); litIdx.Add(baseIndex + 2);
-    litIdx.Add(baseIndex + 0); litIdx.Add(baseIndex + 2); litIdx.Add(baseIndex + 3);
-}
-var bigCube = Mesh.Create(litVerts.ToArray(), litIdx.ToArray());
-
-// ---- Small marker cube: unlit white, just to show the light's position ---
+// Small unlit white marker cube to show the light's position. We keep
+// this hand-built (rather than using Meshes.Cube) because the marker
+// is intentionally rendered with the unlit PositionColor shader so it
+// glows uniformly white regardless of the light's direction.
 var markerVerts = new ColorVertex3D[]
 {
     new(new Vertex3D(-1f, -1f, -1f), Color.White),
