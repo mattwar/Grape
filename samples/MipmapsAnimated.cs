@@ -33,7 +33,6 @@
 //             each instant -> stays a clean uniform gray as the
 //             quad shrinks.
 
-using System.Collections.Immutable;
 using System.Numerics;
 using Grape;
 
@@ -44,13 +43,7 @@ var noMips   = CreateCheckerboard(TexSize, TexSize, CellSize, mipmaps: false);
 var withMips = CreateCheckerboard(TexSize, TexSize, CellSize, mipmaps: true);
 
 const float HalfSize = 0.5f;
-var quad = new Mesh<TextureVertex3D>(
-    vertices: ImmutableArray.Create(
-        new TextureVertex3D(new Vertex3D(-HalfSize, -HalfSize, 0f), new Vector2(0f, 1f)),
-        new TextureVertex3D(new Vertex3D( HalfSize, -HalfSize, 0f), new Vector2(1f, 1f)),
-        new TextureVertex3D(new Vertex3D( HalfSize,  HalfSize, 0f), new Vector2(1f, 0f)),
-        new TextureVertex3D(new Vertex3D(-HalfSize,  HalfSize, 0f), new Vector2(0f, 0f))),
-    indices: ImmutableArray.Create<uint>(0, 1, 2, 0, 2, 3));
+var quad = Meshes.TexturedRectangle(size: new Vector2(HalfSize * 2f));
 
 var camera = new PerspectiveCamera
 {

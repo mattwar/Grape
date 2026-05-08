@@ -32,10 +32,6 @@ public sealed class Image : IDisposable
 
     public static Image Create(int width, int height, PixelFormat format, bool mipmaps = false)
     {
-        // SDL must be initialised before any SDL.* call. Touching
-        // Application.Current starts the app on demand.
-        _ = Application.Current;
-
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
             throw new InvalidOperationException("Cannot create image");
@@ -220,7 +216,6 @@ public sealed class Image : IDisposable
     public static Image Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        _ = Application.Current;
 
         // SDL.LoadBMP keeps BMPs as a zero-dependency path: BMP is
         // ubiquitous, SDL handles it directly, and it sidesteps a
@@ -244,14 +239,13 @@ public sealed class Image : IDisposable
     /// </summary>
     public static Image Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
     {
-        _ = Application.Current;
-
+        // Always allocate ABGR8888 — the GPU fast-path sampling
+        // format. CopyFromBitmap converts per pixel, so the bitmap's
+        // native color type (Skia's default Bgra8888 on little-endian)
+        // is normalized here and never reaches the GPU upload.
         using var skBitmap = SkiaSharp.SKBitmap.Decode(bytes)
             ?? throw new InvalidOperationException("SkiaSharp could not decode the supplied image bytes.");
-
-        // Open-coded so we can pass `mipmaps` through to Image.Create
-        // (the SKBitmap.ToImage extension can't take that flag).
-        var image = Image.Create(skBitmap.Width, skBitmap.Height, skBitmap.PixelFormat, mipmaps);
+        var image = Image.Create(skBitmap.Width, skBitmap.Height, PixelFormat.ABGR8888, mipmaps);
         image.CopyFromBitmap(skBitmap);
         return image;
     }

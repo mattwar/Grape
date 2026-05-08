@@ -42,8 +42,49 @@ public abstract class Window : IDisposable
     }
 
     protected Window(WindowFlags flags = WindowFlags.None)
-        : this(100, 100, flags)
+        : this(DefaultSize(), flags)
     {
+    }
+
+    private Window((int Width, int Height) size, WindowFlags flags)
+        : this(size.Width, size.Height, flags)
+    {
+    }
+
+    // Half the primary display's usable bounds (i.e. excluding the
+    // taskbar) so a default-sized window is comfortably visible on
+    // any reasonable monitor. Falls back to 800x600 if SDL can't
+    // report a primary display (rare; headless / no video init).
+    private static (int Width, int Height) DefaultSize()
+    {
+        const int Fallback_W = 800, Fallback_H = 600;
+        int w = Fallback_W, h = Fallback_H;
+        try
+        {
+            // The window ctor body initializes the video subsystem,
+            // but we need it up *before* that to query display bounds.
+            // SDL refcounts so the ctor's later init call is a no-op.
+            // Display + SDL calls run on the application thread.
+            var app = Application.Start();
+            app.Send(_ =>
+            {
+                if (!SDL.InitSubSystem(SDL.InitFlags.Video))
+                    return;
+                var bounds = Devices.Display.Primary.UsableBounds;
+                int hw = (int)(bounds.Width / 2);
+                int hh = (int)(bounds.Height / 2);
+                if (hw > 0 && hh > 0)
+                {
+                    w = hw;
+                    h = hh;
+                }
+            });
+        }
+        catch
+        {
+            // Fall through with whatever w/h we captured.
+        }
+        return (w, h);
     }
 
     /// <summary>

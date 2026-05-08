@@ -29,20 +29,6 @@
 using System.Numerics;
 using Grape;
 
-static Mesh<ColorVertex3D> MakeQuad(Color c)
-{
-    // Two-triangle quad on the XY plane, centred on origin, side 1.
-    var p0 = new Vertex3D(-0.5f, -0.5f, 0f);
-    var p1 = new Vertex3D( 0.5f, -0.5f, 0f);
-    var p2 = new Vertex3D( 0.5f,  0.5f, 0f);
-    var p3 = new Vertex3D(-0.5f,  0.5f, 0f);
-
-    return Mesh.Create([
-        new ColorVertex3D(p0, c), new ColorVertex3D(p1, c), new ColorVertex3D(p2, c),
-        new ColorVertex3D(p0, c), new ColorVertex3D(p2, c), new ColorVertex3D(p3, c),
-    ]);
-}
-
 // HSV -> RGB; H in [0,1), S/V in [0,1].
 static Color Hsv(float h, float s, float v, byte a = 255)
 {
@@ -114,10 +100,10 @@ static Mesh<ColorVertex3D> MakeBackdrop()
 //   - Additive: backdrop brightened toward magenta (glow)
 //   - Multiply: backdrop darkened toward magenta
 var bandColor = new Color(220, 80, 200, 180);
-var opaqueQuad   = MakeQuad(bandColor);
-var alphaQuad    = MakeQuad(bandColor);
-var additiveQuad = MakeQuad(bandColor);
-var multiplyQuad = MakeQuad(bandColor);
+var opaqueQuad   = Meshes.Rectangle(bandColor);
+var alphaQuad    = Meshes.Rectangle(bandColor);
+var additiveQuad = Meshes.Rectangle(bandColor);
+var multiplyQuad = Meshes.Rectangle(bandColor);
 var backdrop     = MakeBackdrop();
 
 var window = new Window3D

@@ -29,18 +29,7 @@ using Grape;
 //   X axis: red,    from (0,0,0) to (+1,0,0)
 //   Y axis: green,  from (0,0,0) to (0,+1,0)
 //   Z axis: blue,   from (0,0,0) to (0,0,+1)
-var axes = Mesh.Create<ColorVertex3D>(
-[
-    new(new Vertex3D(0f, 0f, 0f), new Color(255, 64, 64)),
-    new(new Vertex3D(1f, 0f, 0f), new Color(255, 64, 64)),
-
-    new(new Vertex3D(0f, 0f, 0f), new Color(64, 255, 64)),
-    new(new Vertex3D(0f, 1f, 0f), new Color(64, 255, 64)),
-
-    new(new Vertex3D(0f, 0f, 0f), new Color(64, 128, 255)),
-    new(new Vertex3D(0f, 0f, 1f), new Color(64, 128, 255)),
-],
-    topology: Topology.LineList);
+var axes = Meshes.Axes(length: 1f);
 
 // A filled reference triangle off to the right, rendered with the
 // default TriangleList topology. Just to show solid and line-based
@@ -94,7 +83,7 @@ window.Rendering += (w, rd) =>
         byte b = (byte)(220 - 60 * u);
         plotVertices[i] = new ColorVertex3D(new Vertex3D(x, y, 0f), new Color(r, g, b));
     }
-    plot.Reset(plotVertices, ReadOnlySpan<uint>.Empty);
+    plot.Update(plotVertices);
 
     // Axes at the world origin.
     rd.DrawMesh(axes, ShaderSets.PositionColorWithTransform, viewProjection);

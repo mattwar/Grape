@@ -34,21 +34,8 @@ using Grape;
 //        +----------+
 //   v1 (-1,-1)   v2 (1,-1)
 //
-static Mesh<ColorVertex3D> MakeQuad(Color color)
-{
-    var v0 = new ColorVertex3D(new Vertex3D(-1f,  1f, 0f), color);
-    var v1 = new ColorVertex3D(new Vertex3D(-1f, -1f, 0f), color);
-    var v2 = new ColorVertex3D(new Vertex3D( 1f, -1f, 0f), color);
-    var v3 = new ColorVertex3D(new Vertex3D( 1f,  1f, 0f), color);
-
-    return Mesh.Create([
-        v0, v1, v2,   // first triangle (CCW from +Z)
-        v0, v2, v3,   // second triangle (CCW from +Z)
-    ]);
-}
-
-var quadLeft  = MakeQuad(new Color(80, 200, 255));   // cyan
-var quadRight = MakeQuad(new Color(255, 160, 80));   // amber
+var quadLeft  = Meshes.Rectangle(new Color(80, 200, 255), size: new Vector2(2f));   // cyan
+        var quadRight = Meshes.Rectangle(new Color(255, 160, 80), size: new Vector2(2f));   // amber
 
 // A backdrop strip placed behind both quads. When the right quad culls
 // its back face, the missing pixels reveal this backdrop -- proving

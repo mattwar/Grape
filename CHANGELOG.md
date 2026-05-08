@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- glTF 2.0 (`.glb` / `.gltf`) loader via SharpGLTF; `Model.Load` now
+  dispatches `.glb`/`.gltf` paths through it.
+- glTF v1 loads geometry, base-color factor, and base-color texture
+  only (no animations, skinning, morph targets, or full PBR yet).
+- `Meshes` class with built-in mesh generators for cubes, planes, spheres,
+  cylinders, cones, capsules, tori, platonic solids, axes, grids,
+  rectangles, circles, and ellipses.
+- `Mesh<T>.Transform(matrix)` bakes a transform into vertex positions
+  (and properly transforms normals via the inverse-transpose).
+- `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
+  meshes into one for static-batching / mesh composition.
+- `Mesh<T>.Update(vertices)` replaces vertex data while keeping the
+  existing index buffer; bumps `Version` so the renderer re-uploads.
+
+### Changed
+- Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
+- Default window size (parameterless `Window2D` / `Window3D` ctor) is
+  now half the primary display's usable bounds instead of 100x100.
+- `GpuRenderer` now converts non-native-format textures to `ABGR8888`
+  for upload instead of throwing, with a one-time warning per format.
+- `Image.Decode` now allocates surfaces in `ABGR8888` (the GPU fast
+  format) regardless of the source bitmap's color type.
+
+### Fixed
+- Texture upload failures no longer tear down the entire frame: the
+  failing image is logged once and affected draws are skipped.
+
+### Removed
+- `Mesh<T>` constructors and `Reset` overload that took
+  `ImmutableArray<T>`. Build the mesh once with `Mesh.Create(...)` and,
+  if dynamic, call `mesh.Update(vertices)` to push new contents.
+- `Mesh<T>` constructors are now `internal`. Construct meshes via
+  `Mesh.Create(...)`; this also gets type-inference from collection
+  expressions.
+- `Renderer3D.DrawMesh` extension overloads that took raw vertex arrays
+  / `ImmutableArray<T>`. Wrap your vertices in a `Mesh<T>` once via
+  `Mesh.Create(...)` and pass the mesh; this keeps the renderer's
+  GPU-buffer cache working across frames.
+
 ## [0.2.0] - 2026-05-07
 
 ### Added

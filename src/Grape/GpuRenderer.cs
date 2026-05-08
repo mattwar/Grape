@@ -22,6 +22,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly List<MeshCacheEntry> _meshResources = new();
     private readonly List<TextureCacheEntry> _textureResources = new();
     private readonly List<CubemapCacheEntry> _cubemapResources = new();
+
+    // Images / cubemaps whose GPU upload threw. Tracked so we can both
+    // (a) silently skip retrying every frame for the same broken
+    // resource and (b) skip the bind step downstream so a single bad
+    // texture doesn't tear down the entire frame mid-pass and turn the
+    // window black. Logged once per offender via Console.Error.
+    private readonly HashSet<Image> _failedTextureUploads = new();
+    private readonly HashSet<Cubemap> _failedCubemapUploads = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
@@ -803,7 +811,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
         else
         {
-            mesh.Reset(span, ReadOnlySpan<uint>.Empty);
+            mesh.Update(span);
         }
 
         TransformArgs argsTransform = transform;
@@ -919,7 +927,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     var resources = command.Resources;
 
                     // Skip the upload entirely when the mesh hasn't changed
-                    // since we last sent it to the GPU. Reset(...) on Mesh<T>
+                    // since we last sent it to the GPU. Update(...) on Mesh<T>
                     // bumps Version so this picks up edits automatically.
                     var needsUpload =
                         resources.VertexBuffer is null ||
@@ -1015,11 +1023,38 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         resources.LastWireframeUploadedVersion = mesh.Version;
                     }
 
-                    if (command.Command.Texture is { } image)
-                        EnsureTextureUploaded(copyPass!, image);
+                    if (command.Command.Texture is { } image && !_failedTextureUploads.Contains(image))
+                    {
+                        try
+                        {
+                            EnsureTextureUploaded(copyPass!, image);
+                        }
+                        catch (Exception ex)
+                        {
+                            _failedTextureUploads.Add(image);
+                            Console.Error.WriteLine(
+                                $"Grape.GpuRenderer: failed to upload image " +
+                                $"({image.Size.Width}x{image.Size.Height}, format {image.PixelFormat}) " +
+                                $"to GPU: {ex.GetType().Name}: {ex.Message}. " +
+                                $"Affected draws will be skipped for the rest of this session.");
+                        }
+                    }
 
-                    if (command.Command.Cubemap is { } cubemap)
-                        EnsureCubemapUploaded(copyPass!, cubemap);
+                    if (command.Command.Cubemap is { } cubemap && !_failedCubemapUploads.Contains(cubemap))
+                    {
+                        try
+                        {
+                            EnsureCubemapUploaded(copyPass!, cubemap);
+                        }
+                        catch (Exception ex)
+                        {
+                            _failedCubemapUploads.Add(cubemap);
+                            Console.Error.WriteLine(
+                                $"Grape.GpuRenderer: failed to upload cubemap to GPU: " +
+                                $"{ex.GetType().Name}: {ex.Message}. " +
+                                $"Affected draws will be skipped for the rest of this session.");
+                        }
+                    }
 
                     // Per-instance vertex data (slot 1) for instanced
                     // commands. Acquired from a pool that grows monotonically
@@ -1113,6 +1148,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
                 foreach (var command in prepared)
                 {
+                    // Skip draws whose texture/cubemap upload failed --
+                    // logged in the copy pass, no need to repeat here.
+                    if (command.Command.Texture is { } failedImage && _failedTextureUploads.Contains(failedImage))
+                        continue;
+                    if (command.Command.Cubemap is { } failedCubemap && _failedCubemapUploads.Contains(failedCubemap))
+                        continue;
+
                     var shader = command.Command.Shader;
                     var vsGpu = GetOrCreateGpuShader(shader.Vertex);
                     var fsGpu = GetOrCreateGpuShader(shader.Fragment);
@@ -1363,7 +1405,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         // existing GPU texture. UploadToTexture passes
                         // cycle: true so re-writing while the previous
                         // contents may still be in flight is safe.
-                        var px = image.GetPixels();
+                        var px = GetUploadBytes(image, out var rented);
                         if (entry.UploadBuffer is null || entry.UploadBufferBytes < px.Length)
                         {
                             entry.UploadBuffer?.Dispose();
@@ -1371,6 +1413,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                             entry.UploadBufferBytes = px.Length;
                         }
                         copyPass.UploadToTexture(entry.UploadBuffer!, entry.Texture, (uint)w, (uint)h, px);
+                        ReleaseUploadBytes(rented);
                     }
                     else
                     {
@@ -1380,7 +1423,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         entry.UploadBuffer = null;
                         entry.UploadBufferBytes = 0;
 
-                        var resizedFormat = MapPixelFormat(image.PixelFormat);
+                        var resizedFormat = ResolveGpuFormat(image.PixelFormat);
                         var resizedLevels = ComputeMipLevelCount(w, h, image.Mipmaps);
                         entry.Texture = _device.CreateTexture(new GpuTextureCreateInfo
                         {
@@ -1398,9 +1441,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         entry.Mipmaps = image.Mipmaps;
                         entry.NumLevels = resizedLevels;
 
-                        var px = image.GetPixels();
+                        var px = GetUploadBytes(image, out var rented);
                         using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)px.Length);
                         copyPass.UploadToTexture(upload, entry.Texture, (uint)w, (uint)h, px);
+                        ReleaseUploadBytes(rented);
                     }
 
                     if (entry.Mipmaps && entry.NumLevels > 1)
@@ -1413,7 +1457,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
 
         var (width, height) = image.Size;
-        var format = MapPixelFormat(image.PixelFormat);
+        var format = ResolveGpuFormat(image.PixelFormat);
         var numLevels = ComputeMipLevelCount(width, height, image.Mipmaps);
 
         var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
@@ -1428,9 +1472,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             SampleCount = SDL.GPUSampleCount.SampleCount1,
         });
 
-        var pixels = image.GetPixels();
+        var pixels = GetUploadBytes(image, out var firstRented);
         using var firstUpload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
         copyPass.UploadToTexture(firstUpload, gpuTexture, (uint)width, (uint)height, pixels);
+        ReleaseUploadBytes(firstRented);
 
         if (image.Mipmaps && numLevels > 1)
             _pendingMipmapGeneration.Add(gpuTexture);
@@ -1487,7 +1532,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
 
         var size = cubemap.Size;
-        var format = MapPixelFormat(cubemap.Format);
+        var format = ResolveGpuFormat(cubemap.Format);
         var numLevels = ComputeMipLevelCount(size, size, cubemap.Mipmaps);
 
         var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
@@ -1664,16 +1709,80 @@ internal class GpuRenderer : Renderer3D, IDisposable
         return slot;
     }
 
-    private static SDL.GPUTextureFormat MapPixelFormat(PixelFormat format) => format switch
+    // GPU texture format resolution. The two formats with a direct
+    // little-endian byte-layout match are mapped 1:1; everything else
+    // falls back to R8G8B8A8Unorm and the upload bytes are converted
+    // to ABGR8888 on the CPU by GetUploadBytes. This means callers can
+    // hand the renderer images in any pixel format the Image API
+    // supports without seeing a NotSupportedException tear down the
+    // frame mid-pass.
+    private static SDL.GPUTextureFormat ResolveGpuFormat(PixelFormat format) => format switch
     {
         // SDL_PIXELFORMAT_ABGR8888 stores bytes in memory as R, G, B, A on
         // little-endian platforms, matching SDL_GPU R8G8B8A8_UNORM.
         PixelFormat.ABGR8888 => SDL.GPUTextureFormat.R8G8B8A8Unorm,
         PixelFormat.ARGB8888 => SDL.GPUTextureFormat.B8G8R8A8Unorm,
-        _ => throw new NotSupportedException(
-            $"Image pixel format '{format}' has no GPU texture format mapping. " +
-            "Convert the image to ABGR8888 before sampling on the GPU."),
+        // Conversion fallback: GetUploadBytes will repack to RGBA bytes.
+        _ => SDL.GPUTextureFormat.R8G8B8A8Unorm,
     };
+
+    // Formats we've already warned about, so a converted texture only
+    // logs once per process.
+    private static readonly HashSet<PixelFormat> _warnedConvertedFormats = new();
+
+    // Returns the pixel bytes to upload for `image`. If the image's
+    // pixel format maps directly to a GPU format, returns the surface's
+    // raw bytes (no copy). Otherwise allocates a pooled byte[] and
+    // converts pixels to ABGR8888 (R,G,B,A) one-by-one through the
+    // image's per-pixel accessor, which knows how to decode any SDL
+    // surface format. The caller MUST pass the returned `rented` array
+    // back to ReleaseUploadBytes after the upload is queued.
+    private static ReadOnlySpan<byte> GetUploadBytes(Image image, out byte[]? rented)
+    {
+        var fmt = image.PixelFormat;
+        if (fmt == PixelFormat.ABGR8888 || fmt == PixelFormat.ARGB8888)
+        {
+            rented = null;
+            return image.GetPixels();
+        }
+
+        // Warn once. This is on a slow path; the lock cost is fine.
+        lock (_warnedConvertedFormats)
+        {
+            if (_warnedConvertedFormats.Add(fmt))
+            {
+                Console.Error.WriteLine(
+                    $"Grape.GpuRenderer: image with pixel format '{fmt}' is being " +
+                    $"converted to ABGR8888 for GPU upload. For best performance " +
+                    $"create textures in PixelFormat.ABGR8888 directly.");
+            }
+        }
+
+        var (w, h) = image.Size;
+        int byteCount = w * h * 4;
+        var buffer = ArrayPool<byte>.Shared.Rent(byteCount);
+        for (int y = 0; y < h; y++)
+        {
+            int row = y * w * 4;
+            for (int x = 0; x < w; x++)
+            {
+                var c = image.GetPixel(x, y);
+                int i = row + x * 4;
+                buffer[i] = c.R;
+                buffer[i + 1] = c.G;
+                buffer[i + 2] = c.B;
+                buffer[i + 3] = c.A;
+            }
+        }
+        rented = buffer;
+        return new ReadOnlySpan<byte>(buffer, 0, byteCount);
+    }
+
+    private static void ReleaseUploadBytes(byte[]? rented)
+    {
+        if (rented is not null)
+            ArrayPool<byte>.Shared.Return(rented);
+    }
 
     private GpuPipeline GetOrCreatePipeline(
         GpuShader vertexShader,

@@ -70,9 +70,11 @@ public sealed class Model : IDisposable
     }
 
     /// <summary>
-    /// Loads a 3D model from disk. Today this dispatches by extension
-    /// to the OBJ loader (any <c>.mtl</c> sidecar referenced by
-    /// <c>mtllib</c> is loaded too); future formats register here.
+    /// Loads a 3D model from disk. Today this dispatches by extension:
+    /// <c>.obj</c> goes through the OBJ loader (any <c>.mtl</c>
+    /// sidecar referenced by <c>mtllib</c> is loaded too) and
+    /// <c>.glb</c> / <c>.gltf</c> go through the glTF loader. Future
+    /// formats register here.
     /// </summary>
     public static Model Load(string path)
     {
@@ -80,8 +82,11 @@ public sealed class Model : IDisposable
         var ext = Path.GetExtension(path);
         if (ext.Equals(".obj", StringComparison.OrdinalIgnoreCase))
             return OBJ.Load(path);
+        if (ext.Equals(".glb", StringComparison.OrdinalIgnoreCase) ||
+            ext.Equals(".gltf", StringComparison.OrdinalIgnoreCase))
+            return GLTF.Load(path);
         throw new NotSupportedException(
-            $"Unsupported model format '{ext}'. Supported: .obj.");
+            $"Unsupported model format '{ext}'. Supported: .obj, .glb, .gltf.");
     }
 
     /// <summary>
