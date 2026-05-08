@@ -29,11 +29,11 @@ var window = new Window2D
     CloseKey = Key.Escape,
 };
 
-var icon = Image.LoadImage(SampleAsset("grape.bmp"));
+var icon = Image.Load(SampleAsset("grape.bmp"));
 icon.SetAlpha(0, icon.GetPixel(0, 0));
 window.Icon = icon;
 
-var rocketImage = Image.LoadImage(SampleAsset("rocket.png"));
+var rocketImage = Image.Load(SampleAsset("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f)
 {

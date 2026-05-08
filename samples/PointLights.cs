@@ -215,12 +215,12 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
 
         // Lit ground.
-        rd.DrawMesh(ground, Shaders.LitColor, new LitArgs(Matrix4x4.Identity));
+        rd.DrawMesh(ground, Shaders.LitColor, new LightingArgs(Matrix4x4.Identity));
 
         // Lit boxes.
         foreach (var p in boxes)
         {
-            rd.DrawMesh(box, Shaders.LitColor, new LitArgs(Matrix4x4.CreateTranslation(p)));
+            rd.DrawMesh(box, Shaders.LitColor, new LightingArgs(Matrix4x4.CreateTranslation(p)));
         }
 
         // Unlit markers, one per light. Use PositionColorWithTransform

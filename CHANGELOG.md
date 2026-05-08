@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `Image.Load(path, mipmaps)` -- single entry point for image files.
+- `Image.Decode(ReadOnlySpan<byte>, mipmaps)` for in-memory image bytes.
+- `Model.Load(path)` and `.obj` / `.mtl` loaders.
+- OBJ loader smooths per-position normals when `vn` is absent.
+
+### Changed
+- Folded `Grape.SkiaSharp` into `Grape`; SkiaSharp is now a core dep.
+- `Image.Load` dispatches by extension: `.bmp` via SDL, others via SkiaSharp.
+- `Image.Save` dispatches by extension: `.bmp` via SDL, `.png`/`.jpg`/`.webp` via SkiaSharp.
+
+### Removed
+- `Image.LoadBitmap` (use `Image.Load` instead).
+- Standalone `Grape.SkiaSharp` project (its types live in `Grape` now).
+
 ## [0.1.0] - 2026-05-04
 
 ### Added
