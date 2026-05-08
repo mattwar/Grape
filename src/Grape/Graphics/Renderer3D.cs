@@ -191,6 +191,25 @@ public abstract class Renderer3D
     public DirectionalLight? DirectionalLight { get; set; }
 
     /// <summary>
+    /// Mutable list of point lights that lit shaders accumulate per
+    /// fragment. Add/remove freely between frames; the renderer
+    /// snapshots and uploads the list at the start of each
+    /// <c>Render()</c>. There is no fixed cap -- the storage buffer
+    /// grows on demand.
+    /// </summary>
+    /// <remarks>
+    /// Mutating the list <em>between</em> queued draws within a single
+    /// frame works but is unusual: the per-draw count uniform is taken
+    /// at the time <c>DrawMesh</c> is called, while the buffer contents
+    /// are taken at render time, so adding lights between draws affects
+    /// only later draws in the same frame and removing lights between
+    /// draws may leave earlier draws looping over slots that no longer
+    /// describe a valid light. Stick to the "mutate between frames"
+    /// pattern unless you have a specific reason.
+    /// </remarks>
+    public List<PointLight> PointLights { get; } = new();
+
+    /// <summary>
     /// Aspect ratio (width / height) used when sampling the camera's
     /// projection in scene-aware draws. Computed from the active
     /// render target's pixel dimensions; concrete renderers override
@@ -410,6 +429,15 @@ public abstract class Renderer3D
             && TArgs.SetDirectionalLight is { } setDir)
         {
             args = setDir(args, dirLight);
+        }
+
+        // Point light count -> count field. Always fires when the args
+        // struct opts in; the storage buffer itself is bound by the
+        // concrete renderer at draw time. Count of zero is a no-op in
+        // the shader's loop.
+        if (TArgs.SetPointLightCount is { } setCount)
+        {
+            args = setCount(args, PointLights.Count);
         }
 
         return args;

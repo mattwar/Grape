@@ -1046,6 +1046,36 @@ internal sealed class GpuIndexBuffer : GpuBuffer
     }
 }
 
+/// <summary>
+/// A GPU storage buffer (a.k.a. SSBO / structured buffer) that vertex
+/// or fragment shaders can read from. Used for resources whose count
+/// isn't known at shader-compile time (e.g. a variable-length list of
+/// point lights). Pair with <c>StructuredBuffer&lt;T&gt;</c> in HLSL.
+/// </summary>
+internal sealed class GpuStorageBuffer : GpuBuffer
+{
+    private GpuStorageBuffer(GpuDevice device, nint bufferId, uint size)
+        : base(device, bufferId, size)
+    {
+    }
+
+    internal static GpuStorageBuffer Create(GpuDevice device, uint size)
+    {
+        var createInfo = new SDL.GPUBufferCreateInfo
+        {
+            Size = size,
+            Usage = SDL.GPUBufferUsageFlags.GraphicsStorageRead,
+            Props = 0,
+        };
+
+        var bufferId = SDL.CreateGPUBuffer(device.GpuDeviceID, createInfo);
+        if (bufferId == 0)
+            throw new InvalidOperationException(
+                $"Failed to create GPU storage buffer: {SDL.GetError()}");
+        return new GpuStorageBuffer(device, bufferId, createInfo.Size);
+    }
+}
+
 
 /// <summary>
 /// A block of GPU copy and render instructions.
@@ -1458,6 +1488,33 @@ internal sealed class GpuRenderPass : IDisposable
     }
 
     /// <summary>
+    /// Binds storage buffers to the fragment stage starting at the given slot.
+    /// The shader sees them as <c>StructuredBuffer&lt;T&gt;</c> bindings.
+    /// </summary>
+    public void BindFragmentStorageBuffers(uint firstSlot, ReadOnlySpan<GpuStorageBuffer> buffers)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuRenderPass));
+
+        unsafe
+        {
+            Span<nint> ids = stackalloc nint[buffers.Length];
+            for (int i = 0; i < buffers.Length; i++)
+            {
+                var b = buffers[i];
+                if (b.IsDisposed)
+                    throw new ObjectDisposedException(nameof(b));
+                ids[i] = b.BufferId;
+            }
+
+            fixed (nint* pIds = ids)
+            {
+                SDL.BindGPUFragmentStorageBuffers(_gpuRenderPassID, firstSlot, (nint)pIds, (uint)ids.Length);
+            }
+        }
+    }
+
+    /// <summary>
     /// Sets the stencil reference value for subsequent draw calls in this render pass.
     /// </summary>
     public void SetStencilReference(byte reference)
@@ -1770,11 +1827,13 @@ internal sealed class GpuShader : IDisposable
 {
     private readonly GpuDevice _gpuDevice;
     private nint _shaderId;
+    private readonly uint _numStorageBuffers;
 
-    private GpuShader(GpuDevice device, nint shaderId)
+    private GpuShader(GpuDevice device, nint shaderId, uint numStorageBuffers)
     {
         _gpuDevice = device;
         _shaderId = shaderId;
+        _numStorageBuffers = numStorageBuffers;
         device.AddResource(this);
     }
 
@@ -1800,12 +1859,15 @@ internal sealed class GpuShader : IDisposable
                 };
 
                 var shaderId = SDL.CreateGPUShader(device.GpuDeviceID, createInfo);
-                return new GpuShader(device, shaderId);
+                return new GpuShader(device, shaderId, info.NumStorageBuffers);
             }
         }
     }
 
     internal nint ShaderId => _shaderId;
+
+    /// <summary>Storage-buffer slot count this shader expects bound. Used at draw time to skip the bind when the shader doesn't use any.</summary>
+    internal uint NumStorageBuffers => _numStorageBuffers;
 
     public bool IsDisposed => _shaderId == 0;
 

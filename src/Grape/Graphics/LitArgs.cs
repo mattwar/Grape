@@ -5,10 +5,11 @@ namespace Grape;
 
 /// <summary>
 /// Per-draw arguments for <see cref="Shaders.LitColor"/>. Carries the
-/// model matrix the user supplies and four lighting fields that the
-/// renderer fills in from <see cref="Renderer3D.Camera"/>,
-/// <see cref="Renderer3D.AmbientLight"/>, and
-/// <see cref="Renderer3D.DirectionalLight"/> via <see cref="IRenderArgs{TSelf}"/>.
+/// model matrix the user supplies and lighting fields that the renderer
+/// fills in from <see cref="Renderer3D.Camera"/>,
+/// <see cref="Renderer3D.AmbientLight"/>,
+/// <see cref="Renderer3D.DirectionalLight"/>, and
+/// <see cref="Renderer3D.PointLights"/> via <see cref="IRenderArgs{TSelf}"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -44,6 +45,14 @@ public struct LitArgs : IRenderArgs<LitArgs>
     /// <summary>Directional light color (RGBA, 0..1). Filled in by the renderer.</summary>
     public Vector4 LightColor;
 
+    /// <summary>
+    /// Point light count packed into <c>.X</c> (cast to int in the shader);
+    /// the rest of the vec4 is reserved padding so the cbuffer slot stays
+    /// 16 bytes wide. Filled in by the renderer; the actual light data
+    /// lives in a storage buffer the renderer binds separately.
+    /// </summary>
+    public Vector4 PointLightCount;
+
     public LitArgs(Matrix4x4 model)
     {
         Model = model;
@@ -51,6 +60,7 @@ public struct LitArgs : IRenderArgs<LitArgs>
         AmbientLight = Vector4.Zero;
         LightDirection = Vector4.Zero;
         LightColor = Vector4.Zero;
+        PointLightCount = Vector4.Zero;
     }
 
     public static implicit operator LitArgs(Matrix4x4 model) => new(model);
@@ -71,4 +81,8 @@ public struct LitArgs : IRenderArgs<LitArgs>
             a.LightColor = light.Color;
             return a;
         };
+
+    /// <inheritdoc cref="IRenderArgs{TSelf}.SetPointLightCount"/>
+    public static Func<LitArgs, int, LitArgs>? SetPointLightCount { get; } =
+        (a, count) => { a.PointLightCount = new Vector4(count, 0f, 0f, 0f); return a; };
 }

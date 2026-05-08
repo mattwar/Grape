@@ -32,6 +32,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // a buffer that may still be in flight is safe.
     private readonly List<InstanceBuffer> _instanceBufferPool = new();
     private int _instanceBuffersAcquired;
+
+    // Per-frame point-light storage buffer + its staging upload buffer.
+    // Snapshotted from Renderer3D.PointLights at the start of each
+    // frame's copy pass; bound to the fragment stage on draws whose
+    // shader declares a storage buffer (e.g. LitColor). Capacity grows
+    // monotonically; the GPU buffer is created lazily on the first
+    // frame that actually has lights to upload.
+    private GpuStorageBuffer? _pointLightBuffer;
+    private GpuUploadBuffer? _pointLightUpload;
+    private uint _pointLightBufferCapacity;
+    // Bytes per packed light: two vec4s (Position+Range, Color+Intensity).
+    private const int PointLightStrideBytes = 32;
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private GpuSampler? _cubemapSampler;
@@ -892,6 +904,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
             {
                 OnBeforeUploads(copyPass!);
 
+                // Snapshot + upload the point-light list once per frame.
+                // Per-draw bindings reference whichever count the user's
+                // args struct captured at queue time; the buffer holds
+                // the live list. See Renderer3D.PointLights remarks for
+                // the (rare) implications of mutating between draws.
+                UploadPointLights(copyPass!);
+
                 foreach (var command in prepared)
                 {
                     var mesh = command.Command.Mesh;
@@ -1167,6 +1186,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         var sampler = command.Command.Sampler ?? CubemapSampler;
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
+                    }
+
+                    // Bind the per-frame point-light buffer to any
+                    // fragment shader that declares a storage buffer.
+                    // We only ever populate slot 0; shaders that want
+                    // additional buffers beyond that are on their own.
+                    if (fsGpu.NumStorageBuffers > 0 && _pointLightBuffer is { } plb)
+                    {
+                        renderPass.BindFragmentStorageBuffers(0, [plb]);
                     }
 
                     // Wireframe takes precedence over the mesh's native
@@ -1536,6 +1564,49 @@ internal class GpuRenderer : Renderer3D, IDisposable
         int max = Math.Max(width, height);
         if (max <= 1) return 1;
         return (uint)(BitOperations.Log2((uint)max) + 1);
+    }
+
+    // Snapshots Renderer3D.PointLights and uploads them to the per-frame
+    // storage buffer that lit shaders read as StructuredBuffer<PointLight>.
+    // Always ensures the buffer exists (with at least one slot of capacity)
+    // so the shader has something to bind even when the light list is
+    // empty -- the per-draw count uniform is 0 in that case so nothing
+    // is read from it. Capacity grows monotonically, doubling on overflow.
+    private void UploadPointLights(GpuCopyPass copyPass)
+    {
+        var lights = PointLights;
+
+        // Pack each PointLight as two vec4s into a stack/heap buffer.
+        // PointLight is already laid out that way ([StructLayout(Sequential)]
+        // with two Vector4 fields), so a direct MemoryMarshal cast works.
+        // CollectionsMarshal gives us the underlying array view without a copy.
+        var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(lights);
+        var byteSpan = MemoryMarshal.AsBytes(span);
+        var requiredBytes = (uint)Math.Max(byteSpan.Length, PointLightStrideBytes);
+
+        // Grow buffer + upload staging on demand. Doubling avoids
+        // chasing every small increment when the user is adding lights
+        // one at a time.
+        if (_pointLightBuffer is null || _pointLightBufferCapacity < requiredBytes)
+        {
+            _pointLightBuffer?.Dispose();
+            _pointLightUpload?.Dispose();
+
+            uint newCapacity = _pointLightBufferCapacity == 0
+                ? Math.Max(requiredBytes, (uint)(8 * PointLightStrideBytes))
+                : Math.Max(requiredBytes, _pointLightBufferCapacity * 2);
+
+            _pointLightBuffer = GpuStorageBuffer.Create(_device, newCapacity);
+            _pointLightUpload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, newCapacity);
+            _pointLightBufferCapacity = newCapacity;
+        }
+
+        // Skip the actual byte upload when there's nothing to write --
+        // the buffer's prior contents are unread (count uniform is 0).
+        if (byteSpan.Length > 0)
+        {
+            copyPass.Upload(_pointLightUpload!, _pointLightBuffer!, byteSpan);
+        }
     }
 
     // Acquire a pooled instance-rate vertex buffer + matching upload

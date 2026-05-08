@@ -103,4 +103,14 @@ public interface IRenderArgs<TSelf>
     /// when the renderer's directional light is non-null.
     /// </summary>
     static virtual Func<TSelf, DirectionalLight, TSelf>? SetDirectionalLight { get; } = null;
+
+    /// <summary>
+    /// Returns a copy of the args struct with the count of point lights
+    /// the renderer has uploaded to its storage buffer this frame. The
+    /// shader uses this to bound its loop over the
+    /// <c>StructuredBuffer&lt;PointLight&gt;</c> binding -- a count of
+    /// zero means "no point-light contribution; the storage buffer
+    /// might be unallocated."
+    /// </summary>
+    static virtual Func<TSelf, int, TSelf>? SetPointLightCount { get; } = null;
 }
