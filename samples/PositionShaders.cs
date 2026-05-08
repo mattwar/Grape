@@ -11,7 +11,6 @@
 // The samples/NuGet.config in this folder pulls Grape.Graphics from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
-using System.Collections.Immutable;
 using System.Numerics;
 using Grape;
 
@@ -24,13 +23,11 @@ using Grape;
 // survives the runtime HLSL -> shadercross path.
 
 // Position-only triangle, ~1 unit tall, centered at origin.
-var triangle = new Mesh<Vertex3D>(
-    vertices: [
-        new Vertex3D( 0.0f,  0.5f, 0f),
-        new Vertex3D( 0.5f, -0.5f, 0f),
-        new Vertex3D(-0.5f, -0.5f, 0f)
-        ],
-    indices: ImmutableArray<uint>.Empty);
+var triangle = Mesh.Create([
+    new Vertex3D( 0.0f,  0.5f, 0f),
+    new Vertex3D( 0.5f, -0.5f, 0f),
+    new Vertex3D(-0.5f, -0.5f, 0f)
+    ]);
 
 // A static triangle whose positions are already in NDC inside the top-left
 // quadrant. Used to exercise ShaderSets.Position, which takes no transform.
