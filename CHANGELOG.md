@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- glTF 2.0 (`.glb` / `.gltf`) loader via SharpGLTF; `Model.Load` now
+  dispatches `.glb`/`.gltf` paths through it.
+- glTF v1 loads geometry, base-color factor, and base-color texture
+  only (no animations, skinning, morph targets, or full PBR yet).
 - `Meshes` class with built-in mesh generators for cubes, planes, spheres,
   cylinders, cones, capsules, tori, platonic solids, axes, grids,
   rectangles, circles, and ellipses.
@@ -17,6 +21,16 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
+- Default window size (parameterless `Window2D` / `Window3D` ctor) is
+  now half the primary display's usable bounds instead of 100x100.
+- `GpuRenderer` now converts non-native-format textures to `ABGR8888`
+  for upload instead of throwing, with a one-time warning per format.
+- `Image.Decode` now allocates surfaces in `ABGR8888` (the GPU fast
+  format) regardless of the source bitmap's color type.
+
+### Fixed
+- Texture upload failures no longer tear down the entire frame: the
+  failing image is logged once and affected draws are skipped.
 
 ### Removed
 - `Mesh<T>` constructors and `Reset` overload that took

@@ -109,6 +109,7 @@
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />
+    <PackageReference Include="SharpGLTF.Toolkit" Version="1.0.6" />
     <PackageReference Include="SkiaSharp" Version="3.119.0" />
     <PackageReference Include="System.Collections.Immutable" Version="9.0.8" />
   </ItemGroup>
