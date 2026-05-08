@@ -95,7 +95,6 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\Grape\Grape.csproj" PrivateAssets="all" />
-    <ProjectReference Include="..\Grape.SkiaSharp\Grape.SkiaSharp.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Grape.Jelly\Grape.Jelly.csproj" PrivateAssets="all" />
   </ItemGroup>
 
@@ -103,7 +102,7 @@
     Public NuGet dependencies of the bundled libraries. Declared here so
     they appear as <dependencies> in this metapackage's .nuspec and reach
     consumers transitively. Keep these versions in sync with the matching
-    PackageReferences in Grape.csproj and Grape.SkiaSharp.csproj.
+    PackageReferences in Grape.csproj.
   -->
   <ItemGroup>
     <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
@@ -122,10 +121,6 @@
     <None Include="..\Grape\bin\$(Configuration)\net9.0\Grape.dll"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
     <None Include="..\Grape\bin\$(Configuration)\net9.0\Grape.pdb"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.dll"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Grape.SkiaSharp\bin\$(Configuration)\net9.0\Grape.SkiaSharp.pdb"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
     <None Include="..\Grape.Jelly\bin\$(Configuration)\net9.0\Grape.Jelly.dll"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />

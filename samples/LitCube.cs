@@ -99,7 +99,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(model));
+        rd.DrawMesh(cube, Shaders.LitColor, new LightingArgs(model));
     }
 
     w.Invalidate();

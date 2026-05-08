@@ -123,3 +123,46 @@ public readonly struct LitVertex3D
         ShaderVertexElementKind.Normal3,
         ShaderVertexElementKind.Color4);
 }
+
+/// <summary>
+/// A vertex that carries everything a textured + lit surface needs:
+/// position, world-space normal, texture coordinate, and a baked
+/// per-vertex tint. Pairs with <see cref="Shaders.LitTexture"/> -- the
+/// shader runs the same Lambertian + point-light math as
+/// <see cref="Shaders.LitColor"/>, but starts from
+/// <c>diffuseTexture(uv) * vertexColor</c> instead of just the vertex
+/// color. This is the unified vertex type produced by the OBJ loader:
+/// missing normals are fabricated from face geometry, missing UVs
+/// default to (0, 0), and the per-vertex tint carries the material's
+/// diffuse color (white when none is supplied).
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+public readonly struct LitTextureVertex3D
+{
+    public readonly Vector3 Position;
+    public readonly Vector3 Normal;
+    public readonly Vector2 TextureCoordinate;
+    public readonly Color Color;
+
+    public LitTextureVertex3D(Vector3 position, Vector3 normal, Vector2 textureCoordinate, Color color)
+    {
+        Position = position;
+        Normal = normal;
+        TextureCoordinate = textureCoordinate;
+        Color = color;
+    }
+
+    public LitTextureVertex3D(Vector3 position, Vector3 normal, Vector2 textureCoordinate)
+        : this(position, normal, textureCoordinate, Color.White)
+    {
+    }
+
+    /// <summary>
+    /// The shader-side vertex layout that pairs with this vertex struct.
+    /// </summary>
+    public static ShaderVertexLayout ShaderVertexLayout { get; } = new(
+        ShaderVertexElementKind.Position3,
+        ShaderVertexElementKind.Normal3,
+        ShaderVertexElementKind.TextureCoordinate2,
+        ShaderVertexElementKind.Color4);
+}

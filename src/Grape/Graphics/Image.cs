@@ -205,26 +205,102 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
-    /// Loads a bitmap from the specified file path.
+    /// Loads an image from disk. The decoder is selected by file
+    /// extension: <c>.bmp</c> goes through SDL's built-in BMP loader
+    /// (no extra dependencies, exact pixel preservation); every other
+    /// extension is decoded by SkiaSharp, covering PNG, JPG, WebP, GIF,
+    /// and the rest of SkiaSharp's supported formats.
     /// </summary>
-    public static Image LoadBitmap(string filePath, bool mipmaps = false)
+    /// <param name="filePath">Path to the image file.</param>
+    /// <param name="mipmaps">
+    /// When true, allocates mipmap storage and regenerates mip levels
+    /// from the base image. Recommended for textures sampled at
+    /// varying distances; unnecessary for full-resolution UI sprites.
+    /// </param>
+    public static Image Load(string filePath, bool mipmaps = false)
     {
+        ArgumentException.ThrowIfNullOrEmpty(filePath);
         _ = Application.Current;
 
-        var imageId = SDL.LoadBMP(filePath);
-        if (imageId == 0)
-            throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
-        return new Image(imageId, mipmaps);
+        // SDL.LoadBMP keeps BMPs as a zero-dependency path: BMP is
+        // ubiquitous, SDL handles it directly, and it sidesteps a
+        // SkiaSharp decode allocation + native call. Other formats
+        // fall through to SkiaSharp.
+        if (Path.GetExtension(filePath).Equals(".bmp", StringComparison.OrdinalIgnoreCase))
+        {
+            var imageId = SDL.LoadBMP(filePath);
+            if (imageId == 0)
+                throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
+            return new Image(imageId, mipmaps);
+        }
+
+        var bytes = File.ReadAllBytes(filePath);
+        return Decode(bytes, mipmaps);
     }
 
     /// <summary>
-    /// Save the contents of the image to a BMP file.
+    /// Decodes an image from an encoded byte span (PNG, JPG, WebP, ...)
+    /// using SkiaSharp.
     /// </summary>
-    public void Save(string filename)
+    public static Image Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
     {
+        _ = Application.Current;
+
+        using var skBitmap = SkiaSharp.SKBitmap.Decode(bytes)
+            ?? throw new InvalidOperationException("SkiaSharp could not decode the supplied image bytes.");
+
+        // Open-coded so we can pass `mipmaps` through to Image.Create
+        // (the SKBitmap.ToImage extension can't take that flag).
+        var image = Image.Create(skBitmap.Width, skBitmap.Height, skBitmap.PixelFormat, mipmaps);
+        image.CopyFromBitmap(skBitmap);
+        return image;
+    }
+
+    /// <summary>
+    /// Saves the image to disk. The encoder is selected by file
+    /// extension: <c>.bmp</c> goes through SDL's <c>SaveBMP</c>;
+    /// <c>.png</c>, <c>.jpg</c> / <c>.jpeg</c>, and <c>.webp</c> are
+    /// encoded by SkiaSharp.
+    /// </summary>
+    /// <param name="filename">Destination path. Extension picks the format.</param>
+    /// <param name="quality">
+    /// Encoder quality 0..100 for lossy formats (JPEG, WebP). Ignored
+    /// for lossless formats (BMP, PNG). Defaults to 90.
+    /// </param>
+    public void Save(string filename, int quality = 90)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(filename);
         if (IsDisposed)
             return;
-        SDL.SaveBMP(_imageId, filename);
+
+        var ext = Path.GetExtension(filename);
+
+        // SDL.SaveBMP is the lossless zero-dependency path for the
+        // format SDL already speaks, mirroring Load's BMP fast path.
+        if (ext.Equals(".bmp", StringComparison.OrdinalIgnoreCase))
+        {
+            SDL.SaveBMP(_imageId, filename);
+            return;
+        }
+
+        var format = ext.ToLowerInvariant() switch
+        {
+            ".png" => SkiaSharp.SKEncodedImageFormat.Png,
+            ".jpg" or ".jpeg" => SkiaSharp.SKEncodedImageFormat.Jpeg,
+            ".webp" => SkiaSharp.SKEncodedImageFormat.Webp,
+            _ => throw new NotSupportedException(
+                $"Unsupported image format '{ext}'. Supported: .bmp, .png, .jpg, .jpeg, .webp."),
+        };
+
+        // Round-trip through an SKBitmap snapshot. The pixel-by-pixel
+        // copy is the cost of converting between Grape's surface and
+        // SkiaSharp's bitmap representations; for one-shot saves this
+        // is fine, and it keeps the in-memory Image untouched.
+        using var bitmap = this.ToSKBitmap();
+        using var stream = File.Create(filename);
+        if (!bitmap.Encode(stream, format, quality))
+            throw new InvalidOperationException(
+                $"SkiaSharp failed to encode image as {format}.");
     }
 
     /// <summary>

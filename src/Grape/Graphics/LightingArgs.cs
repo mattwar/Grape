@@ -19,13 +19,13 @@ namespace Grape;
 /// translation; non-uniform scales would need a true inverse-transpose).
 /// </para>
 /// <para>
-/// Default-constructed <see cref="LitArgs"/> has <see cref="Model"/> =
+/// Default-constructed <see cref="LightingArgs"/> has <see cref="Model"/> =
 /// identity and zeroed lighting fields; populate <see cref="Model"/>
 /// and let the renderer fill in the rest.
 /// </para>
 /// </remarks>
 [StructLayout(LayoutKind.Sequential)]
-public struct LitArgs : IRenderArgs<LitArgs>
+public struct LightingArgs : IRenderArgs<LightingArgs>
 {
     /// <summary>Per-draw world transform. Caller-supplied.</summary>
     public Matrix4x4 Model;
@@ -53,7 +53,7 @@ public struct LitArgs : IRenderArgs<LitArgs>
     /// </summary>
     public Vector4 PointLightCount;
 
-    public LitArgs(Matrix4x4 model)
+    public LightingArgs(Matrix4x4 model)
     {
         Model = model;
         ViewProjection = Matrix4x4.Identity;
@@ -63,18 +63,18 @@ public struct LitArgs : IRenderArgs<LitArgs>
         PointLightCount = Vector4.Zero;
     }
 
-    public static implicit operator LitArgs(Matrix4x4 model) => new(model);
+    public static implicit operator LightingArgs(Matrix4x4 model) => new(model);
 
     /// <inheritdoc cref="IRenderArgs{TSelf}.SetViewProjection"/>
-    public static Func<LitArgs, Matrix4x4, LitArgs>? SetViewProjection { get; } =
+    public static Func<LightingArgs, Matrix4x4, LightingArgs>? SetViewProjection { get; } =
         (a, vp) => { a.ViewProjection = vp; return a; };
 
     /// <inheritdoc cref="IRenderArgs{TSelf}.SetAmbientLight"/>
-    public static Func<LitArgs, Vector4, LitArgs>? SetAmbientLight { get; } =
+    public static Func<LightingArgs, Vector4, LightingArgs>? SetAmbientLight { get; } =
         (a, amb) => { a.AmbientLight = amb; return a; };
 
     /// <inheritdoc cref="IRenderArgs{TSelf}.SetDirectionalLight"/>
-    public static Func<LitArgs, DirectionalLight, LitArgs>? SetDirectionalLight { get; } =
+    public static Func<LightingArgs, DirectionalLight, LightingArgs>? SetDirectionalLight { get; } =
         (a, light) =>
         {
             a.LightDirection = new Vector4(light.Direction, 0f);
@@ -83,6 +83,6 @@ public struct LitArgs : IRenderArgs<LitArgs>
         };
 
     /// <inheritdoc cref="IRenderArgs{TSelf}.SetPointLightCount"/>
-    public static Func<LitArgs, int, LitArgs>? SetPointLightCount { get; } =
+    public static Func<LightingArgs, int, LightingArgs>? SetPointLightCount { get; } =
         (a, count) => { a.PointLightCount = new Vector4(count, 0f, 0f, 0f); return a; };
 }
