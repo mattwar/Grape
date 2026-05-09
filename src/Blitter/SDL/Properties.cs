@@ -1,0 +1,116 @@
+using System;
+using System.Runtime.InteropServices;
+
+namespace Blitter;
+
+internal class Properties : IDisposable
+{
+    private uint _propertiesId;
+
+    internal Properties(uint propertiesId)
+    {
+        _propertiesId = propertiesId;
+    }
+
+    internal uint PropertiesId => _propertiesId;
+
+    internal static readonly Properties Empty = new Properties(0);
+
+    internal SDL.PropertyType GetPropertyType(string propertyName)
+    {
+        if (_propertiesId == 0)
+            return SDL.PropertyType.Invalid;
+        return SDL.GetPropertyType(_propertiesId, propertyName);
+    }
+
+    internal object? GetPropertyValue(string propertyName)
+    {
+        if (_propertiesId == 0)    
+            return null;
+
+        switch (GetPropertyType(propertyName))
+        {
+            case SDL.PropertyType.String:
+                return SDL.GetStringProperty(_propertiesId, propertyName, "");
+            case SDL.PropertyType.Number:
+                return SDL.GetNumberProperty(_propertiesId, propertyName, 0);
+            case SDL.PropertyType.Boolean:
+                return SDL.GetBooleanProperty(_propertiesId, propertyName, false);
+            case SDL.PropertyType.Float:
+                return SDL.GetFloatProperty(_propertiesId, propertyName, 0.0f);
+            default:
+                return null;
+        }
+    }
+
+    internal string GetStringProperty(string propertyName)
+    {
+        if (_propertiesId == 0
+            || GetPropertyType(propertyName) != SDL.PropertyType.String)
+            return "";
+        return SDL.GetStringProperty(_propertiesId, propertyName, "");
+    }
+
+    internal long GetNumberProperty(string propertyName)
+    {
+        if (_propertiesId == 0
+            || GetPropertyType(propertyName) != SDL.PropertyType.Number)
+            return 0;
+        return SDL.GetNumberProperty(_propertiesId, propertyName, 0);
+    }
+
+    internal float GetFloatProperty(string propertyName)
+    {
+        if (_propertiesId == 0
+            || GetPropertyType(propertyName) != SDL.PropertyType.Float)
+            return 0;
+        return SDL.GetFloatProperty(_propertiesId, propertyName, 0);
+    }
+
+    internal float GetBooleanProperty(string propertyName)
+    {
+        if (_propertiesId == 0
+            || GetPropertyType(propertyName) != SDL.PropertyType.Boolean)
+            return 0;
+        return SDL.GetFloatProperty(_propertiesId, propertyName, 0);
+    }
+
+    internal Span<T> GetSpanProperty<T>(string propertyName, T end) where T : unmanaged =>
+        GetSpanProperty<T>(propertyName, (T item) => EqualityComparer<T>.Default.Equals(item, end));
+
+    internal Span<T> GetSpanProperty<T>(string propertyName, Func<T, bool> fnIsEnd) where T : unmanaged
+    {
+        if (_propertiesId == 0
+            || GetPropertyType(propertyName) != SDL.PropertyType.Pointer)
+            return Span<T>.Empty;
+
+        unsafe
+        {
+            var ptr = SDL.GetPointerProperty(_propertiesId, propertyName, 0);
+            T* start = (T*)Marshal.ReadIntPtr(ptr);
+
+            // determine length of the array
+            T* current = start;
+            int count = 0;
+            while (!fnIsEnd(*current))
+            {
+                count++;
+                current++;
+            }
+
+            return new Span<T>(start, count);
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_propertiesId != 0)
+        {
+            var id = Interlocked.Exchange(ref _propertiesId, 0);
+            if (id != 0)
+            {
+                SDL.DestroyProperties(id);
+            }
+        }
+    }
+}

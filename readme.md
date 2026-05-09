@@ -1,18 +1,18 @@
-# Grape <img src="assets/grape.png" alt="Grape logo" height="48" align="center" />
+# Blitter <img src="assets/logo.png" alt="Blitter logo" height="48" align="center" />
 
-[![CI](https://github.com/mattwar/Grape/actions/workflows/CI.yml/badge.svg)](https://github.com/mattwar/Grape/actions/workflows/CI.yml)
-[![NuGet](https://img.shields.io/nuget/v/Grape.Graphics.svg?logo=nuget)](https://www.nuget.org/packages/Grape.Graphics)
-[![Downloads](https://img.shields.io/nuget/dt/Grape.Graphics.svg?logo=nuget)](https://www.nuget.org/packages/Grape.Graphics)
+[![CI](https://github.com/mattwar/Blitter/actions/workflows/CI.yml/badge.svg)](https://github.com/mattwar/Blitter/actions/workflows/CI.yml)
+[![NuGet](https://img.shields.io/nuget/v/Blitter.svg?logo=nuget)](https://www.nuget.org/packages/Blitter)
+[![Downloads](https://img.shields.io/nuget/dt/Blitter.svg?logo=nuget)](https://www.nuget.org/packages/Blitter)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
 
-**Grape** is a small, friendly graphics programming library for .NET, built on top of [SDL3](https://www.libsdl.org/) (via the [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) bindings) and integrated with [SkiaSharp](https://github.com/mono/SkiaSharp). It wraps many of SDL3's APIs in clean, idiomatic C# classes — and bridges SkiaSharp (which draws into bitmaps) so the pixels you paint with Skia end up on screen — so you can focus on drawing things and making them move instead of wrestling with native interop and low level GPU concepts.
+**Blitter** is a small, friendly 2D & 3D graphics programming library for .NET, built on top of [SDL3](https://www.libsdl.org/) (via the [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) bindings) and integrated with [SkiaSharp](https://github.com/mono/SkiaSharp). It wraps many of SDL3's APIs in clean, idiomatic C# classes — and bridges SkiaSharp (which draws into bitmaps) so the pixels you paint with Skia end up on screen — so you can focus on drawing things and making them move instead of wrestling with native interop and low level GPU concepts.
 
-> ⚠️ **Early days.** Grape is an ongoing project. The API is currently unstable and will likely change. Use at your own risk — and have fun.
+> ⚠️ **Early days.** Blitter is an ongoing project. The API is currently unstable and will likely change. Use at your own risk — and have fun.
 
-## Why Grape?
+## Why Blitter?
 
-SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Grape exists to give .NET developers a small, approachable surface for:
+SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Blitter exists to give .NET developers a small, approachable surface for:
 
 - Opening a window
 - Drawing 2D sprites and primitives
@@ -30,14 +30,14 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 - **Input** — keyboard, mouse, gamepad, and touch via simple events
 - **Audio** — load and play WAV data
 - **Images** — load PNG, JPEG, BMP, and more (via SkiaSharp); manipulate pixels; set color keys; draw with the SkiaSharp canvas API.
-- **`Grape.Jelly`** — a tiny scene-graph layer (sprites, props, panels, scenes) on top of `Window2D`. This is really experimental and may get removed.
+- **`Blitter.Blocks`** — a tiny scene-graph layer (sprites, props, panels, scenes) on top of `Window2D`. This is really experimental and may get removed.
 
 ## Installation
 
-Grape is published as a NuGet package:
+Blitter is published as a NuGet package:
 
 ```sh
-dotnet add package Grape.Graphics
+dotnet add package Blitter
 ```
 
 The native SDL3 binaries are pulled in automatically via the `SDL3-CS.Native` and `SDL3-CS.Native.Shadercross` package dependencies — there is nothing to install separately.
@@ -49,7 +49,7 @@ Targets **.NET 9**.
 A bouncing red square. The `Rendering` event fires when the window needs to repaint; calling `Invalidate()` schedules the next frame.
 
 ```csharp
-using Grape;
+using Blitter;
 
 var window = new Window2D(800, 600)
 {
@@ -81,7 +81,7 @@ A spinning, colored triangle rendered with a built-in shader. Instead of using `
 
 ```csharp
 using System.Numerics;
-using Grape;
+using Blitter;
 
 var triangle = Mesh.Create<ColorVertex3D>(
 [
@@ -122,37 +122,37 @@ More examples live in [samples/](samples/) — each is a single `.cs` file you c
 
 | Project | What it is |
 | --- | --- |
-| `Grape` | Core library: windows, rendering (BMP), input, audio. |
-| `Grape.Graphics` | Packaging project — bundles `Grape` and `Grape.Jelly` into a single NuGet package. |
-| `Grape.Jelly` | Scene-graph helpers (sprites, scenes, panels) on top of `Grape`. |
+| `Blitter` | Core library: windows, rendering (BMP), input, audio. |
+| `Blitter.Blocks` | Components (sprites, scenes, panels). |
+| `Blitter.Package` | Packaging project — bundles `Blitter` and `Blitter.Blocks` into the `Blitter` NuGet package. |
 
 ## Building from Source
 
 ```sh
-git clone https://github.com/mattwar/Grape.git
-cd Grape
-dotnet build src/Grape.sln
+git clone https://github.com/mattwar/Blitter.git
+cd Blitter
+dotnet build src/Blitter.sln
 dotnet run samples/TriangleSwarm.cs
 ```
 
 To produce a NuGet package locally:
 
 ```sh
-dotnet pack src/Grape.Graphics/Grape.Graphics.csproj -c Release -o artifacts/nuget
+dotnet pack src/Blitter.Package/Blitter.Package.csproj -c Release -o artifacts/nuget
 ```
 
 ## Status & Roadmap
 
-Grape is pre-1.0 and changes frequently. Expect rough edges, missing features, and the occasional API rename. Issues and pull requests are welcome, but please don't depend on it for anything important yet.
+Blitter is pre-1.0 and changes frequently. Expect rough edges, missing features, and the occasional API rename. Issues and pull requests are welcome, but please don't depend on it for anything important yet.
 
 ## Acknowledgments
 
-Grape stands on the shoulders of some excellent open-source projects:
+Blitter stands on the shoulders of some excellent open-source projects:
 
 - [SDL3](https://www.libsdl.org/) by Sam Lantinga and the SDL contributors — the cross-platform foundation for windowing, GPU, input, and audio.
 - [SDL_shadercross](https://github.com/libsdl-org/SDL_shadercross) — runtime HLSL/SPIR-V shader translation used by `Window3D`.
 - [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) by Edward Gushchin — the C# bindings for SDL3.
-- [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Grape bridges those bitmaps onto the screen.
+- [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Blitter bridges those bitmaps onto the screen.
 - [SharpGLTF](https://github.com/vpenades/SharpGLTF) by Vicente Penades — glTF 2.0 (`.glb` / `.gltf`) parsing used by `Model.Load`.
 - [Nito.AsyncEx](https://github.com/StephenCleary/AsyncEx) by Stephen Cleary — async coordination primitives.
 

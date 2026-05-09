@@ -1,22 +1,22 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/RicochetRocket.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 //
 // Asset paths below resolve relative to this source file, so the
 // sample works regardless of the shell's current directory.
 
 using System.Runtime.CompilerServices;
-using Grape;
-using Grape.Jelly;
+using Blitter;
+using Blitter.Blocks;
 
 static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
     => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
@@ -29,7 +29,7 @@ var window = new Window2D
     CloseKey = Key.Escape,
 };
 
-var icon = Image.Load(SampleAsset("grape.bmp"));
+var icon = Image.Load(SampleAsset("Blitter.bmp"));
 icon.SetAlpha(0, icon.GetPixel(0, 0));
 window.Icon = icon;
 

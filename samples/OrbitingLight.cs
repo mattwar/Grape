@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/OrbitingLight.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // A small spinning cube sits at the origin while a bright marker cube
 // orbits around it, representing the directional light's position. The
@@ -19,7 +19,7 @@
 // renderer is always "from cube toward marker".)
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // Big lit cube: per-face normals so each face shades uniformly under
 // the directional light.

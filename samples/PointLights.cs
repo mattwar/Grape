@@ -1,14 +1,14 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/PointLights.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates Grape's point-light system. Lights live in a list on
+// Demonstrates Blitter's point-light system. Lights live in a list on
 // the renderer; lit shaders pick them up automatically through the
 // IUniformArgs trait + a per-frame storage buffer the renderer uploads.
 // Add or remove lights freely between frames -- the buffer grows on
@@ -21,7 +21,7 @@
 // pool of color it casts on the ground.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // ---- Geometry helpers --------------------------------------------------------
 

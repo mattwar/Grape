@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/Logo.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Renders the Blitter logo: an 8x8 block built out of individually
 // colored "bits" with a small transparent gap between every cell so
@@ -19,7 +19,7 @@
 // and the sample becomes a pure on-screen demo.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // --- Layout knobs ---------------------------------------------------
 

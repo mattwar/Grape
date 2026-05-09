@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/StanfordBunny.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Renders one of two classic graphics test models -- the Stanford
 // Bunny (~70K triangles) or the Utah Teapot (~6K triangles) -- loaded
@@ -27,7 +27,7 @@
 
 using System.Numerics;
 using System.Runtime.CompilerServices;
-using Grape;
+using Blitter;
 
 //const string ModelFile = "teapot.obj";
 const string ModelFile = "bunny.obj";

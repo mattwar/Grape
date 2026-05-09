@@ -1,14 +1,14 @@
-﻿#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/LitCube.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates Grape's directional + ambient lighting. The cube uses
+// Demonstrates Blitter's directional + ambient lighting. The cube uses
 // per-face normals (so each face is uniformly shaded by its angle to
 // the light) and a single flat color. As the cube rotates, faces
 // brighten and darken under the directional light, with the ambient
@@ -20,7 +20,7 @@
 // arguments only carry the user-supplied model matrix.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // Lit cube with per-face normals so each face shades uniformly under
 // the directional light. `Meshes.Cube` returns 24 vertices (4 per face)

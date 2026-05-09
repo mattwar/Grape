@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/Skybox.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // A spinning camera inside a procedurally-generated skybox.
 //
@@ -26,7 +26,7 @@
 // every skybox pixel to depth 1 (the far plane).
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 const int FaceSize = 128;
 

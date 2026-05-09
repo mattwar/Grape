@@ -2,12 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "pack-grape-graphics",
+            "label": "pack-blitter",
             "type": "shell",
             "command": "dotnet",
             "args": [
                 "build",
-                "${workspaceFolder}/src/Grape.Graphics/Grape.Graphics.csproj",
+                "${workspaceFolder}/src/Blitter.Package/Blitter.Package.csproj",
                 "-c",
                 "Debug",
                 "--nologo"
@@ -34,7 +34,7 @@
                 "${file}"
             ],
             "options": { "cwd": "${workspaceFolder}" },
-            "dependsOn": "pack-grape-graphics",
+            "dependsOn": "pack-blitter",
             "dependsOrder": "sequence",
             "problemMatcher": "$msCompile",
             "group": { "kind": "build", "isDefault": true },

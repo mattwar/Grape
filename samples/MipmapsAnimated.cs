@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/MipmapsAnimated.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Side-by-side comparison of texture sampling without and with
 // mipmaps, isolated from anisotropic filtering.
@@ -34,7 +34,7 @@
 //             quad shrinks.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 const int TexSize = 1024;
 const int CellSize = 2; // 2-pixel cells = maximum-frequency detail

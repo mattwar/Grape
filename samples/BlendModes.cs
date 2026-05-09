@@ -1,14 +1,14 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/BlendModes.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 // Four wide bands stacked vertically with visible gaps between them,
@@ -27,7 +27,7 @@
 // with DepthMode.Overlay so they always read clearly.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // HSV -> RGB; H in [0,1), S/V in [0,1].
 static Color Hsv(float h, float s, float v, byte a = 255)
