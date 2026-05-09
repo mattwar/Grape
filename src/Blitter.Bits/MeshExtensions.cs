@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Mesh authoring helpers: bake a transform into a mesh's vertices, or

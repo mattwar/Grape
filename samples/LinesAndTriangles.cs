@@ -22,6 +22,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // World axes: three independent line segments. Each pair of vertices
 // in the buffer is one line, so the topology is LineList.

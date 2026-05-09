@@ -28,6 +28,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // HSV -> RGB; H in [0,1), S/V in [0,1].
 static Color Hsv(float h, float s, float v, byte a = 255)

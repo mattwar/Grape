@@ -1,26 +1,22 @@
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
-/// First-person ground-walker camera. WASD slides along the world's
-/// horizontal plane (movement ignores pitch, so looking down doesn't
-/// dive into the floor), holding the configured <see cref="LookButton"/>
-/// while moving the mouse rotates yaw/pitch, and Q/E nudges
-/// <see cref="EyeHeight"/> up/down. Roll is locked at zero.
+/// Free 6-DOF "fly" camera. WASD pans along the camera's local XZ
+/// plane (relative to its current heading), Q/E rises and falls, and
+/// holding the configured <see cref="LookButton"/> while moving the
+/// mouse rotates yaw/pitch. Roll stays at zero.
 /// </summary>
-public sealed class CameraWalker : CameraController
+public sealed class CameraFlyer : CameraController
 {
     private readonly Window _window;
     private Vector2? _lastMousePos;
 
-    /// <summary>Walker position on the ground plane (Y = floor level).</summary>
-    public Vector3 Position { get; set; } = Vector3.Zero;
+    /// <summary>Camera position in world space.</summary>
+    public Vector3 Position { get; set; } = new(0f, 0f, 5f);
 
-    /// <summary>Distance from <see cref="Position"/> up to the eye.</summary>
-    public float EyeHeight { get; set; } = 1.7f;
-
-    /// <summary>World-up axis.</summary>
+    /// <summary>World-up axis used for the look-at <see cref="Camera.Up"/>.</summary>
     public Vector3 Up { get; set; } = Vector3.UnitY;
 
     /// <summary>Yaw angle in radians (rotation around <see cref="Up"/>; 0 = looking down -Z).</summary>
@@ -32,14 +28,11 @@ public sealed class CameraWalker : CameraController
     /// <summary>Maximum absolute pitch in radians; prevents flipping over the poles. Default ~85°.</summary>
     public float MaxPitch { get; set; } = MathF.PI / 2f - 0.05f;
 
-    /// <summary>Walking speed in world units per second.</summary>
-    public float MoveSpeed { get; set; } = 3f;
+    /// <summary>Movement speed in world units per second.</summary>
+    public float MoveSpeed { get; set; } = 5f;
 
     /// <summary>Multiplier applied to <see cref="MoveSpeed"/> while <see cref="Key.LShift"/> is held.</summary>
-    public float SprintMultiplier { get; set; } = 2f;
-
-    /// <summary>Eye-height change in world units per second while Q/E held.</summary>
-    public float HeightSpeed { get; set; } = 1f;
+    public float SprintMultiplier { get; set; } = 4f;
 
     /// <summary>Radians per pixel of mouse motion while looking.</summary>
     public float LookSpeed { get; set; } = 0.005f;
@@ -47,7 +40,7 @@ public sealed class CameraWalker : CameraController
     /// <summary>Mouse button that, when held, drives look rotation. Default <see cref="MouseButton.Right"/>.</summary>
     public MouseButton LookButton { get; set; } = MouseButton.Right;
 
-    public CameraWalker(Window window)
+    public CameraFlyer(Window window)
     {
         ArgumentNullException.ThrowIfNull(window);
         _window = window;
@@ -69,23 +62,22 @@ public sealed class CameraWalker : CameraController
         }
         _lastMousePos = pos;
 
-        // Look direction includes pitch.
+        // Forward direction from yaw + pitch (right-handed, -Z forward at yaw=0).
         var cosP = MathF.Cos(Pitch);
-        var look = new Vector3(
+        var forward = new Vector3(
             -cosP * MathF.Sin(Yaw),
              MathF.Sin(Pitch),
             -cosP * MathF.Cos(Yaw));
 
-        // Movement direction stays on the horizontal plane: yaw-only,
-        // so looking down doesn't shorten the step.
-        var forwardFlat = new Vector3(-MathF.Sin(Yaw), 0f, -MathF.Cos(Yaw));
-        var rightFlat = Vector3.Normalize(Vector3.Cross(forwardFlat, Up));
+        var right = Vector3.Normalize(Vector3.Cross(forward, Up));
 
         var move = Vector3.Zero;
-        if (Keyboard.IsDown(Key.W)) move += forwardFlat;
-        if (Keyboard.IsDown(Key.S)) move -= forwardFlat;
-        if (Keyboard.IsDown(Key.D)) move += rightFlat;
-        if (Keyboard.IsDown(Key.A)) move -= rightFlat;
+        if (Keyboard.IsDown(Key.W)) move += forward;
+        if (Keyboard.IsDown(Key.S)) move -= forward;
+        if (Keyboard.IsDown(Key.D)) move += right;
+        if (Keyboard.IsDown(Key.A)) move -= right;
+        if (Keyboard.IsDown(Key.E)) move += Up;
+        if (Keyboard.IsDown(Key.Q)) move -= Up;
 
         if (move != Vector3.Zero)
         {
@@ -95,12 +87,8 @@ public sealed class CameraWalker : CameraController
             Position += Vector3.Normalize(move) * speed * dt;
         }
 
-        if (Keyboard.IsDown(Key.E)) EyeHeight += HeightSpeed * dt;
-        if (Keyboard.IsDown(Key.Q)) EyeHeight -= HeightSpeed * dt;
-
-        var eye = Position + Up * EyeHeight;
-        Camera.Position = eye;
-        Camera.Target = eye + look;
+        Camera.Position = Position;
+        Camera.Target = Position + forward;
         Camera.Up = Up;
     }
 }

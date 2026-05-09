@@ -20,6 +20,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Big lit cube: per-face normals so each face shades uniformly under
 // the directional light.

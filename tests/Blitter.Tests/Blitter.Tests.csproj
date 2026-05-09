@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Blitter\Blitter.csproj" />
+    <ProjectReference Include="..\..\src\Blitter.Bits\Blitter.Bits.csproj" />
   </ItemGroup>
 
 </Project>

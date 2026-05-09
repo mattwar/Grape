@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blitter.Tests", "..\tests\B
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blitter.Blocks.Tests", "..\tests\Blitter.Blocks.Tests\Blitter.Blocks.Tests.csproj", "{A49389CA-20FB-4DA1-BBDC-C022016747E7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blitter.Bits", "Blitter.Bits\Blitter.Bits.csproj", "{0A8DF985-8733-4175-B475-06DD20E3F17D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -99,6 +101,18 @@ Global
 		{A49389CA-20FB-4DA1-BBDC-C022016747E7}.Release|x64.Build.0 = Release|Any CPU
 		{A49389CA-20FB-4DA1-BBDC-C022016747E7}.Release|x86.ActiveCfg = Release|Any CPU
 		{A49389CA-20FB-4DA1-BBDC-C022016747E7}.Release|x86.Build.0 = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|x64.Build.0 = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Debug|x86.Build.0 = Debug|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|x64.ActiveCfg = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|x64.Build.0 = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|x86.ActiveCfg = Release|Any CPU
+		{0A8DF985-8733-4175-B475-06DD20E3F17D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

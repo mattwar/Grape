@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Smoothly follows a moving <see cref="Target"/> in world space. The

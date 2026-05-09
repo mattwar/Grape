@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Built-in procedural mesh generators for common 3D primitives.

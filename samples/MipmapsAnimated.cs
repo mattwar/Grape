@@ -35,6 +35,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 const int TexSize = 1024;
 const int CellSize = 2; // 2-pixel cells = maximum-frequency detail
