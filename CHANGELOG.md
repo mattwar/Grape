@@ -34,9 +34,17 @@ All notable changes to this project will be documented in this file.
   movement on the horizontal plane).
 - `CameraFollower` — exponentially-smoothed follow camera tracking a
   moving target.
+- `Renderer2D.DrawCanvas(rect, [background,] action)` draws via a
+  SkiaSharp `SKCanvas`; scratch bitmap/canvas/image pooled per renderer.
+- `SKBitmap.ToImage()` extension snapshots a Skia bitmap into a Blitter
+  `Image` for use with `DrawImage` (one GPU upload, reused per call).
+- New samples: `SkiaCanvas`, `SkiaBitmap` showcasing the SkiaSharp
+  rendering integration.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
+- Renamed `Image.RenderCanvas` to `Image.DrawCanvas` for naming
+  consistency with the rest of the `Draw*` family.
 - Default window size (parameterless `Window2D` / `Window3D` ctor) is
   now half the primary display's usable bounds instead of 100x100.
 - `GpuRenderer` now converts non-native-format textures to `ABGR8888`
