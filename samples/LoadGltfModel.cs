@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/LoadGltfModel.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Demonstrates loading a 3D model from a glTF 2.0 file (`.glb` /
 // `.gltf`) via Model.Load(). Real-world workflow: export from Blender,
@@ -18,7 +18,7 @@
 // use you'd just point Model.Load at your own file.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
@@ -26,7 +26,7 @@ using SharpGLTF.Scenes;
 
 // --- Build a procedural textured-cube glb -----------------------------
 
-var tempDir = Directory.CreateTempSubdirectory("grape-gltfsample");
+var tempDir = Directory.CreateTempSubdirectory("Blitter-gltfsample");
 var texPath = Path.Combine(tempDir.FullName, "checker.png");
 WriteCheckerboardPng(texPath, size: 128, cells: 8);
 

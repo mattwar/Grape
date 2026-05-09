@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/Antialiasing.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Demonstrates Renderer3D.Antialiasing (MSAA). Press SPACE to cycle:
 // None -> X2 -> X4 -> X8 -> None ...
@@ -22,7 +22,7 @@
 
 using System.Collections.Immutable;
 using System.Numerics;
-using Grape;
+using Blitter;
 
 const int Spokes = 64;
 const float HalfThickness = 0.003f; // ~1-2 pixels wide at 4K

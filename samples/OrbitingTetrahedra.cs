@@ -1,14 +1,14 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/OrbitingTetrahedra.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 // Two regular tetrahedra orbit a common axis in the XZ plane while
@@ -18,7 +18,7 @@
 // depth, with the depth buffer resolving the intersection per-pixel.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // Regular tetrahedron with vertices on the unit cube's diagonals.
 // Each vertex carries a color so the faces show as colored gradients

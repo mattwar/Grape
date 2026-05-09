@@ -1,4 +1,4 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -10,7 +10,7 @@
 // scene" call.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 var triangle = Mesh.Create([
     new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),

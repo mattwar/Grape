@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/LinesAndTriangles.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Three meshes drawn with three different topologies through the same
 // renderer:
@@ -21,7 +21,7 @@
 // it correctly.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // World axes: three independent line segments. Each pair of vertices
 // in the buffer is one line, so the topology is LineList.

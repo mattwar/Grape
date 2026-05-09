@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/IndexedCube.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // A spinning cube built from an indexed mesh: 8 unique vertices reused
 // across 12 triangles via 36 indices. Without indices the same geometry
@@ -18,7 +18,7 @@
 // savings: the GPU drops half the triangles before rasterisation.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // 8 unique corners of a unit cube centred on the origin. Each gets its
 // own color so face interpolation makes the cube's structure obvious.

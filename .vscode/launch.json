@@ -3,7 +3,7 @@
     "configurations": [
         {
             // F5 on any .cs file in samples/ to build + debug it.
-            // The preLaunchTask packs Grape.Graphics into the local feed and
+            // The preLaunchTask packs Blitter into the local feed and
             // builds the file as a file-based app to a deterministic folder.
             "name": "Debug current sample",
             "type": "coreclr",

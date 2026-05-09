@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/LoadObjModel.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Demonstrates loading a 3D model from a Wavefront OBJ file via
 // Model.Load(). Real-world workflow: export an .obj from your favorite
@@ -18,7 +18,7 @@
 // a path on disk. Replace `objPath` with your own file to load it.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // A small two-material model: an octahedron (bipyramid) with the four
 // upper faces in one color and the four lower faces in another. Two
@@ -64,7 +64,7 @@ const string Mtl = """
 
 // Write fixtures to a temp directory; clean them up on exit. In a
 // real application Model.Load just takes a path to your authored OBJ.
-var tempDir = Directory.CreateTempSubdirectory("grape-objsample");
+var tempDir = Directory.CreateTempSubdirectory("Blitter-objsample");
 var objPath = Path.Combine(tempDir.FullName, "gem.obj");
 var mtlPath = Path.Combine(tempDir.FullName, "gem.mtl");
 File.WriteAllText(objPath, Obj);

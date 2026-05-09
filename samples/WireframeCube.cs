@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/WireframeCube.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Two cubes side-by-side, sharing the same mesh:
 //
@@ -22,7 +22,7 @@
 // the flag.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // 8 unique cube corners + 36 triangle indices (12 triangles, CCW from
 // outside). Identical to the IndexedCube sample.

@@ -1,7 +1,7 @@
 <Project>
 
   <!--
-    Shared MSBuild properties for every project in the Grape repo.
+    Shared MSBuild properties for every project in the Blitter repo.
     Project-specific properties (e.g. PackageId, AllowUnsafeBlocks, OutputType)
     stay in the individual .csproj files.
   -->
@@ -18,8 +18,8 @@
     <Authors>Matt Warren</Authors>
     <Company>Matt Warren</Company>
     <Copyright>Copyright (c) Matt Warren</Copyright>
-    <PackageProjectUrl>https://github.com/mattwar/Grape</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/mattwar/Grape.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/mattwar/Blitter</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/mattwar/Blitter.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>

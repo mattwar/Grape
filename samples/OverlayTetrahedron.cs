@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/OverlayTetrahedron.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Builds on OrbitingTetrahedra to demonstrate DepthMode.Overlay: a third
 // "indicator" tetrahedron orbits the same axis as the other two, but is
@@ -16,7 +16,7 @@
 // depth mode automatically.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {

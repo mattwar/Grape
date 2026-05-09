@@ -1,18 +1,18 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/DebugText.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // Demonstrates 3D debug text. The string is updated every frame to show
 // elapsed time and frame number; the text mesh re-uploads via the renderer's

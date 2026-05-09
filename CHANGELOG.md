@@ -92,7 +92,6 @@ All notable changes to this project will be documented in this file.
 - Folded `Grape.SkiaSharp` into `Grape`; SkiaSharp is now a core dep.
 - `Image.Load` dispatches by extension: `.bmp` via SDL, others via SkiaSharp.
 - `Image.Save` dispatches by extension: `.bmp` via SDL, `.png`/`.jpg`/`.webp` via SkiaSharp.
-- Reorganised source into `Grape.Devices`, `Grape.Events`, `Grape.Shaders` namespaces.
 - Split monolithic `Events.cs`, `GpuDevice.cs`, and `Shader.cs` into per-type files.
 - Flattened `Graphics/` and `System/` subfolders into the project root.
 
@@ -109,8 +108,6 @@ All notable changes to this project will be documented in this file.
   shaders, meshes, vertices, and image loading.
 - Input: keyboard, mouse, gamepad, touch.
 - Audio: WAV loading and playback.
-- Companion `Grape.Jelly` scene-graph helpers and `Grape.SkiaSharp` integration
-  (not yet packaged).
 - GitHub Actions workflows for CI and release-on-tag publishing.
 - Third-party attribution in `THIRD-PARTY-NOTICES.md`.
 - Package-scoped `README.md` rendered on the nuget.org package page.
@@ -124,9 +121,8 @@ All notable changes to this project will be documented in this file.
 - `Invalidate()` calls within one tick coalesce into a single render.
 - `Window.NextFrameAsync()` lets manual loops share the same cadence.
 - Renderers gained `BackgroundColor` and an `AutoClear` toggle.
-- `Grape.Jelly` props now expose `Draw(Renderer2D)` instead of `Render(...)`.
 - `AsyncPeriodicTimer` now uses `Stopwatch` for monotonic cadence.
 - `AsyncPeriodicTimer` gained a `Reset()` method.
 
-[0.2.0]: https://github.com/mattwar/Grape/releases/tag/v0.2.0
-[0.1.1]: https://github.com/mattwar/Grape/releases/tag/v0.1.1
+[0.2.0]: https://github.com/mattwar/Blitter/releases/tag/v0.2.0
+[0.1.1]: https://github.com/mattwar/Blitter/releases/tag/v0.1.1

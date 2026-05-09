@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Grape includes or depends on third-party software. The original copyright
+Blitter includes or depends on third-party software. The original copyright
 notices and license terms for each are reproduced below.
 
 ---

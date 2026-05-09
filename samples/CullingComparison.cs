@@ -1,12 +1,12 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/CullingComparison.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
 // Two identical single-faced quads spin side-by-side. The left one uses
 // CullMode.None (both sides drawn) and stays visible throughout its
@@ -20,7 +20,7 @@
 // geometry like this quad, you can see exactly what gets thrown away.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // A unit quad facing +Z, wound counter-clockwise when viewed from +Z so
 // "front" lines up with the right-hand rule.

@@ -1,14 +1,14 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/SplitScreen3D.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 // Two cameras rendering the same scene side-by-side, demonstrating
@@ -16,7 +16,7 @@
 // scope ends cleanly and the next pane's setting is independent.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {

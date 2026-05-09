@@ -1,18 +1,18 @@
-#:package Grape.Graphics@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/SpinningTexturedTriangle.cs
 //
-// While Grape.Graphics is unpublished, build a local copy first:
+// While Blitter is unpublished, build a local copy first:
 //
-//     dotnet build src/Grape.Graphics/Grape.Graphics.csproj
+//     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Grape.Graphics from
+// The samples/NuGet.config in this folder pulls Blitter from
 // ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
-using Grape;
+using Blitter;
 
 // A textured triangle. Position is in NDC; UVs are in [0,1] with
 // (0,0) at the top-left of the texture and (1,1) at the bottom-right.
