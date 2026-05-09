@@ -3,91 +3,42 @@ using System.Collections.Immutable;
 
 namespace Grape.Jelly;
 
-public class Scene2D //: IDisposable
+public class Scene2D : Container2D
 {
-    private ImmutableList<Prop2D> _props = ImmutableList<Prop2D>.Empty;
-    //private readonly AsyncPeriodicEvent _updateEvent;
-
-    public Scene2D(ImmutableList<Prop2D> props)
+    public Scene2D(params ImmutableList<Prop2D> props) : base(props)
     {
-        _props = props;
-        //_updateEvent = new AsyncPeriodicEvent(TimeSpan.FromMicroseconds(100), this.Update);
     }
 
-    //public void Dispose()
-    //{
-    //    //_ = StopUpdatingAsync();
-    //}
-
-    ///// <summary>
-    ///// How often the scene is updated. Default is 16ms.
-    ///// </summary>
-    //public TimeSpan UpdatePeriod
-    //{
-    //    get => _updateEvent.Period;
-    //    set => _updateEvent.Period = value;
-    //}
-
-    ///// <summary>
-    ///// Starts the scene progressing.
-    ///// </summary>
-    //public virtual void StartUpdating()
-    //{
-    //    _updateEvent.Start();
-    //}
-
-    ///// <summary>
-    ///// Stops the scene from progressing.
-    ///// </summary>
-    //public virtual Task StopUpdatingAsync()
-    //{
-    //    return _updateEvent.StopAsync();
-    //}
-
-    //public Action<TimeSpan> Updated;
+    private Window2D? _window;
 
     /// <summary>
-    /// Updates the scene state.
-    /// Returns true if the scene changed.
+    /// Runs the scene until canceled or another exit condition is reached.
     /// </summary>
-    public bool Update(UpdateContext2D context, CancellationToken cancellationToken = default)
+    public async Task RunAsync(Window2D window, CancellationToken cancellationToken = default)
     {
-        var changed = false;
+        _window = window;
+        var rd = window.Renderer;
 
-        //var size = this.Window.Size;
-        //var context = new UpdateContext
-        //{
-        //    Time = time,
-        //    Bounds = new Rect(0, 0, size.Width, size.Height)
-        //};
-
-        foreach (var prop in _props)
+        try
         {
-            if (cancellationToken.IsCancellationRequested)
-                return false;
-
-            if (prop.Update(context))
+            // Animate the scene until exit condition
+            while (!cancellationToken.IsCancellationRequested && !ShouldExit())
             {
-                changed = true;
-            }
+                var context = rd.GetUpdateContext();
+                this.Update(in context);
+                this.Draw(rd);               
+                await window.NextFrameAsync(cancellationToken);
+            }       
         }
-
-        return changed;
-    }
-
-    /// <summary>
-    /// Renders all the props in the scene.
-    /// </summary>
-    public void Draw(Renderer2D renderer)
-    {
-        foreach (var prop in _props)
+        finally
         {
-            prop.Draw(renderer);
+            _window = null;           
         }
     }
 
-    public void AddProp(Prop2D prop)
+    protected virtual bool ShouldExit()
     {
-        ImmutableInterlocked.Update(ref _props, (list) => list.Add(prop));
+        return _window == null
+            || _window.IsClosed;
     }
 }

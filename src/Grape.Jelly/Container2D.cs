@@ -6,6 +6,8 @@ public abstract class Container2D : Prop2D
 {
     private ImmutableList<Prop2D> _props = ImmutableList<Prop2D>.Empty;
 
+    public ImmutableList<Prop2D> Props => _props;
+
     public Container2D(ImmutableList<Prop2D> props)
     {
         _props = props;
