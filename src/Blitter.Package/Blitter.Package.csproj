@@ -97,6 +97,7 @@
   -->
   <ItemGroup>
     <ProjectReference Include="..\Blitter\Blitter.csproj" PrivateAssets="all" />
+    <ProjectReference Include="..\Blitter.Bits\Blitter.Bits.csproj" PrivateAssets="all" />
     <ProjectReference Include="..\Blitter.Blocks\Blitter.Blocks.csproj" PrivateAssets="all" />
   </ItemGroup>
 
@@ -124,6 +125,10 @@
     <None Include="..\Blitter\bin\$(Configuration)\net9.0\Blitter.dll"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
     <None Include="..\Blitter\bin\$(Configuration)\net9.0\Blitter.pdb"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Blitter.Bits\bin\$(Configuration)\net9.0\Blitter.Bits.dll"
+          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Blitter.Bits\bin\$(Configuration)\net9.0\Blitter.Bits.pdb"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />
     <None Include="..\Blitter.Blocks\bin\$(Configuration)\net9.0\Blitter.Blocks.dll"
           Pack="true" PackagePath="lib\net9.0\" Visible="false" />

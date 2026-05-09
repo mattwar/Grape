@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Blitter.Bits;
 
 namespace Blitter.Tests;
 

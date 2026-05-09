@@ -21,6 +21,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Lit cube with per-face normals so each face shades uniformly under
 // the directional light. `Meshes.Cube` returns 24 vertices (4 per face)

@@ -1,6 +1,6 @@
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Base class for camera-driving controllers — objects that own a

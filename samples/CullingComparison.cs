@@ -21,6 +21,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A unit quad facing +Z, wound counter-clockwise when viewed from +Z so
 // "front" lines up with the right-hand rule.

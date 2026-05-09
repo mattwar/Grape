@@ -1,7 +1,7 @@
 using System.Numerics;
 using Blitter.Events;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Orbits the camera around <see cref="Target"/> via mouse drag, with

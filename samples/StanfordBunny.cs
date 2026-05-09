@@ -28,6 +28,7 @@
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using Blitter;
+using Blitter.Bits;
 
 //const string ModelFile = "teapot.obj";
 const string ModelFile = "bunny.obj";

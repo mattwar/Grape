@@ -22,6 +22,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // ---- Geometry helpers --------------------------------------------------------
 
