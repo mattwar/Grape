@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using SkiaSharp;
 
@@ -114,6 +113,200 @@ public static class SkiaSharpExtensions
             var bitmap = new SKBitmap(info);
             image.CopyToBitmap(bitmap);
             return bitmap;
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with a
+        /// Gaussian blur applied. The blur kernel is clamped at the
+        /// image edges; pre-pad the source if you need bleed room.
+        /// </summary>
+        /// <param name="sigmaX">Horizontal blur standard deviation, in pixels.</param>
+        /// <param name="sigmaY">Vertical blur standard deviation, in pixels.</param>
+        public Image Blur(float sigmaX, float sigmaY)
+        {
+            using var filter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
+            return ApplyImageFilter(image, filter, padLeft: 0, padTop: 0, padRight: 0, padBottom: 0);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with a
+        /// uniform Gaussian blur applied.
+        /// </summary>
+        /// <param name="sigma">Blur standard deviation, in pixels.</param>
+        public Image Blur(float sigma) => image.Blur(sigma, sigma);
+
+        /// <summary>
+        /// Returns a new image with a drop shadow composited under the
+        /// source. The result is automatically padded so the shadow is
+        /// not clipped: the source's (0,0) appears at
+        /// (<c>max(0,-dx) + ceil(3*sigmaX)</c>,
+        /// <c>max(0,-dy) + ceil(3*sigmaY)</c>) in the returned image.
+        /// </summary>
+        /// <param name="dx">Horizontal shadow offset, in pixels.</param>
+        /// <param name="dy">Vertical shadow offset, in pixels.</param>
+        /// <param name="sigmaX">Horizontal shadow blur, in pixels.</param>
+        /// <param name="sigmaY">Vertical shadow blur, in pixels.</param>
+        /// <param name="color">Shadow color (alpha included).</param>
+        public Image DropShadow(float dx, float dy, float sigmaX, float sigmaY, Blitter.Color color)
+        {
+            // Pad enough to fit the shadow's blurred footprint plus
+            // the offset on whichever side the shadow falls.
+            int blurX = (int)MathF.Ceiling(3f * sigmaX);
+            int blurY = (int)MathF.Ceiling(3f * sigmaY);
+            int padLeft   = blurX + (int)MathF.Ceiling(MathF.Max(0f, -dx));
+            int padTop    = blurY + (int)MathF.Ceiling(MathF.Max(0f, -dy));
+            int padRight  = blurX + (int)MathF.Ceiling(MathF.Max(0f,  dx));
+            int padBottom = blurY + (int)MathF.Ceiling(MathF.Max(0f,  dy));
+
+            using var filter = SKImageFilter.CreateDropShadow(
+                dx, dy, sigmaX, sigmaY, new SKColor(color.R, color.G, color.B, color.A));
+            return ApplyImageFilter(image, filter, padLeft, padTop, padRight, padBottom);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source converted
+        /// to grayscale via the standard luminance weights.
+        /// </summary>
+        public Image Grayscale()
+        {
+            // Rec. 601 luma coefficients applied to R, G, B; alpha untouched.
+            ReadOnlySpan<float> matrix =
+            [
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                0.299f, 0.587f, 0.114f, 0f, 0f,
+                0f,     0f,     0f,     1f, 0f,
+            ];
+            using var colorFilter = SKColorFilter.CreateColorMatrix(matrix.ToArray());
+            using var filter = SKImageFilter.CreateColorFilter(colorFilter);
+            return ApplyImageFilter(image, filter, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with each
+        /// channel multiplied by <paramref name="tint"/>'s channels
+        /// (treated as 0..1). Alpha is multiplied like the others, so
+        /// a fully opaque tint preserves the source alpha.
+        /// </summary>
+        public Image Tint(Blitter.Color tint)
+        {
+            float r = tint.R / 255f;
+            float g = tint.G / 255f;
+            float b = tint.B / 255f;
+            float a = tint.A / 255f;
+            ReadOnlySpan<float> matrix =
+            [
+                r,  0f, 0f, 0f, 0f,
+                0f, g,  0f, 0f, 0f,
+                0f, 0f, b,  0f, 0f,
+                0f, 0f, 0f, a,  0f,
+            ];
+            using var colorFilter = SKColorFilter.CreateColorMatrix(matrix.ToArray());
+            using var filter = SKImageFilter.CreateColorFilter(colorFilter);
+            return ApplyImageFilter(image, filter, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Returns a new image expanded by the dilate radius on each
+        /// side, with bright pixels grown by a max filter of the given
+        /// radius. Useful for outline / glow building.
+        /// </summary>
+        /// <param name="radiusX">Horizontal dilate radius, in pixels.</param>
+        /// <param name="radiusY">Vertical dilate radius, in pixels.</param>
+        public Image Dilate(int radiusX, int radiusY)
+        {
+            using var filter = SKImageFilter.CreateDilate(radiusX, radiusY);
+            return ApplyImageFilter(image, filter, radiusX, radiusY, radiusX, radiusY);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with bright
+        /// pixels shrunk by a min filter of the given radius. Useful
+        /// for inset effects.
+        /// </summary>
+        /// <param name="radiusX">Horizontal erode radius, in pixels.</param>
+        /// <param name="radiusY">Vertical erode radius, in pixels.</param>
+        public Image Erode(int radiusX, int radiusY)
+        {
+            using var filter = SKImageFilter.CreateErode(radiusX, radiusY);
+            return ApplyImageFilter(image, filter, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Returns a new image with the source shifted by
+        /// (<paramref name="dx"/>, <paramref name="dy"/>). The result
+        /// is padded so no content is clipped: the source's (0,0)
+        /// appears at (<c>max(0,-dx)+dx</c>, <c>max(0,-dy)+dy</c>) in
+        /// the returned image.
+        /// </summary>
+        public Image Offset(float dx, float dy)
+        {
+            int padLeft   = (int)MathF.Ceiling(MathF.Max(0f, -dx));
+            int padTop    = (int)MathF.Ceiling(MathF.Max(0f, -dy));
+            int padRight  = (int)MathF.Ceiling(MathF.Max(0f,  dx));
+            int padBottom = (int)MathF.Ceiling(MathF.Max(0f,  dy));
+            using var filter = SKImageFilter.CreateOffset(dx, dy);
+            return ApplyImageFilter(image, filter, padLeft, padTop, padRight, padBottom);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with an
+        /// arbitrary convolution kernel applied. The kernel is laid
+        /// out row-major and must contain
+        /// <paramref name="kernelWidth"/> &#215;
+        /// <paramref name="kernelHeight"/> values.
+        /// </summary>
+        /// <param name="kernelWidth">Kernel width in samples.</param>
+        /// <param name="kernelHeight">Kernel height in samples.</param>
+        /// <param name="kernel">Row-major kernel weights.</param>
+        /// <param name="gain">Output multiplier applied after convolution. Defaults to 1.</param>
+        /// <param name="bias">Constant added to each channel after the gain. Defaults to 0.</param>
+        public Image Convolve(int kernelWidth, int kernelHeight, ReadOnlySpan<float> kernel, float gain = 1f, float bias = 0f)
+        {
+            if (kernel.Length != kernelWidth * kernelHeight)
+                throw new ArgumentException(
+                    $"Kernel length {kernel.Length} does not match {kernelWidth}x{kernelHeight}.",
+                    nameof(kernel));
+
+            var kernelSize = new SKSizeI(kernelWidth, kernelHeight);
+            // Center the kernel; matches the conventional sampling for
+            // edge-detect / sharpen / emboss kernels.
+            var kernelOffset = new SKPointI(kernelWidth / 2, kernelHeight / 2);
+            using var filter = SKImageFilter.CreateMatrixConvolution(
+                kernelSize, kernel.ToArray(), gain, bias,
+                kernelOffset, SKShaderTileMode.Clamp,
+                convolveAlpha: false);
+            return ApplyImageFilter(image, filter, 0, 0, 0, 0);
+        }
+
+        /// <summary>
+        /// Returns a new image the same size as the source with a
+        /// magnifier lens covering <paramref name="lens"/>. Pixels
+        /// inside the lens are sampled at <paramref name="zoom"/>
+        /// magnification; pixels outside are unchanged.
+        /// </summary>
+        /// <param name="lens">Lens rectangle, in source-image pixels.</param>
+        /// <param name="zoom">Zoom factor (1 = no magnification, 2 = 2x).</param>
+        /// <param name="inset">
+        /// Soft-blend border thickness, in pixels. Magnified pixels
+        /// fade smoothly into the unscaled background over this many
+        /// pixels at the lens edge. 0 produces a hard edge.
+        /// </param>
+        /// <param name="sampling">
+        /// How magnified pixels are filtered.
+        /// <see cref="ImageSampling.Linear"/> (default) is right for
+        /// photographic content; <see cref="ImageSampling.Nearest"/>
+        /// preserves crisp pixels for pixel-art / debug zoom uses.
+        /// </param>
+        public Image Magnify(Rect lens, float zoom, float inset = 0f, ImageSampling sampling = ImageSampling.Linear)
+        {
+            var lensRect = new SKRect(lens.X, lens.Y, lens.X + lens.Width, lens.Y + lens.Height);
+            var skSampling = sampling == ImageSampling.Nearest
+                ? new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None)
+                : new SKSamplingOptions(SKFilterMode.Linear,  SKMipmapMode.None);
+            using var filter = SKImageFilter.CreateMagnifier(
+                lensRect, inset, zoom, skSampling, null, SKRect.Empty);
+            return ApplyImageFilter(image, filter, 0, 0, 0, 0);
         }
     }
 
@@ -289,6 +482,37 @@ public static class SkiaSharpExtensions
         }
 
         image.CopyFromBitmap(bitmap);
+    }
+
+    private static Image ApplyImageFilter(
+        Image source, SKImageFilter filter,
+        int padLeft, int padTop, int padRight, int padBottom)
+    {
+        ObjectDisposedException.ThrowIf(source.IsDisposed, source);
+
+        var (sw, sh) = source.Size;
+        int dw = sw + padLeft + padRight;
+        int dh = sh + padTop + padBottom;
+        if (dw <= 0 || dh <= 0)
+            return Image.Create(Math.Max(1, dw), Math.Max(1, dh));
+
+        // Stage source -> SKBitmap, draw with the filter into a same-
+        // sized destination SKBitmap, then snapshot back to a new
+        // Image. ABGR8888 + Rgba8888 keeps the byte layout aligned
+        // with the fast copy path in CopyFromBitmap.
+        using var srcBitmap = source.ToSKBitmap();
+        var dstInfo = new SKImageInfo(dw, dh, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        using var dstBitmap = new SKBitmap(dstInfo);
+        using (var canvas = new SKCanvas(dstBitmap))
+        {
+            canvas.Clear(SKColors.Transparent);
+            using var paint = new SKPaint { ImageFilter = filter };
+            canvas.DrawBitmap(srcBitmap, padLeft, padTop, paint);
+        }
+
+        var result = Image.Create(dw, dh);
+        result.CopyFromBitmap(dstBitmap);
+        return result;
     }
 
     extension(SKBitmap bitmap)

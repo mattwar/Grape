@@ -207,11 +207,10 @@ public sealed class Image : IDisposable
     }
 
     /// <summary>
-    /// Loads an image from disk. The decoder is selected by file
-    /// extension: <c>.bmp</c> goes through SDL's built-in BMP loader
-    /// (no extra dependencies, exact pixel preservation); every other
-    /// extension is decoded by SkiaSharp, covering PNG, JPG, WebP, GIF,
-    /// and the rest of SkiaSharp's supported formats.
+    /// Loads an image from disk. Decoding is handled by SkiaSharp,
+    /// covering PNG, JPG, WebP, GIF, BMP, and the rest of SkiaSharp's
+    /// supported formats. The decoded image is normalized to
+    /// <see cref="PixelFormat.ABGR8888"/>.
     /// </summary>
     /// <param name="filePath">Path to the image file.</param>
     /// <param name="mipmaps">
@@ -222,18 +221,6 @@ public sealed class Image : IDisposable
     public static Image Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-
-        // SDL.LoadBMP keeps BMPs as a zero-dependency path: BMP is
-        // ubiquitous, SDL handles it directly, and it sidesteps a
-        // SkiaSharp decode allocation + native call. Other formats
-        // fall through to SkiaSharp.
-        if (Path.GetExtension(filePath).Equals(".bmp", StringComparison.OrdinalIgnoreCase))
-        {
-            var imageId = SDL.LoadBMP(filePath);
-            if (imageId == 0)
-                throw new InvalidOperationException($"SDL_LoadBMP Error: {SDL.GetError()}");
-            return new Image(imageId, mipmaps);
-        }
 
         var bytes = File.ReadAllBytes(filePath);
         return Decode(bytes, mipmaps);
@@ -258,9 +245,8 @@ public sealed class Image : IDisposable
 
     /// <summary>
     /// Saves the image to disk. The encoder is selected by file
-    /// extension: <c>.bmp</c> goes through SDL's <c>SaveBMP</c>;
-    /// <c>.png</c>, <c>.jpg</c> / <c>.jpeg</c>, and <c>.webp</c> are
-    /// encoded by SkiaSharp.
+    /// extension and handled by SkiaSharp: <c>.png</c>,
+    /// <c>.jpg</c> / <c>.jpeg</c>, <c>.webp</c>, and <c>.bmp</c>.
     /// </summary>
     /// <param name="filename">Destination path. Extension picks the format.</param>
     /// <param name="quality">
@@ -274,22 +260,14 @@ public sealed class Image : IDisposable
             return;
 
         var ext = Path.GetExtension(filename);
-
-        // SDL.SaveBMP is the lossless zero-dependency path for the
-        // format SDL already speaks, mirroring Load's BMP fast path.
-        if (ext.Equals(".bmp", StringComparison.OrdinalIgnoreCase))
-        {
-            SDL.SaveBMP(_imageId, filename);
-            return;
-        }
-
         var format = ext.ToLowerInvariant() switch
         {
             ".png" => SkiaSharp.SKEncodedImageFormat.Png,
             ".jpg" or ".jpeg" => SkiaSharp.SKEncodedImageFormat.Jpeg,
             ".webp" => SkiaSharp.SKEncodedImageFormat.Webp,
+            ".bmp" => SkiaSharp.SKEncodedImageFormat.Bmp,
             _ => throw new NotSupportedException(
-                $"Unsupported image format '{ext}'. Supported: .bmp, .png, .jpg, .jpeg, .webp."),
+                $"Unsupported image format '{ext}'. Supported: .png, .jpg, .jpeg, .webp, .bmp."),
         };
 
         // Round-trip through an SKBitmap snapshot. The pixel-by-pixel
