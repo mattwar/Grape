@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
 using Blitter.Shaders;
+using Blitter.Utilities;
 
 namespace Blitter;
 
@@ -33,6 +34,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
+    private readonly PoolMap _commandPools = new();
 
     // Pool of instance-rate vertex buffers + their staging upload buffers.
     // Each instanced DrawCommand acquires one for the frame; at frame end
@@ -418,6 +420,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
         _msaaSampleCount = sampleCount;
     }
 
+
+    private NoArgsDrawCommand AllocateNoArgsDrawCommand() =>
+        _commandPools.GetPool<NoArgsDrawCommand>(static (pool) => new NoArgsDrawCommand(pool)).Allocate();
+
+    private DrawCommand<TArgs> AllocateDrawCommand<TArgs>() where TArgs : unmanaged =>
+        _commandPools.GetPool<DrawCommand<TArgs>>(static (pool) => new DrawCommand<TArgs>(pool)).Allocate();
+
+    private InstancedDrawCommand<TArgs, TInstance> AllocateInstancedDrawCommand<TArgs, TInstance>() 
+        where TArgs : unmanaged 
+        where TInstance : unmanaged =>
+        _commandPools.GetPool<InstancedDrawCommand<TArgs, TInstance>>(static (pool) => new InstancedDrawCommand<TArgs, TInstance>(pool)).Allocate();
+
     /// <summary>
     /// Queues a mesh for drawing using the given shader.
     /// </summary>
@@ -427,7 +441,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture: null, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -445,21 +461,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            Texture: null,
-            Cubemap: null,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture: null, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -482,7 +486,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -499,21 +505,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            texture,
-            Cubemap: null,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -531,7 +525,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(cubemap);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, cubemap, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture: null, cubemap, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -548,21 +544,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(cubemap);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            Texture: null,
-            cubemap,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture: null, cubemap, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -582,7 +566,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture, cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -599,21 +585,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            texture,
-            Cubemap: null,
-            sampler,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture, cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <inheritdoc/>
@@ -654,28 +628,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
         if (instances.IsEmpty)
             return;
 
-        // Snapshot the instance bytes into a pooled byte[] so the user's
-        // span doesn't have to outlive the call. The array is returned to
-        // ArrayPool at frame end.
-        var bytes = MemoryMarshal.AsBytes(instances);
-        var rented = ArrayPool<byte>.Shared.Rent(bytes.Length);
-        bytes.CopyTo(rented);
-
-        // Per-instance Matrix4x4 attributes are reconstructed in HLSL with
-        // consecutive locations as rows, so the shader sees them in their
-        // native layout. Per-uniform cbuffer matrices, by contrast, are
-        // implicitly transposed by HLSL's column-major cbuffer storage. To
-        // keep the shaders symmetric (`mul(M, v)` everywhere), we transpose
-        // each per-instance matrix here so both paths arrive at the shader
-        // with the same orientation.
-        TransposeInstanceMatrices(rented.AsSpan(0, bytes.Length), shader.InstanceLayout, instances.Length);
-
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new InstancedDrawCommand<TArgs>(
+        var command = AllocateInstancedDrawCommand<TArgs, TInstance>();
+        command.Init(
             mesh,
             shader,
             texture,
-            Sampler: null,
+            cubemap: null,
+            sampler: null,
             DepthMode,
             BlendMode,
             CullMode,
@@ -685,10 +645,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             ClipRect,
             shader.ArgsLayout,
             args,
-            shader.InstanceLayout,
-            rented,
-            bytes.Length,
-            instances.Length));
+            shader.InstanceLayout,  
+            instances
+            );
+        _commands.Add(command);
     }
 
     // Combines the mesh's declared topology with the renderer's
@@ -2232,20 +2192,21 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Topology Topology,
         SDL.GPUSampleCount SampleCount);
 
-    private record DrawCommand(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        Cubemap? Cubemap,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect)
+    private abstract record DrawCommand
     {
+        public Mesh Mesh { get; private protected set; } = null!;
+        public ShaderSet Shader { get; private protected set; } = null!;
+        public Image? Texture { get; private protected set; }
+        public Cubemap? Cubemap { get; private protected set; }
+        public GpuSampler? Sampler { get; private protected set; }
+        public DepthMode DepthMode { get; private protected set; }
+        public BlendMode BlendMode { get; private protected set; }
+        public CullMode CullMode { get; private protected set; }
+        public Topology Topology { get; private protected set; }
+        public bool Wireframe { get; private protected set; }
+        public Rect? Viewport { get; private protected set; }
+        public Rect? ClipRect { get; private protected set; }
+
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
         /// render pass. The base command has no args; the generic
@@ -2279,27 +2240,108 @@ internal class GpuRenderer : Renderer3D, IDisposable
         /// Returns any pooled CPU buffers held by this command. Called
         /// at frame end after the GPU work has been recorded.
         /// </summary>
-        public virtual void Release() { }
+        public virtual void Release()
+        {
+        }
     }
 
-    private sealed record DrawCommand<TArgs>(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        Cubemap? Cubemap,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect,
-        ShaderArgsLayout Layout,
-        TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Cubemap, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+    private sealed record NoArgsDrawCommand : DrawCommand
+    {
+        private readonly Pool<NoArgsDrawCommand> _pool;
+
+        public NoArgsDrawCommand(Pool<NoArgsDrawCommand> pool)
+        {
+            _pool = pool;
+        }
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect)
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+        }
+
+        public override void Release()
+        {
+            _pool.Return(this);
+        }
+    }
+
+    /// <summary>
+    /// Draw command with uniform arguments.
+    /// </summary>
+    private record DrawCommand<TArgs> : DrawCommand
         where TArgs : unmanaged
     {
+        private readonly Pool<DrawCommand<TArgs>> _pool;
+
+        public DrawCommand(Pool<DrawCommand<TArgs>> pool)
+        {
+            _pool = pool;
+        }
+
+        public TArgs Args { get; private set; }
+
+        public ShaderArgsLayout ArgsLayout { get; private set; } = null!;
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,            
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args)
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+        }
+
+        public override void Release()
+        {
+            _pool.Return(this);
+        }
+
         public override void PushArgs(GpuRenderPass renderPass)
         {
             // Read the typed value into a local so we have a stable ref
@@ -2315,7 +2357,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             var bytes = MemoryMarshal.AsBytes(
                 MemoryMarshal.CreateReadOnlySpan(ref value, 1));
             int offset = 0;
-            foreach (var element in Layout.Elements)
+            foreach (var element in ArgsLayout.Elements)
             {
                 var slice = bytes.Slice(offset, element.Size);
                 switch (element.Stage)
@@ -2332,43 +2374,99 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    // Instanced draw. Owns a pooled byte[] holding the user's instance
-    // span, copied at queue time so the user's storage doesn't have to
-    // outlive the call. The render loop uploads InstanceBytes into a
-    // pooled GPU instance-rate vertex buffer and binds it on slot 1.
-    private sealed record InstancedDrawCommand<TArgs>(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect,
-        ShaderArgsLayout ArgsLayoutValue,
-        TArgs Args,
-        ShaderVertexLayout InstanceLayoutValue,
-        byte[] InstanceBytesArray,
-        int InstanceBytesLength,
-        int InstanceCountValue)
-        : DrawCommand(Mesh, Shader, Texture, Cubemap: null, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+    /// <summary>
+    /// Draw command uniform arguments and per-instance data
+    /// </summary>
+    private sealed record InstancedDrawCommand<TArgs, TInstance> : DrawCommand
         where TArgs : unmanaged
+        where TInstance : unmanaged
     {
-        public override ShaderVertexLayout? InstanceLayout => InstanceLayoutValue;
-        public override int InstanceCount => InstanceCountValue;
-        public override ReadOnlySpan<byte> InstanceBytes =>
-            InstanceBytesArray.AsSpan(0, InstanceBytesLength);
+        private ShaderVertexLayout _instanceLayout = null!;
+        private TInstance[] _rentedInstancesArray = null!;
+        private int _instancesLength;
 
+        public TArgs Args { get; private set; }
+
+        public ShaderArgsLayout ArgsLayout { get; private set; } = null!;
+
+        private readonly Pool<InstancedDrawCommand<TArgs, TInstance>> _pool;
+
+        public InstancedDrawCommand(Pool<InstancedDrawCommand<TArgs, TInstance>> pool)
+        {
+            _pool = pool;
+        }
+
+        public override ShaderVertexLayout? InstanceLayout => _instanceLayout;
+        public override int InstanceCount => _instancesLength;
+        public override ReadOnlySpan<byte> InstanceBytes =>         
+            MemoryMarshal.AsBytes(_rentedInstancesArray.AsSpan(0, _instancesLength));
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args,           
+            ShaderVertexLayout instanceLayout,
+            ReadOnlySpan<TInstance> instances
+            )
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+
+            _instanceLayout = instanceLayout;
+            _rentedInstancesArray = ArrayPool<TInstance>.Shared.Rent(instances.Length);
+            instances.CopyTo(_rentedInstancesArray);
+            _instancesLength = instances.Length;
+
+            // Per-instance Matrix4x4 attributes are reconstructed in HLSL with
+            // consecutive locations as rows, so the shader sees them in their
+            // native layout. Per-uniform cbuffer matrices, by contrast, are
+            // implicitly transposed by HLSL's column-major cbuffer storage. To
+            // keep the shaders symmetric (`mul(M, v)` everywhere), we transpose
+            // each per-instance matrix here so both paths arrive at the shader
+            // with the same orientation.
+            TransposeInstanceMatrices(
+                MemoryMarshal.AsBytes(_rentedInstancesArray.AsSpan(0, _instancesLength)),
+                _instanceLayout,
+                _instancesLength);
+        }
+
+        public override void Release()
+        {
+            ArrayPool<TInstance>.Shared.Return(_rentedInstancesArray);
+            _rentedInstancesArray = null!;
+            _pool.Return(this);
+        }
+        
         public override void PushArgs(GpuRenderPass renderPass)
         {
             var value = Args;
             var bytes = MemoryMarshal.AsBytes(
                 MemoryMarshal.CreateReadOnlySpan(ref value, 1));
             int offset = 0;
-            foreach (var element in ArgsLayoutValue.Elements)
+            foreach (var element in ArgsLayout.Elements)
             {
                 var slice = bytes.Slice(offset, element.Size);
                 switch (element.Stage)
@@ -2382,11 +2480,6 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 }
                 offset += element.Size;
             }
-        }
-
-        public override void Release()
-        {
-            ArrayPool<byte>.Shared.Return(InstanceBytesArray);
         }
     }
 
