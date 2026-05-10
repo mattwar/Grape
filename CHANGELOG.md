@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
+  (lines, rays, axes, boxes, spheres); opt in per renderer via
+  `Renderer3D.DebugDrawEnabled`.
 - `Application.ScheduleTick(period, callback)` registers a periodic
   callback driven by the application event loop, allocation-free.
 - `PeriodicAwaiter` provides an allocation-free `ValueTask`-based

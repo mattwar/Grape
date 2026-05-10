@@ -506,6 +506,57 @@ public abstract class Renderer3D
     /// <summary>Queues ASCII debug text for drawing at the given world-space transform.</summary>
     public abstract void DrawDebugText(string text, in Matrix4x4 transform);
 
+    private bool _debugDrawEnabled;
+
+    /// <summary>
+    /// When true, this renderer draws primitives queued via
+    /// <see cref="DebugDraw"/> as an overlay each frame.
+    /// </summary>
+    // In multi-renderer apps, enable on exactly one renderer; if more
+    // than one is enabled, only the first to flush each frame sees the
+    // queued primitives.
+    public bool DebugDrawEnabled
+    {
+        get => _debugDrawEnabled;
+        set
+        {
+            if (_debugDrawEnabled == value) return;
+            _debugDrawEnabled = value;
+            if (value) Interlocked.Increment(ref DebugDraw.ConsumerCount);
+            else       Interlocked.Decrement(ref DebugDraw.ConsumerCount);
+        }
+    }
+
+    // Cached line mesh reused across frames; storage grows as needed
+    // via Mesh<T>.Update.
+    private Mesh<ColorVertex3D>? _debugDrawLineMesh;
+
+    // Drains DebugDraw's queued lines into the cached mesh and queues
+    // it as a normal scene-aware draw. Concrete renderers call this
+    // once per frame before iterating their command list, so debug
+    // primitives ride the configured camera, viewport, and depth state.
+    protected void FlushDebugDraw()
+    {
+        if (!_debugDrawEnabled) return;
+
+        var lines = DebugDraw.TakeLines();
+        if (lines.Count == 0) return;
+
+        _debugDrawLineMesh ??= Mesh.Create<ColorVertex3D>(
+            ReadOnlySpan<ColorVertex3D>.Empty, Topology.LineList);
+
+        var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(lines);
+        _debugDrawLineMesh.Update(span);
+
+        // Identity model: ApplyRenderArgs composes the camera VP into
+        // the transform field, so debug lines share the scene's view-
+        // projection.
+        DrawMesh(
+            _debugDrawLineMesh,
+            ShaderSets.PositionColorWithTransform,
+            new TransformArgs(Matrix4x4.Identity));
+    }
+
     /// <summary>
     /// When true, calls to <see cref="Render"/> become no-ops. Used by
     /// <see cref="Window3D"/> to suppress stray <c>Render()</c> calls

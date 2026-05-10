@@ -860,6 +860,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 return;
             }
 
+            // Drain DebugDraw before preparing commands so the queued
+            // line-mesh draw goes through the normal prepare/upload path.
+            FlushDebugDraw();
+
             PrepareCommandsInPlace();
 
             if (!_renderFrame.TryBeginCopyPass(out var copyPass))
