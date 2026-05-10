@@ -28,6 +28,14 @@ All notable changes to this project will be documented in this file.
   (and properly transforms normals via the inverse-transpose).
 - `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
   meshes into one for static-batching / mesh composition.
+- `BoundingBox` and `BoundingSphere` value types with intersection,
+  containment, encapsulation, and matrix-transform helpers.
+- `IPositionVertex3D` interface implemented by all built-in 3D vertex
+  types so generic helpers can read positions from any mesh.
+- `Mesh<T>.ComputeBoundingBox` / `ComputeBoundingSphere` /
+  `ComputeCenter` / `GetPositions` / `WritePositionsTo` extensions.
+- `Model.ComputeBoundingBox` / `ComputeBoundingSphere` / `ComputeCenter`
+  extensions, with optional transform overload for world-space bounds.
 - `Mesh<T>.Update(vertices)` replaces vertex data while keeping the
   existing index buffer; bumps `Version` so the renderer re-uploads.
 - `IUpdateContext` / `IUpdateContext2D` / `IUpdateContext3D` interfaces
