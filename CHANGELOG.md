@@ -28,6 +28,34 @@ All notable changes to this project will be documented in this file.
   (and properly transforms normals via the inverse-transpose).
 - `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
   meshes into one for static-batching / mesh composition.
+- `BoundingBox` and `BoundingSphere` value types with intersection,
+  containment, encapsulation, and matrix-transform helpers.
+- `BoundingRect` and `BoundingCircle` 2D counterparts (in
+  `Blitter.Bits`); distinct from the SDL-interop `Rect` layout type.
+- `IPositionVertex3D` interface implemented by all built-in 3D vertex
+  types so generic helpers can read positions from any mesh.
+- `IPositionVertex2D` interface implemented by `Vertex2D`.
+- `Image.ComputeOpaqueBounds()` returns the tight pixel-aligned
+  `BoundingRect` around an image's non-transparent pixels (with an
+  alpha-threshold parameter for ignoring anti-aliased fringes).
+- `Image.ComputeOpaqueCircle()` returns the same as a `BoundingCircle`.
+- `Image.ComputeOpaqueRects(cellSize)` decomposes the opaque region
+  into a small set of axis-aligned rects via grid-cover + greedy
+  merge, for tighter sprite collision than a single bounding rect.
+- `BoundingRectsExtensions` (in `Blitter.Bits`): `ContainsAny`,
+  `IntersectsAny` (single + collection), and `Union` over arrays /
+  spans of `BoundingRect`.
+- `BoundingBoxesExtensions` (in `Blitter.Bits`): same operations
+  over arrays / spans of `BoundingBox`.
+- `Mesh<T>.ComputeBoundingBox` / `ComputeBoundingSphere` /
+  `ComputeCenter` extensions.
+- `Mesh<T>.ComputeOccupiedBoxes(voxelSize, mode)` and the matching
+  `Model` extension decompose a mesh's surface into axis-aligned
+  `BoundingBox[]` via voxelization + 3D greedy merge; pick
+  `MeshOccupancyMode.Accurate` (SAT triangle test) for tight fit or
+  `Fast` (triangle-AABB test) for blocky meshes.
+- `Model.ComputeBoundingBox` / `ComputeBoundingSphere` / `ComputeCenter`
+  extensions, with optional transform overload for world-space bounds.
 - `Mesh<T>.Update(vertices)` replaces vertex data while keeping the
   existing index buffer; bumps `Version` so the renderer re-uploads.
 - `IUpdateContext` / `IUpdateContext2D` / `IUpdateContext3D` interfaces

@@ -12,10 +12,11 @@ namespace Blitter;
 /// pinned and passed directly to the renderer without an intermediate copy.
 /// </remarks>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct Vertex2D : IEquatable<Vertex2D>
+public readonly struct Vertex2D : IEquatable<Vertex2D>, IPositionVertex2D
 {
     /// <summary>The vertex position, in renderer coordinates.</summary>
     public readonly Vector2 Position;
+    Vector2 IPositionVertex2D.Position => Position;
 
     /// <summary>The vertex tint color, as float RGBA in 0..1.</summary>
     public readonly Vector4 Color;

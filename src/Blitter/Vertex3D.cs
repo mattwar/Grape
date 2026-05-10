@@ -8,9 +8,10 @@ namespace Blitter;
 /// A vertex with with just a position.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct Vertex3D
+public readonly struct Vertex3D : IPositionVertex3D
 {
     public readonly Vector3 Position;
+    Vector3 IPositionVertex3D.Position => Position;
 
     public Vertex3D(Vector3 position)
     {
@@ -36,9 +37,10 @@ public readonly struct Vertex3D
 /// A vertex with position and color
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct ColorVertex3D
+public readonly struct ColorVertex3D : IPositionVertex3D
 {
     public readonly Vector3 Position;
+    Vector3 IPositionVertex3D.Position => Position;
     public readonly Color Color;
 
     public ColorVertex3D(Vector3 position, Color color)
@@ -65,9 +67,10 @@ public readonly struct ColorVertex3D
 /// vertex input of the bundled <c>PositionTexture</c> ShaderSets.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct TextureVertex3D
+public readonly struct TextureVertex3D : IPositionVertex3D
 {
     public readonly Vector3 Position;
+    Vector3 IPositionVertex3D.Position => Position;
     public readonly Vector2 TextureCoordinate;
 
     public TextureVertex3D(Vector3 position, Vector2 textureCoordinate)
@@ -98,9 +101,10 @@ public readonly struct TextureVertex3D
 /// the result by the per-vertex color.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct LitVertex3D
+public readonly struct LitVertex3D : IPositionVertex3D
 {
     public readonly Vector3 Position;
+    Vector3 IPositionVertex3D.Position => Position;
     public readonly Vector3 Normal;
     public readonly Color Color;
 
@@ -138,9 +142,10 @@ public readonly struct LitVertex3D
 /// diffuse color (white when none is supplied).
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public readonly struct LitTextureVertex3D
+public readonly struct LitTextureVertex3D : IPositionVertex3D
 {
     public readonly Vector3 Position;
+    Vector3 IPositionVertex3D.Position => Position;
     public readonly Vector3 Normal;
     public readonly Vector2 TextureCoordinate;
     public readonly Color Color;
