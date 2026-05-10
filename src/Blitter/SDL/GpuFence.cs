@@ -1,16 +1,26 @@
 namespace Blitter;
 
+using Blitter.Utilities;
+
 /// <summary>
 /// A join point for GPU work.
 /// </summary>
 internal sealed class GpuFence : IDisposable
 {
     private readonly GpuDevice _device;
+    private readonly Pool<GpuFence> _pool;
     private nint _fenceId;
 
-    internal GpuFence(GpuDevice device, nint fenceId)
+    // Constructed by the pool factory only. Acquire a real instance via
+    // GpuDevice.AllocateFence (called from GpuRenderFrame.SubmitAndAcquireFence).
+    internal GpuFence(GpuDevice device, Pool<GpuFence> pool)
     {
         _device = device;
+        _pool = pool;
+    }
+
+    internal void Init(nint fenceId)
+    {
         _fenceId = fenceId;
     }
 
@@ -27,15 +37,22 @@ internal sealed class GpuFence : IDisposable
     {
         if (IsDisposed)
             return;
-        SDL.WaitForGPUFences(_device.GpuDeviceID, true, [_fenceId], 1);
+        // Marshal the single fence id through a stack-allocated span to
+        // avoid the per-call array allocation of a `[_fenceId]` collection
+        // expression.
+        unsafe
+        {
+            var id = _fenceId;
+            SDL.WaitForGPUFences(_device.GpuDeviceID, true, (nint)(&id), 1);
+        }
     }
 
     public void Dispose()
     {
-        var id = Interlocked.Exchange(ref _fenceId, 0);
-        if (id != 0)
-        {
-            SDL.ReleaseGPUFence(_device.GpuDeviceID, id);
-        }
+        var id = _fenceId;
+        if (id == 0) return;
+        _fenceId = 0;
+        SDL.ReleaseGPUFence(_device.GpuDeviceID, id);
+        _pool.Return(this);
     }
 }

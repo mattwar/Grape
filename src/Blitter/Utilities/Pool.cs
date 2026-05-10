@@ -23,6 +23,9 @@ internal class Pool<T> where T : class
         ArgumentNullException.ThrowIfNull(item);
         _stack.Push(item);
     }
+
+    // Diagnostic: number of items currently sitting idle in the pool.
+    internal int IdleCount => _stack.Count;
 }
 
 internal class PoolMap

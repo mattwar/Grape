@@ -5,14 +5,14 @@ namespace Blitter;
 /// <summary>
 /// Describes one color target used by a render pass.
 /// </summary>
-internal record GpuColorTargetInfo
+internal record struct GpuColorTargetInfo
 {
     // GPUColorTargetInfo
 
     /// <summary>
     /// The texture that will be used as a color target by a render pass.
     /// </summary>
-    public GpuTexture? Texture { get; init; } = default!;
+    public GpuTexture? Texture { get; init; }
 
     /// <summary>
     /// The mip level to use as a color target.
@@ -42,7 +42,7 @@ internal record GpuColorTargetInfo
     /// <summary>
     /// The texture that will receive the results of a multisample resolve operation. Ignored if a RESOLVE* store_op is not used.
     /// </summary>
-    public GpuTexture? ResolveTexture { get; init; } = default!;
+    public GpuTexture? ResolveTexture { get; init; }
 
     /// <summary>
     /// The mip level of the resolve texture to use for the resolve operation. Ignored if a RESOLVE* store_op is not used.

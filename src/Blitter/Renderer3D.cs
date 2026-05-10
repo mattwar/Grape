@@ -17,6 +17,13 @@ public abstract class Renderer3D
     private readonly long _startTs = Stopwatch.GetTimestamp();
     private long _lastRenderTs = Stopwatch.GetTimestamp();
 
+    private SendOrPostCallback _renderOnApplicationThreadCallBack;
+
+    protected Renderer3D()
+    {
+        _renderOnApplicationThreadCallBack = (_) => this.RenderOnApplicationThread();
+    }
+
     /// <summary>
     /// Elapsed wall-clock time since this renderer was created. Useful as
     /// an animation phase (e.g. <c>sin(t)</c>) that keeps advancing through
@@ -516,9 +523,10 @@ public abstract class Renderer3D
     {
         if (RenderSuppressed)
             return;
+
         // Marshal to the application thread so callers can invoke Render()
         // from any thread; Send is a no-op when already on the app thread.
-        Application.Current.Send(_ => RenderOnApplicationThread());
+        Application.Current.Send(_renderOnApplicationThreadCallBack, null);
     }
 
     /// <summary>

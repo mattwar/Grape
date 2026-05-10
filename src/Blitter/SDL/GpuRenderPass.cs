@@ -2,133 +2,45 @@ using static SDL3.SDL;
 
 namespace Blitter;
 
+using Blitter.Utilities;
+
 /// <summary>
 /// A scoped render recording phase for drawing into one or more GPU targets.
 /// </summary>
 internal sealed class GpuRenderPass : IDisposable
 {
-    private readonly GpuDevice _gpuDevice;
-    private readonly GpuCommandBuffer _gpuCommandBuffer;
+    private readonly Pool<GpuRenderPass> _pool;
+    private GpuCommandBuffer? _gpuCommandBuffer;
     private nint _gpuRenderPassID;
 
-    private GpuRenderPass(GpuDevice device, GpuCommandBuffer commandBuffer, nint gpuRenderPassID)
+    // Constructed by the pool factory only. Acquire a real instance via
+    // GpuDevice.AllocateRenderPass / TryAllocateRenderPass.
+    internal GpuRenderPass(Pool<GpuRenderPass> pool)
     {
-        _gpuDevice = device;
+        _pool = pool;
+    }
+
+    internal void Init(GpuCommandBuffer commandBuffer, nint renderPassId)
+    {
         _gpuCommandBuffer = commandBuffer;
-        _gpuRenderPassID = gpuRenderPassID;
-        device.AddResource(this);
+        _gpuRenderPassID = renderPassId;
     }
 
     public bool IsDisposed => _gpuRenderPassID == 0;
 
     public void Dispose()
     {
-        var id = Interlocked.Exchange(ref _gpuRenderPassID, 0);
-        if (id != 0)
-        {
-            SDL.EndGPURenderPass(id);
-            _gpuDevice.RemoveResource(this);
-        }
+        var id = _gpuRenderPassID;
+        if (id == 0) return;
+        _gpuRenderPassID = 0;
+        _gpuCommandBuffer = null;
+        SDL.EndGPURenderPass(id);
+        _pool.Return(this);
     }
 
-    internal static GpuRenderPass Begin(
-        GpuDevice device,
-        GpuCommandBuffer commandBuffer,
-        IReadOnlyList<GpuColorTargetInfo> colorTargets,
-        GpuDepthStencilTargetInfo depthTarget)
-    {
-        var renderPassId = BeginNative(commandBuffer, colorTargets, depthTarget);
-        if (renderPassId == 0)
-            throw new InvalidOperationException($"Failed to begin GPU render pass: {SDL.GetError()}");
-        return new GpuRenderPass(device, commandBuffer, renderPassId);
-    }
-
-    /// <summary>
-    /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
-    /// if the underlying SDL call fails, for example because the device is
-    /// being torn down or the swapchain image is no longer valid.
-    /// </summary>
-    internal static bool TryBegin(
-        GpuDevice device,
-        GpuCommandBuffer commandBuffer,
-        IReadOnlyList<GpuColorTargetInfo> colorTargets,
-        GpuDepthStencilTargetInfo depthTarget,
-        out GpuRenderPass? renderPass)
-    {
-        var renderPassId = BeginNative(commandBuffer, colorTargets, depthTarget);
-        if (renderPassId == 0)
-        {
-            renderPass = null;
-            return false;
-        }
-
-        renderPass = new GpuRenderPass(device, commandBuffer, renderPassId);
-        return true;
-    }
-
-    private static nint BeginNative(
-        GpuCommandBuffer commandBuffer,
-        IReadOnlyList<GpuColorTargetInfo> colorTargets,
-        GpuDepthStencilTargetInfo depthTarget)
-    {
-        // allocate space for target infos on stack.
-        // assumption is that this is consumed in BeginGPURenderPass and not stored.
-        Span<GPUColorTargetInfo> nativeColorTargets = stackalloc GPUColorTargetInfo[colorTargets.Count];
-        for (int i = 0; i < colorTargets.Count; i++)
-        {
-            var ct = colorTargets[i];
-            nativeColorTargets[i] = new SDL.GPUColorTargetInfo
-            {
-                Texture = ct.Texture?.TextureId ?? 0,
-                MipLevel = ct.MipLevel,
-                LayerOrDepthPlane = ct.LayerOrDepthPlane,
-                ClearColor = ct.ClearColor,
-                LoadOp = ct.LoadOp,
-                StoreOp = ct.StoreOp,
-                ResolveTexture = ct.ResolveTexture?.TextureId ?? 0,
-                ResolveMipLevel = ct.ResolveMipLevel,
-                ResolveLayer = ct.ResolveLayer,
-                Cycle = (byte)(ct.Cycle ? 1 : 0),
-                CycleResolveTexture = (byte)(ct.CycleResolveTexture ? 1 : 0)
-            };
-        }
-
-        var nativeDepthTarget = new SDL.GPUDepthStencilTargetInfo
-        {
-            Texture = depthTarget.Texture?.TextureId ?? 0,
-            ClearDepth = depthTarget.ClearDepth,
-            LoadOp = depthTarget.LoadOp,
-            StoreOp = depthTarget.StoreOp,
-            StencilLoadOp = depthTarget.StencilLoadOp,
-            StencilStoreOp = depthTarget.StencilStoreOp,
-            Cycle = (byte)(depthTarget.Cycle ? 1 : 0),
-            ClearStencil = depthTarget.ClearStencil
-        };
-
-        unsafe
-        {
-            fixed (GPUColorTargetInfo* pColorTargets = nativeColorTargets)
-            {
-                if (depthTarget.Texture is null)
-                {
-                    // SDL_GPU expects a NULL pointer when no depth/stencil
-                    // target is in use. Passing a zero-filled struct by ref
-                    // is NOT equivalent and causes native heap corruption.
-                    return SDL.BeginGPURenderPass(
-                        commandBuffer.CommandBufferId,
-                        (nint)pColorTargets,
-                        (uint)nativeColorTargets.Length,
-                        IntPtr.Zero);
-                }
-
-                return SDL.BeginGPURenderPass(
-                    commandBuffer.CommandBufferId,
-                    (nint)pColorTargets,
-                    (uint)nativeColorTargets.Length,
-                    nativeDepthTarget);
-            }
-        }
-    }
+    // SDL render-pass creation is exposed via GpuDevice.AllocateRenderPass /
+    // TryAllocateRenderPass so the pool ownership stays in one place.
+    // The native marshalling logic moved to GpuDevice.BeginRenderPassNative.
 
     /// <summary>
     /// Binds the graphics pipeline to the render pass's command buffer.
@@ -222,7 +134,7 @@ internal sealed class GpuRenderPass : IDisposable
         {
             fixed (T* pData = &data)
             {
-                SDL.PushGPUVertexUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
+                SDL.PushGPUVertexUniformData(_gpuCommandBuffer!.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
             }
         }
     }
@@ -238,7 +150,7 @@ internal sealed class GpuRenderPass : IDisposable
         {
             fixed (byte* pData = data)
             {
-                SDL.PushGPUVertexUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
+                SDL.PushGPUVertexUniformData(_gpuCommandBuffer!.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
             }
         }
     }
@@ -278,7 +190,7 @@ internal sealed class GpuRenderPass : IDisposable
         {
             fixed (T* pData = &data)
             {
-                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
+                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer!.CommandBufferId, slotIndex, (nint)pData, (uint)sizeof(T));
             }
         }
     }
@@ -294,7 +206,7 @@ internal sealed class GpuRenderPass : IDisposable
         {
             fixed (byte* pData = data)
             {
-                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
+                SDL.PushGPUFragmentUniformData(_gpuCommandBuffer!.CommandBufferId, slotIndex, (nint)pData, (uint)data.Length);
             }
         }
     }
@@ -414,3 +326,4 @@ internal sealed class GpuRenderPass : IDisposable
         SDL.SetGPUBlendConstants(_gpuRenderPassID, blendConstants);
     }
 }
+
