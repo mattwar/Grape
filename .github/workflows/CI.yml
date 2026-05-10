@@ -43,7 +43,10 @@ jobs:
           }
           foreach ($p in $testProjects) {
             Write-Host "Running tests for $($p.FullName)"
-            dotnet test $p.FullName -c Release --no-build --verbosity normal
+            # Exclude GPU/allocation-sensitive tests: they require a real
+            # graphics driver and are timing/JIT-sensitive, so they're
+            # intended for local development runs, not headless CI.
+            dotnet test $p.FullName -c Release --no-build --verbosity normal --filter "Category!=Gpu"
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 

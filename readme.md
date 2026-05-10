@@ -82,7 +82,7 @@ await window.WaitForCloseAsync();
 
 ## A 3D example (manual render loop)
 
-A spinning, colored triangle rendered with a built-in shader. Instead of using `Rendering` event, this version drives frames itself: queue draws on `window.Renderer`, call `Render()` to flush, and `await window.NextFrameAsync()` to pace the loop.
+A spinning, colored triangle rendered with a built-in shader. Instead of using the `Rendering` event, this version drives frames itself: queue draws on the renderer inside `window.RunAsync(...)`, which paces the loop on a dedicated thread and presents each frame for you. Multiple windows can be composed via `Task.WhenAll`.
 
 ```csharp
 using System.Numerics;
@@ -103,10 +103,9 @@ var window = new Window3D
     CloseKey = Key.Escape
 };
 
-while (!window.IsClosed)
+await window.RunAsync(r =>
 {
-    var rd = window.Renderer;
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = (float)r.ElapsedSinceStart.TotalSeconds;
     var (width, height) = window.Size;
     var aspect = (float)height / width;
     var transform =
@@ -114,11 +113,8 @@ while (!window.IsClosed)
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
-    rd.Render();
-
-    await window.NextFrameAsync();
-}
+    r.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+});
 ```
 
 More examples live in [samples/](samples/) — each is a single `.cs` file you can run directly with `dotnet run samples/<name>.cs` (.NET 10+).
@@ -160,7 +156,6 @@ Blitter stands on the shoulders of some excellent open-source projects:
 - [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) by Edward Gushchin — the C# bindings for SDL3.
 - [SkiaSharp](https://github.com/mono/SkiaSharp) — image decoding (PNG, JPEG, etc.) and 2D canvas drawing into bitmaps. Blitter bridges those bitmaps onto the screen.
 - [SharpGLTF](https://github.com/vpenades/SharpGLTF) by Vicente Penades — glTF 2.0 (`.glb` / `.gltf`) parsing used by `Model.Load`.
-- [Nito.AsyncEx](https://github.com/StephenCleary/AsyncEx) by Stephen Cleary — async coordination primitives.
 
 Full copyright notices and license texts are reproduced in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 

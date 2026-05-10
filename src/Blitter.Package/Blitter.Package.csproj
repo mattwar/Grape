@@ -108,7 +108,6 @@
     PackageReferences in Blitter.csproj.
   -->
   <ItemGroup>
-    <PackageReference Include="Nito.AsyncEx" Version="5.1.2" />
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />

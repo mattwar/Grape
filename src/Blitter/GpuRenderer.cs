@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
 using Blitter.Shaders;
+using Blitter.Utilities;
 
 namespace Blitter;
 
@@ -33,6 +34,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
+    private readonly PoolMap _commandPools = new();
 
     // Pool of instance-rate vertex buffers + their staging upload buffers.
     // Each instanced DrawCommand acquires one for the frame; at frame end
@@ -418,6 +420,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
         _msaaSampleCount = sampleCount;
     }
 
+
+    private NoArgsDrawCommand AllocateNoArgsDrawCommand() =>
+        _commandPools.GetPool<NoArgsDrawCommand>(static (pool) => new NoArgsDrawCommand(pool)).Allocate();
+
+    private DrawCommand<TArgs> AllocateDrawCommand<TArgs>() where TArgs : unmanaged =>
+        _commandPools.GetPool<DrawCommand<TArgs>>(static (pool) => new DrawCommand<TArgs>(pool)).Allocate();
+
+    private InstancedDrawCommand<TArgs, TInstance> AllocateInstancedDrawCommand<TArgs, TInstance>() 
+        where TArgs : unmanaged 
+        where TInstance : unmanaged =>
+        _commandPools.GetPool<InstancedDrawCommand<TArgs, TInstance>>(static (pool) => new InstancedDrawCommand<TArgs, TInstance>(pool)).Allocate();
+
     /// <summary>
     /// Queues a mesh for drawing using the given shader.
     /// </summary>
@@ -427,7 +441,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture: null, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -445,21 +461,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            Texture: null,
-            Cubemap: null,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture: null, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -482,7 +486,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -499,21 +505,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            texture,
-            Cubemap: null,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture, cubemap: null, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -531,7 +525,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(cubemap);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, Texture: null, cubemap, Sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture: null, cubemap, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -548,21 +544,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(cubemap);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            Texture: null,
-            cubemap,
-            Sampler: null,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture: null, cubemap, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <summary>
@@ -582,7 +566,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand(mesh, shader, texture, Cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect));
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, texture, cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
     }
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
@@ -599,21 +585,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(texture);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new DrawCommand<TArgs>(
-            mesh,
-            shader,
-            texture,
-            Cubemap: null,
-            sampler,
-            DepthMode,
-            BlendMode,
-            CullMode,
-            topology,
-            wireframe,
-            Viewport,
-            ClipRect,
-            shader.ArgsLayout,
-            args));
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, texture, cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
     }
 
     /// <inheritdoc/>
@@ -654,28 +628,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
         if (instances.IsEmpty)
             return;
 
-        // Snapshot the instance bytes into a pooled byte[] so the user's
-        // span doesn't have to outlive the call. The array is returned to
-        // ArrayPool at frame end.
-        var bytes = MemoryMarshal.AsBytes(instances);
-        var rented = ArrayPool<byte>.Shared.Rent(bytes.Length);
-        bytes.CopyTo(rented);
-
-        // Per-instance Matrix4x4 attributes are reconstructed in HLSL with
-        // consecutive locations as rows, so the shader sees them in their
-        // native layout. Per-uniform cbuffer matrices, by contrast, are
-        // implicitly transposed by HLSL's column-major cbuffer storage. To
-        // keep the shaders symmetric (`mul(M, v)` everywhere), we transpose
-        // each per-instance matrix here so both paths arrive at the shader
-        // with the same orientation.
-        TransposeInstanceMatrices(rented.AsSpan(0, bytes.Length), shader.InstanceLayout, instances.Length);
-
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
-        _commands.Add(new InstancedDrawCommand<TArgs>(
+        var command = AllocateInstancedDrawCommand<TArgs, TInstance>();
+        command.Init(
             mesh,
             shader,
             texture,
-            Sampler: null,
+            cubemap: null,
+            sampler: null,
             DepthMode,
             BlendMode,
             CullMode,
@@ -685,10 +645,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             ClipRect,
             shader.ArgsLayout,
             args,
-            shader.InstanceLayout,
-            rented,
-            bytes.Length,
-            instances.Length));
+            shader.InstanceLayout,  
+            instances
+            );
+        _commands.Add(command);
     }
 
     // Combines the mesh's declared topology with the renderer's
@@ -900,7 +860,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 return;
             }
 
-            var prepared = PrepareCommands();
+            PrepareCommandsInPlace();
 
             if (!_renderFrame.TryBeginCopyPass(out var copyPass))
             {
@@ -920,11 +880,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 // the (rare) implications of mutating between draws.
                 UploadPointLights(copyPass!);
 
-                foreach (var command in prepared)
+                foreach (var command in _commands)
                 {
-                    var mesh = command.Command.Mesh;
+                    var mesh = command.Mesh;
                     var vertexBytes = mesh.GetVertexBytes();
-                    var resources = command.Resources;
+                    var resources = command.PreparedResources!;
 
                     // Skip the upload entirely when the mesh hasn't changed
                     // since we last sent it to the GPU. Update(...) on Mesh<T>
@@ -994,7 +954,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // unindexed). Built once per mesh.Version change
                     // and reused across frames. Cost is paid only for
                     // meshes that are actually drawn in wireframe.
-                    if (command.Command.Wireframe &&
+                    if (command.Wireframe &&
                         resources.LastWireframeUploadedVersion != mesh.Version)
                     {
                         var edges = BuildWireframeIndices(
@@ -1023,7 +983,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         resources.LastWireframeUploadedVersion = mesh.Version;
                     }
 
-                    if (command.Command.Texture is { } image && !_failedTextureUploads.Contains(image))
+                    if (command.Texture is { } image && !_failedTextureUploads.Contains(image))
                     {
                         try
                         {
@@ -1040,7 +1000,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         }
                     }
 
-                    if (command.Command.Cubemap is { } cubemap && !_failedCubemapUploads.Contains(cubemap))
+                    if (command.Cubemap is { } cubemap && !_failedCubemapUploads.Contains(cubemap))
                     {
                         try
                         {
@@ -1061,12 +1021,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // and is recycled across frames; the user's instance
                     // bytes were already snapshotted into a pooled byte[]
                     // at queue time.
-                    var instanceBytes = command.Command.InstanceBytes;
+                    var instanceBytes = command.InstanceBytes;
                     if (!instanceBytes.IsEmpty)
                     {
                         var instance = AcquireInstanceBuffer(instanceBytes.Length);
                         copyPass!.Upload(instance.Upload!, instance.Buffer!, instanceBytes);
-                        command.Instance = instance;
+                        command.PreparedInstance = instance;
                     }
                 }
             }
@@ -1110,7 +1070,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     StoreOp = SDL.GPUStoreOp.Store,
                 };
             }
-            var colorTargets = ImmutableArray.Create(colorTargetInfo);
+            var colorTargets = new ColorTargetInfo1();
+            colorTargets[0] = colorTargetInfo;
 
             // Clear depth to 1.0 (the far plane in normalized device
             // coordinates) at the start of every frame and discard the
@@ -1146,16 +1107,16 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 var fullW = _depthWidth;
                 var fullH = _depthHeight;
 
-                foreach (var command in prepared)
+                foreach (var command in _commands)
                 {
                     // Skip draws whose texture/cubemap upload failed --
                     // logged in the copy pass, no need to repeat here.
-                    if (command.Command.Texture is { } failedImage && _failedTextureUploads.Contains(failedImage))
+                    if (command.Texture is { } failedImage && _failedTextureUploads.Contains(failedImage))
                         continue;
-                    if (command.Command.Cubemap is { } failedCubemap && _failedCubemapUploads.Contains(failedCubemap))
+                    if (command.Cubemap is { } failedCubemap && _failedCubemapUploads.Contains(failedCubemap))
                         continue;
 
-                    var shader = command.Command.Shader;
+                    var shader = command.Shader;
                     var vsGpu = GetOrCreateGpuShader(shader.Vertex);
                     var fsGpu = GetOrCreateGpuShader(shader.Fragment);
                     var pipeline = GetOrCreatePipeline(
@@ -1163,21 +1124,21 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         fsGpu,
                         _colorFormat,
                         shader.VertexLayout,
-                        command.Command.InstanceLayout,
-                        command.Command.DepthMode,
-                        command.Command.BlendMode,
-                        command.Command.CullMode,
-                        command.Command.Topology,
+                        command.InstanceLayout,
+                        command.DepthMode,
+                        command.BlendMode,
+                        command.CullMode,
+                        command.Topology,
                         _currentSampleCount);
                     renderPass!.BindGraphicsPipeline(pipeline);
-                    if (command.Instance is { Buffer: not null } instance)
+                    if (command.PreparedInstance is { Buffer: not null } instance)
                     {
                         renderPass.BindVertexBuffers(
-                            [command.Resources.VertexBuffer!, instance.Buffer]);
+                            [command.PreparedResources!.VertexBuffer!, instance.Buffer]);
                     }
                     else
                     {
-                        renderPass.BindVertexBuffers([command.Resources.VertexBuffer!]);
+                        renderPass.BindVertexBuffers([command.PreparedResources!.VertexBuffer!]);
                     }
 
                     // Apply viewport/scissor only on transitions: the
@@ -1185,7 +1146,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // Switching back to "null" (full target) requires
                     // an explicit reset call once we've ever applied a
                     // user value -- otherwise SDL keeps the previous.
-                    var v = command.Command.Viewport;
+                    var v = command.Viewport;
                     if (!viewportApplied && v is not null)
                     {
                         ApplyViewport(renderPass, v.Value, fullW, fullH);
@@ -1198,7 +1159,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         lastViewport = v;
                     }
 
-                    var c = command.Command.ClipRect;
+                    var c = command.ClipRect;
                     if (!clipApplied && c is not null)
                     {
                         ApplyClip(renderPass, c.Value, fullW, fullH);
@@ -1211,22 +1172,22 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         lastClipRect = c;
                     }
 
-                    command.Command.PushArgs(renderPass);
-                    if (command.Command.Texture is { } image)
+                    command.PushArgs(renderPass);
+                    if (command.Texture is { } image)
                     {
                         var gpuTexture = LookupTexture(image)
                             ?? throw new InvalidOperationException(
                                 "Texture upload was not recorded for this image.");
-                        var sampler = command.Command.Sampler ?? DefaultSampler;
+                        var sampler = command.Sampler ?? DefaultSampler;
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
-                    else if (command.Command.Cubemap is { } cubemap)
+                    else if (command.Cubemap is { } cubemap)
                     {
                         var gpuTexture = LookupCubemap(cubemap)
                             ?? throw new InvalidOperationException(
                                 "Cubemap upload was not recorded for this cubemap.");
-                        var sampler = command.Command.Sampler ?? CubemapSampler;
+                        var sampler = command.Sampler ?? CubemapSampler;
                         renderPass.BindFragmentSamplers(0,
                             [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
@@ -1243,14 +1204,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     // Wireframe takes precedence over the mesh's native
                     // index/unindexed paths: it always draws indexed,
                     // through the derived edge buffer above.
-                    var instanceCount = (uint)command.Command.InstanceCount;
-                    if (command.Command.Wireframe)
+                    var instanceCount = (uint)command.InstanceCount;
+                    if (command.Wireframe)
                     {
                         renderPass.BindIndexBuffer(
-                            command.Resources.WireframeIndexBuffer!,
+                            command.PreparedResources!.WireframeIndexBuffer!,
                             SDL.GPUIndexElementSize.IndexElementSize32Bit);
                         renderPass.DrawIndexedPrimitives(
-                            (uint)command.Resources.WireframeIndexCount,
+                            (uint)command.PreparedResources!.WireframeIndexCount,
                             instanceCount);
                     }
                     else
@@ -1261,18 +1222,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         // unique vertex only once. Mesh<T> with an empty
                         // index span falls through to the original
                         // DrawPrimitives path.
-                        var indexCount = command.Command.Mesh.IndexCount;
+                        var indexCount = command.Mesh.IndexCount;
                         if (indexCount > 0)
                         {
                             renderPass.BindIndexBuffer(
-                                command.Resources.IndexBuffer!,
+                                command.PreparedResources!.IndexBuffer!,
                                 SDL.GPUIndexElementSize.IndexElementSize32Bit);
                             renderPass.DrawIndexedPrimitives((uint)indexCount, instanceCount);
                         }
                         else
                         {
                             renderPass.DrawPrimitives(
-                                (uint)command.Command.Mesh.VertexCount,
+                                (uint)command.Mesh.VertexCount,
                                 instanceCount);
                         }
                     }
@@ -1290,7 +1251,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
             // mark all acquired GPU instance buffers as free for the next
             // frame's commands.
             foreach (var c in _commands)
+            {
+                c.PreparedResources = null;
+                c.PreparedInstance = null;
                 c.Release();
+            }
             _commands.Clear();
             _instanceBuffersAcquired = 0;
             _debugTextVertexIndex = 0;
@@ -2232,20 +2197,21 @@ internal class GpuRenderer : Renderer3D, IDisposable
         Topology Topology,
         SDL.GPUSampleCount SampleCount);
 
-    private record DrawCommand(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        Cubemap? Cubemap,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect)
+    private abstract record DrawCommand
     {
+        public Mesh Mesh { get; private protected set; } = null!;
+        public ShaderSet Shader { get; private protected set; } = null!;
+        public Image? Texture { get; private protected set; }
+        public Cubemap? Cubemap { get; private protected set; }
+        public GpuSampler? Sampler { get; private protected set; }
+        public DepthMode DepthMode { get; private protected set; }
+        public BlendMode BlendMode { get; private protected set; }
+        public CullMode CullMode { get; private protected set; }
+        public Topology Topology { get; private protected set; }
+        public bool Wireframe { get; private protected set; }
+        public Rect? Viewport { get; private protected set; }
+        public Rect? ClipRect { get; private protected set; }
+
         /// <summary>
         /// Pushes any per-draw arguments this command carries to the given
         /// render pass. The base command has no args; the generic
@@ -2279,27 +2245,116 @@ internal class GpuRenderer : Renderer3D, IDisposable
         /// Returns any pooled CPU buffers held by this command. Called
         /// at frame end after the GPU work has been recorded.
         /// </summary>
-        public virtual void Release() { }
+        public virtual void Release()
+        {
+        }
+
+        // Transient per-frame state attached during PrepareCommandsInPlace
+        // (mesh GPU buffers) and the copy pass (per-instance vertex buffer).
+        // Lives on the command so we don't allocate a parallel array of
+        // wrapper objects per frame. Cleared in the Render() finally block
+        // before commands return to their pools.
+        public MeshResources? PreparedResources;
+        public InstanceBuffer? PreparedInstance;
     }
 
-    private sealed record DrawCommand<TArgs>(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        Cubemap? Cubemap,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect,
-        ShaderArgsLayout Layout,
-        TArgs Args)
-        : DrawCommand(Mesh, Shader, Texture, Cubemap, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+    private sealed record NoArgsDrawCommand : DrawCommand
+    {
+        private readonly Pool<NoArgsDrawCommand> _pool;
+
+        public NoArgsDrawCommand(Pool<NoArgsDrawCommand> pool)
+        {
+            _pool = pool;
+        }
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect)
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+        }
+
+        public override void Release()
+        {
+            _pool.Return(this);
+        }
+    }
+
+    /// <summary>
+    /// Draw command with uniform arguments.
+    /// </summary>
+    private record DrawCommand<TArgs> : DrawCommand
         where TArgs : unmanaged
     {
+        private readonly Pool<DrawCommand<TArgs>> _pool;
+
+        public DrawCommand(Pool<DrawCommand<TArgs>> pool)
+        {
+            _pool = pool;
+        }
+
+        public TArgs Args { get; private set; }
+
+        public ShaderArgsLayout ArgsLayout { get; private set; } = null!;
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,            
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args)
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+        }
+
+        public override void Release()
+        {
+            _pool.Return(this);
+        }
+
         public override void PushArgs(GpuRenderPass renderPass)
         {
             // Read the typed value into a local so we have a stable ref
@@ -2315,7 +2370,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             var bytes = MemoryMarshal.AsBytes(
                 MemoryMarshal.CreateReadOnlySpan(ref value, 1));
             int offset = 0;
-            foreach (var element in Layout.Elements)
+            foreach (var element in ArgsLayout.Elements)
             {
                 var slice = bytes.Slice(offset, element.Size);
                 switch (element.Stage)
@@ -2332,43 +2387,99 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    // Instanced draw. Owns a pooled byte[] holding the user's instance
-    // span, copied at queue time so the user's storage doesn't have to
-    // outlive the call. The render loop uploads InstanceBytes into a
-    // pooled GPU instance-rate vertex buffer and binds it on slot 1.
-    private sealed record InstancedDrawCommand<TArgs>(
-        Mesh Mesh,
-        ShaderSet Shader,
-        Image? Texture,
-        GpuSampler? Sampler,
-        DepthMode DepthMode,
-        BlendMode BlendMode,
-        CullMode CullMode,
-        Topology Topology,
-        bool Wireframe,
-        Rect? Viewport,
-        Rect? ClipRect,
-        ShaderArgsLayout ArgsLayoutValue,
-        TArgs Args,
-        ShaderVertexLayout InstanceLayoutValue,
-        byte[] InstanceBytesArray,
-        int InstanceBytesLength,
-        int InstanceCountValue)
-        : DrawCommand(Mesh, Shader, Texture, Cubemap: null, Sampler, DepthMode, BlendMode, CullMode, Topology, Wireframe, Viewport, ClipRect)
+    /// <summary>
+    /// Draw command uniform arguments and per-instance data
+    /// </summary>
+    private sealed record InstancedDrawCommand<TArgs, TInstance> : DrawCommand
         where TArgs : unmanaged
+        where TInstance : unmanaged
     {
-        public override ShaderVertexLayout? InstanceLayout => InstanceLayoutValue;
-        public override int InstanceCount => InstanceCountValue;
-        public override ReadOnlySpan<byte> InstanceBytes =>
-            InstanceBytesArray.AsSpan(0, InstanceBytesLength);
+        private ShaderVertexLayout _instanceLayout = null!;
+        private TInstance[] _rentedInstancesArray = null!;
+        private int _instancesLength;
 
+        public TArgs Args { get; private set; }
+
+        public ShaderArgsLayout ArgsLayout { get; private set; } = null!;
+
+        private readonly Pool<InstancedDrawCommand<TArgs, TInstance>> _pool;
+
+        public InstancedDrawCommand(Pool<InstancedDrawCommand<TArgs, TInstance>> pool)
+        {
+            _pool = pool;
+        }
+
+        public override ShaderVertexLayout? InstanceLayout => _instanceLayout;
+        public override int InstanceCount => _instancesLength;
+        public override ReadOnlySpan<byte> InstanceBytes =>         
+            MemoryMarshal.AsBytes(_rentedInstancesArray.AsSpan(0, _instancesLength));
+
+        public void Init(
+            Mesh mesh, 
+            ShaderSet shader,
+            Image? texture,
+            Cubemap? cubemap,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args,           
+            ShaderVertexLayout instanceLayout,
+            ReadOnlySpan<TInstance> instances
+            )
+        {
+            this.Mesh = mesh;
+            this.Shader = shader;
+            this.Texture = texture;
+            this.Cubemap = cubemap;
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+
+            _instanceLayout = instanceLayout;
+            _rentedInstancesArray = ArrayPool<TInstance>.Shared.Rent(instances.Length);
+            instances.CopyTo(_rentedInstancesArray);
+            _instancesLength = instances.Length;
+
+            // Per-instance Matrix4x4 attributes are reconstructed in HLSL with
+            // consecutive locations as rows, so the shader sees them in their
+            // native layout. Per-uniform cbuffer matrices, by contrast, are
+            // implicitly transposed by HLSL's column-major cbuffer storage. To
+            // keep the shaders symmetric (`mul(M, v)` everywhere), we transpose
+            // each per-instance matrix here so both paths arrive at the shader
+            // with the same orientation.
+            TransposeInstanceMatrices(
+                MemoryMarshal.AsBytes(_rentedInstancesArray.AsSpan(0, _instancesLength)),
+                _instanceLayout,
+                _instancesLength);
+        }
+
+        public override void Release()
+        {
+            ArrayPool<TInstance>.Shared.Return(_rentedInstancesArray);
+            _rentedInstancesArray = null!;
+            _pool.Return(this);
+        }
+        
         public override void PushArgs(GpuRenderPass renderPass)
         {
             var value = Args;
             var bytes = MemoryMarshal.AsBytes(
                 MemoryMarshal.CreateReadOnlySpan(ref value, 1));
             int offset = 0;
-            foreach (var element in ArgsLayoutValue.Elements)
+            foreach (var element in ArgsLayout.Elements)
             {
                 var slice = bytes.Slice(offset, element.Size);
                 switch (element.Stage)
@@ -2382,11 +2493,6 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 }
                 offset += element.Size;
             }
-        }
-
-        public override void Release()
-        {
-            ArrayPool<byte>.Shared.Return(InstanceBytesArray);
         }
     }
 
@@ -2407,23 +2513,6 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Upload = null;
             CapacityBytes = 0;
         }
-    }
-
-    private sealed class PreparedDrawCommand
-    {
-        public PreparedDrawCommand(DrawCommand command, MeshResources resources)
-        {
-            Command = command;
-            Resources = resources;
-        }
-
-        public DrawCommand Command { get; }
-        public MeshResources Resources { get; }
-
-        // Set in the copy pass for instanced commands; null otherwise.
-        // Holds the pooled GPU instance-rate vertex buffer the upload
-        // was staged into and that the render pass binds on slot 1.
-        public InstanceBuffer? Instance { get; set; }
     }
 
     private sealed class MeshResources
@@ -2514,17 +2603,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public uint NumLevels { get; set; }
     }
 
-    private List<PreparedDrawCommand> PrepareCommands()
+    private void PrepareCommandsInPlace()
     {
-        var prepared = new List<PreparedDrawCommand>(_commands.Count);
-
         foreach (var command in _commands)
         {
-            prepared.Add(new PreparedDrawCommand(
-                command,
-                GetOrCreateMeshResources(command.Mesh)));
+            command.PreparedResources = GetOrCreateMeshResources(command.Mesh);
         }
-
-        return prepared;
     }
+
+    // Single-element span buffer for the color-target argument passed
+    // to the render-pass begin call. GpuColorTargetInfo is a record
+    // struct so the value lives entirely in this stack-resident
+    // buffer; no array allocation per frame.
+    [System.Runtime.CompilerServices.InlineArray(1)]
+    private struct ColorTargetInfo1 { private GpuColorTargetInfo _0; }
 }

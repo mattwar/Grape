@@ -5,7 +5,7 @@ namespace Blitter;
 /// <summary>
 /// Describes the depth and stencil target used by a render pass.
 /// </summary>
-internal record GpuDepthStencilTargetInfo
+internal record struct GpuDepthStencilTargetInfo
 {
     // GPUDepthStencilTargetInfo
 

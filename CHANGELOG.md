@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Application.ScheduleTick(period, callback)` registers a periodic
+  callback driven by the application event loop, allocation-free.
+- `PeriodicAwaiter` provides an allocation-free `ValueTask`-based
+  wait primitive for manual update / render loops.
 - glTF 2.0 (`.glb` / `.gltf`) loader via SharpGLTF; `Model.Load` now
   dispatches `.glb`/`.gltf` paths through it.
 - glTF v1 loads geometry, base-color factor, and base-color texture
@@ -57,6 +61,23 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
+- Window render-tick and heartbeat loops are now allocation-free per
+  tick (no per-iteration `Task.Delay` / `PeriodicTimer` waits).
+- `Window.NextFrameAsync` now returns `ValueTask`; manual loops are
+  allocation-free per iteration when awaited with `ConfigureAwait(false)`.
+- `Window.WaitForNextFrame()` synchronously paces a render loop on
+  the calling thread (no thread shift). Prefer this for main-thread
+  manual loops; `NextFrameAsync` resumes on the application thread.
+- `Window.RunAsync(loopBody)` runs a manual render loop on a dedicated
+  background thread and returns a `Task` that completes when the loop
+  exits; compose multiple windows via `Task.WhenAll`.
+- `Window.RunAsync(shouldContinue, renderFrame)` overload takes a
+  predicate so callers can supply any custom exit condition.
+- `Window.RunAsync` auto-flushes the renderer at the end of each frame
+  body; manual `Render()` calls are no longer required (and are
+  suppressed if you make them).
+- `Scene2D.RunAsync` replaced by synchronous `Scene2D.Run`, paced via
+  `WaitForNextFrame` so the loop stays on its calling thread.
 - Renamed `Image.RenderCanvas` to `Image.DrawCanvas` for naming
   consistency with the rest of the `Draw*` family.
 - Default window size (parameterless `Window2D` / `Window3D` ctor) is

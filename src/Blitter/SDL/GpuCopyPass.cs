@@ -1,48 +1,32 @@
 namespace Blitter;
 
+using Blitter.Utilities;
+
 /// <summary>
 /// A scoped phase for copying data to or from GPU resources.
 /// </summary>
 internal sealed class GpuCopyPass : IDisposable
 {
-    private readonly nint _copyPassId;
-    private bool _disposed;
+    private readonly Pool<GpuCopyPass> _pool;
+    private nint _copyPassId;
 
-    private GpuCopyPass(nint copyPassId)
+    // Constructed by the pool factory only. Acquire a real instance via
+    // GpuDevice.AllocateCopyPass / TryAllocateCopyPass.
+    internal GpuCopyPass(Pool<GpuCopyPass> pool)
+    {
+        _pool = pool;
+    }
+
+    internal void Init(nint copyPassId)
     {
         _copyPassId = copyPassId;
     }
 
-    internal static GpuCopyPass Begin(GpuCommandBuffer commandBuffer)
-    {
-        if (!TryBegin(commandBuffer, out var copyPass) || copyPass == null)
-            throw new InvalidOperationException($"Failed to begin GPU copy pass: {SDL.GetError()}");
-        return copyPass;
-    }
-
-    /// <summary>
-    /// Attempts to begin a copy pass on the given command buffer. Returns
-    /// <c>false</c> (with <paramref name="copyPass"/> set to <c>null</c>) if
-    /// the underlying SDL call fails, e.g. because the device is being torn
-    /// down. Does not throw.
-    /// </summary>
-    internal static bool TryBegin(GpuCommandBuffer commandBuffer, out GpuCopyPass? copyPass)
-    {
-        var copyPassId = SDL.BeginGPUCopyPass(commandBuffer.CommandBufferId);
-        if (copyPassId == 0)
-        {
-            copyPass = null;
-            return false;
-        }
-
-        copyPass = new GpuCopyPass(copyPassId);
-        return true;
-    }
+    public bool IsDisposed => _copyPassId == 0;
 
     public void Upload(GpuUploadBuffer source, GpuBuffer destination, ReadOnlySpan<byte> bytes)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (IsDisposed) throw new ObjectDisposedException(nameof(GpuCopyPass));
         if (source.IsDisposed)
             throw new ObjectDisposedException(nameof(source));
         if (destination.IsDisposed)
@@ -82,8 +66,7 @@ internal sealed class GpuCopyPass : IDisposable
         uint width,
         uint height)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (IsDisposed) throw new ObjectDisposedException(nameof(GpuCopyPass));
         if (source.IsDisposed)
             throw new ObjectDisposedException(nameof(source));
         if (destination.IsDisposed)
@@ -127,8 +110,7 @@ internal sealed class GpuCopyPass : IDisposable
         uint height,
         ReadOnlySpan<byte> bytes)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (IsDisposed) throw new ObjectDisposedException(nameof(GpuCopyPass));
         if (source.IsDisposed)
             throw new ObjectDisposedException(nameof(source));
         if (destination.IsDisposed)
@@ -193,8 +175,7 @@ internal sealed class GpuCopyPass : IDisposable
         uint mipLevel,
         ReadOnlySpan<byte> bytes)
     {
-        if (_disposed)
-            throw new ObjectDisposedException(nameof(GpuCopyPass));
+        if (IsDisposed) throw new ObjectDisposedException(nameof(GpuCopyPass));
         if (source.IsDisposed)
             throw new ObjectDisposedException(nameof(source));
         if (destination.IsDisposed)
@@ -240,10 +221,11 @@ internal sealed class GpuCopyPass : IDisposable
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _disposed = true;
-            SDL.EndGPUCopyPass(_copyPassId);
-        }
+        var id = _copyPassId;
+        if (id == 0) return;
+        _copyPassId = 0;
+        SDL.EndGPUCopyPass(id);
+        _pool.Return(this);
     }
 }
+

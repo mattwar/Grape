@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Blitter.Utilities;
 
 namespace Blitter;
 
@@ -8,19 +9,32 @@ namespace Blitter;
 internal sealed class GpuRenderFrame : IDisposable
 {
     private readonly GpuDevice _device;
-    private readonly GpuCommandBuffer _commandBuffer;
-    private bool _disposed;
+    private readonly Pool<GpuRenderFrame> _pool;
+    private GpuCommandBuffer? _commandBuffer;
+    // Tracks whether the command buffer has already been handed off to
+    // SDL via Submit / SubmitAndAcquireFence so Dispose knows not to
+    // cancel it.
+    private bool _submitted;
 
-    internal GpuRenderFrame(GpuDevice device, GpuCommandBuffer commandBuffer)
+    // Constructed by the pool factory only. Acquire a real instance via
+    // GpuDevice.AllocateRenderFrame (called from GpuDevice.BeginFrame).
+    internal GpuRenderFrame(GpuDevice device, Pool<GpuRenderFrame> pool)
     {
         _device = device;
-        _commandBuffer = commandBuffer;
+        _pool = pool;
     }
 
-    internal GpuCommandBuffer CommandBuffer => _commandBuffer;
+    internal void Init(GpuCommandBuffer commandBuffer)
+    {
+        _commandBuffer = commandBuffer;
+        _submitted = false;
+    }
+
+    internal GpuCommandBuffer CommandBuffer => _commandBuffer
+        ?? throw new ObjectDisposedException(nameof(GpuRenderFrame));
 
     public GpuCopyPass BeginCopyPass() =>
-        GpuCopyPass.Begin(_commandBuffer);
+        _device.AllocateCopyPass(CommandBuffer);
 
     /// <summary>
     /// Attempts to begin a copy pass. Returns <c>false</c> (without throwing)
@@ -28,50 +42,55 @@ internal sealed class GpuRenderFrame : IDisposable
     /// being torn down or the window has just been closed.
     /// </summary>
     public bool TryBeginCopyPass(out GpuCopyPass? copyPass) =>
-        GpuCopyPass.TryBegin(_commandBuffer, out copyPass);
+        _device.TryAllocateCopyPass(CommandBuffer, out copyPass);
 
     public GpuRenderPass BeginRenderPass(
-        ImmutableArray<GpuColorTargetInfo> colorTargets,
+        ReadOnlySpan<GpuColorTargetInfo> colorTargets,
         GpuDepthStencilTargetInfo depthTarget) =>
-        _device.BeginRenderPass(_commandBuffer, colorTargets, depthTarget);
+        _device.AllocateRenderPass(CommandBuffer, colorTargets, depthTarget);
 
     /// <summary>
     /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
     /// if the underlying SDL call fails.
     /// </summary>
     public bool TryBeginRenderPass(
-        ImmutableArray<GpuColorTargetInfo> colorTargets,
+        ReadOnlySpan<GpuColorTargetInfo> colorTargets,
         GpuDepthStencilTargetInfo depthTarget,
         out GpuRenderPass? renderPass) =>
-        _device.TryBeginRenderPass(_commandBuffer, colorTargets, depthTarget, out renderPass);
+        _device.TryAllocateRenderPass(CommandBuffer, colorTargets, depthTarget, out renderPass);
 
     public void Submit()
     {
-        if (_disposed)
-            return;
+        if (_submitted || _commandBuffer is null) return;
 
-        _disposed = true;
+        _submitted = true;
         SDL.SubmitGPUCommandBuffer(_commandBuffer.CommandBufferId);
         _commandBuffer.ReleaseWithoutCancel();
     }
 
     public GpuFence SubmitAndAcquireFence()
     {
-        if (_disposed)
+        if (_submitted || _commandBuffer is null)
             throw new ObjectDisposedException(nameof(GpuRenderFrame));
 
-        _disposed = true;
-        var fence = SDL.SubmitGPUCommandBufferAndAcquireFence(_commandBuffer.CommandBufferId);
+        _submitted = true;
+        var fenceId = SDL.SubmitGPUCommandBufferAndAcquireFence(_commandBuffer.CommandBufferId);
         _commandBuffer.ReleaseWithoutCancel();
-        return new GpuFence(_device, fence);
+        return _device.AllocateFence(fenceId);
     }
 
     public void Dispose()
     {
-        if (!_disposed)
-        {
-            _disposed = true;
+        if (_commandBuffer is null) return;
+
+        // If Submit wasn't called, the command buffer needs to be
+        // cancelled (its Dispose returns it to the pool). After Submit
+        // the buffer was already released to the pool without cancel,
+        // so we just clear our reference.
+        if (!_submitted)
             _commandBuffer.Dispose();
-        }
+        _commandBuffer = null;
+        _submitted = false;
+        _pool.Return(this);
     }
 }

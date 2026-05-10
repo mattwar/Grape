@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Blitter.Utilities;
 using static SDL3.SDL;
 
 namespace Blitter;
@@ -12,9 +13,25 @@ internal sealed class GpuDevice : IDisposable
 
     private nint _gpuDeviceID;
 
+    // Per-frame wrapper pools. Owning the pools on the device means
+    // every per-frame begin/end of a command buffer, render frame,
+    // copy pass, render pass, or fence reuses an existing wrapper
+    // instance instead of allocating a fresh one. The wrapper's
+    // Dispose returns it to the pool here.
+    private readonly Pool<GpuCommandBuffer> _commandBufferPool;
+    private readonly Pool<GpuRenderFrame> _renderFramePool;
+    private readonly Pool<GpuCopyPass> _copyPassPool;
+    private readonly Pool<GpuRenderPass> _renderPassPool;
+    private readonly Pool<GpuFence> _fencePool;
+
     internal GpuDevice(nint gpuDeviceID)
     {
         _gpuDeviceID = gpuDeviceID;
+        _commandBufferPool = new Pool<GpuCommandBuffer>(p => new GpuCommandBuffer(p));
+        _renderFramePool = new Pool<GpuRenderFrame>(p => new GpuRenderFrame(this, p));
+        _copyPassPool = new Pool<GpuCopyPass>(p => new GpuCopyPass(p));
+        _renderPassPool = new Pool<GpuRenderPass>(p => new GpuRenderPass(p));
+        _fencePool = new Pool<GpuFence>(p => new GpuFence(this, p));
         Application.Current.AddResource(this);
     }
 
@@ -110,16 +127,21 @@ internal sealed class GpuDevice : IDisposable
     private ImmutableList<string>? _drivers;
 
     /// <summary>
-    /// Creates a new command buffer on the GPU.
+    /// Acquires a fresh GPU command buffer (rented from the pool).
     /// </summary>
-    public GpuCommandBuffer CreateCommandBuffer() => 
-        GpuCommandBuffer.Create(this);
+    public GpuCommandBuffer CreateCommandBuffer() =>
+        AllocateCommandBuffer();
 
     /// <summary>
     /// Begins a frame of GPU work.
     /// </summary>
-    public GpuRenderFrame BeginFrame() =>
-        new GpuRenderFrame(this, CreateCommandBuffer());
+    public GpuRenderFrame BeginFrame()
+    {
+        var cb = AllocateCommandBuffer();
+        var frame = _renderFramePool.Allocate();
+        frame.Init(cb);
+        return frame;
+    }
 
     /// <summary>
     /// Creates a new shader for the GPU.
@@ -154,30 +176,146 @@ internal sealed class GpuDevice : IDisposable
         GpuIndexBuffer.Create(this, size);
 
     /// <summary>
-    /// Create a new render pass for the GPU.
-    /// </summary>
-    public GpuRenderPass BeginRenderPass(
-        GpuCommandBuffer commandBuffer, 
-        ImmutableArray<GpuColorTargetInfo> colorTargets, 
-        GpuDepthStencilTargetInfo depthTarget
-        ) =>
-        GpuRenderPass.Begin(this, commandBuffer, colorTargets, depthTarget);
-
-    /// <summary>
-    /// Attempts to begin a render pass. Returns <c>false</c> (without throwing)
-    /// if the underlying SDL call fails, e.g. because the device is being torn
-    /// down or the swapchain image is no longer valid.
-    /// </summary>
-    public bool TryBeginRenderPass(
-        GpuCommandBuffer commandBuffer,
-        ImmutableArray<GpuColorTargetInfo> colorTargets,
-        GpuDepthStencilTargetInfo depthTarget,
-        out GpuRenderPass? renderPass) =>
-        GpuRenderPass.TryBegin(this, commandBuffer, colorTargets, depthTarget, out renderPass);
-
-    /// <summary>
     /// Create a new graphics pipeline for the GPU.
     /// </summary>
     public GpuPipeline CreateGraphicsPipeline(GpuPipelineCreateInfo info) =>
         GpuPipeline.CreateGraphicsPipeline(this, info);
+
+    // --- Pool-backed allocation of per-frame wrappers ----------------
+
+    internal GpuCommandBuffer AllocateCommandBuffer()
+    {
+        var commandBufferId = SDL.AcquireGPUCommandBuffer(_gpuDeviceID);
+        if (commandBufferId == 0)
+            throw new InvalidOperationException(
+                $"Failed to acquire GPU command buffer: {SDL.GetError()}");
+        var cb = _commandBufferPool.Allocate();
+        cb.Init(commandBufferId);
+        return cb;
+    }
+
+    internal GpuFence AllocateFence(nint fenceId)
+    {
+        var fence = _fencePool.Allocate();
+        fence.Init(fenceId);
+        return fence;
+    }
+
+    internal GpuCopyPass AllocateCopyPass(GpuCommandBuffer commandBuffer)
+    {
+        if (!TryAllocateCopyPass(commandBuffer, out var copyPass) || copyPass is null)
+            throw new InvalidOperationException(
+                $"Failed to begin GPU copy pass: {SDL.GetError()}");
+        return copyPass;
+    }
+
+    internal bool TryAllocateCopyPass(GpuCommandBuffer commandBuffer, out GpuCopyPass? copyPass)
+    {
+        var copyPassId = SDL.BeginGPUCopyPass(commandBuffer.CommandBufferId);
+        if (copyPassId == 0)
+        {
+            copyPass = null;
+            return false;
+        }
+
+        var pass = _copyPassPool.Allocate();
+        pass.Init(copyPassId);
+        copyPass = pass;
+        return true;
+    }
+
+    internal GpuRenderPass AllocateRenderPass(
+        GpuCommandBuffer commandBuffer,
+        ReadOnlySpan<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget)
+    {
+        if (!TryAllocateRenderPass(commandBuffer, colorTargets, depthTarget, out var renderPass)
+            || renderPass is null)
+            throw new InvalidOperationException(
+                $"Failed to begin GPU render pass: {SDL.GetError()}");
+        return renderPass;
+    }
+
+    internal bool TryAllocateRenderPass(
+        GpuCommandBuffer commandBuffer,
+        ReadOnlySpan<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget,
+        out GpuRenderPass? renderPass)
+    {
+        var renderPassId = BeginRenderPassNative(commandBuffer, colorTargets, depthTarget);
+        if (renderPassId == 0)
+        {
+            renderPass = null;
+            return false;
+        }
+
+        var pass = _renderPassPool.Allocate();
+        pass.Init(commandBuffer, renderPassId);
+        renderPass = pass;
+        return true;
+    }
+
+    private static nint BeginRenderPassNative(
+        GpuCommandBuffer commandBuffer,
+        ReadOnlySpan<GpuColorTargetInfo> colorTargets,
+        GpuDepthStencilTargetInfo depthTarget)
+    {
+        // Stack-allocate the SDL color-target marshalling buffer; SDL
+        // consumes it in BeginGPURenderPass and does not retain it.
+        Span<GPUColorTargetInfo> nativeColorTargets = stackalloc GPUColorTargetInfo[colorTargets.Length];
+        for (int i = 0; i < colorTargets.Length; i++)
+        {
+            var ct = colorTargets[i];
+            nativeColorTargets[i] = new SDL.GPUColorTargetInfo
+            {
+                Texture = ct.Texture?.TextureId ?? 0,
+                MipLevel = ct.MipLevel,
+                LayerOrDepthPlane = ct.LayerOrDepthPlane,
+                ClearColor = ct.ClearColor,
+                LoadOp = ct.LoadOp,
+                StoreOp = ct.StoreOp,
+                ResolveTexture = ct.ResolveTexture?.TextureId ?? 0,
+                ResolveMipLevel = ct.ResolveMipLevel,
+                ResolveLayer = ct.ResolveLayer,
+                Cycle = (byte)(ct.Cycle ? 1 : 0),
+                CycleResolveTexture = (byte)(ct.CycleResolveTexture ? 1 : 0),
+            };
+        }
+
+        var nativeDepthTarget = new SDL.GPUDepthStencilTargetInfo
+        {
+            Texture = depthTarget.Texture?.TextureId ?? 0,
+            ClearDepth = depthTarget.ClearDepth,
+            LoadOp = depthTarget.LoadOp,
+            StoreOp = depthTarget.StoreOp,
+            StencilLoadOp = depthTarget.StencilLoadOp,
+            StencilStoreOp = depthTarget.StencilStoreOp,
+            Cycle = (byte)(depthTarget.Cycle ? 1 : 0),
+            ClearStencil = depthTarget.ClearStencil,
+        };
+
+        unsafe
+        {
+            fixed (GPUColorTargetInfo* pColorTargets = nativeColorTargets)
+            {
+                if (depthTarget.Texture is null)
+                {
+                    // SDL_GPU expects a NULL pointer when no depth/stencil
+                    // target is in use. Passing a zero-filled struct by ref
+                    // is NOT equivalent and causes native heap corruption.
+                    return SDL.BeginGPURenderPass(
+                        commandBuffer.CommandBufferId,
+                        (nint)pColorTargets,
+                        (uint)nativeColorTargets.Length,
+                        IntPtr.Zero);
+                }
+
+                return SDL.BeginGPURenderPass(
+                    commandBuffer.CommandBufferId,
+                    (nint)pColorTargets,
+                    (uint)nativeColorTargets.Length,
+                    nativeDepthTarget);
+            }
+        }
+    }
 }

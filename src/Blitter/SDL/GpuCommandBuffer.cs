@@ -1,50 +1,51 @@
+using Blitter.Utilities;
+
 namespace Blitter;
 
 /// <summary>
 /// A block of GPU copy and render instructions.
 /// </summary>
-internal sealed class GpuCommandBuffer: IDisposable
+internal sealed class GpuCommandBuffer : IDisposable
 {
-    private readonly GpuDevice _gpuDevice;
+    private readonly Pool<GpuCommandBuffer> _pool;
     private nint _commandBufferId;
 
-    private GpuCommandBuffer(GpuDevice device, nint commandBufferId)
+    // Constructed by the pool factory only. Acquire a real instance via
+    // GpuDevice.AllocateCommandBuffer.
+    internal GpuCommandBuffer(Pool<GpuCommandBuffer> pool)
     {
-        _gpuDevice = device;
-        _commandBufferId = commandBufferId;
-        device.AddResource(this);
+        _pool = pool;
     }
 
     internal nint CommandBufferId => _commandBufferId;
 
-    internal static GpuCommandBuffer Create(GpuDevice device)
+    // Populates a freshly-rented wrapper with the SDL handle. Called by
+    // GpuDevice.AllocateCommandBuffer immediately after rent.
+    internal void Init(nint commandBufferId)
     {
-        var commandBufferId = SDL.AcquireGPUCommandBuffer(device.GpuDeviceID);
-        return new GpuCommandBuffer(device, commandBufferId);
+        _commandBufferId = commandBufferId;
     }
 
     public bool IsDisposed => _commandBufferId == 0;
 
     /// <summary>
-    /// Releases the wrapper without cancelling the underlying command buffer.
-    /// Call this once the buffer has been handed off to SDL via Submit/SubmitAndAcquireFence.
+    /// Returns the wrapper to its pool without cancelling the SDL
+    /// command buffer. Used after Submit / SubmitAndAcquireFence has
+    /// handed ownership to SDL.
     /// </summary>
     internal void ReleaseWithoutCancel()
     {
-        var id = Interlocked.Exchange(ref _commandBufferId, 0);
-        if (id != 0)
-        {
-            _gpuDevice.RemoveResource(this);
-        }
+        if (_commandBufferId == 0) return;
+        _commandBufferId = 0;
+        _pool.Return(this);
     }
 
     public void Dispose()
     {
-        var id = Interlocked.Exchange(ref _commandBufferId, 0);
-        if (id != 0)
-        {
-            SDL.CancelGPUCommandBuffer(id);
-            _gpuDevice.RemoveResource(this);
-        }
+        var id = _commandBufferId;
+        if (id == 0) return;
+        _commandBufferId = 0;
+        SDL.CancelGPUCommandBuffer(id);
+        _pool.Return(this);
     }
 }

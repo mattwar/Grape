@@ -108,22 +108,28 @@ public class Window3D : Window
     protected override void RaiseRenderingEvent()
     {
         if (TryGetRenderer(out var renderer))
+            OnRendering(renderer);
+    }
+
+    protected override void RenderFrame(Action body)
+    {
+        if (!TryGetRenderer(out var renderer))
+            return;
+
+        // The window owns the single per-frame Render() flush. Stray
+        // Render() calls from inside the body are suppressed so they
+        // don't double-present.
+        var prev = renderer.RenderSuppressed;
+        renderer.RenderSuppressed = true;
+        try
         {
-            // The window owns the single per-frame Render() flush in the
-            // event-driven path. Stray Render() calls from inside the
-            // handler are suppressed so they don't double-present.
-            var prev = renderer.RenderSuppressed;
-            renderer.RenderSuppressed = true;
-            try
-            {
-                OnRendering(renderer);
-            }
-            finally
-            {
-                renderer.RenderSuppressed = prev;
-            }
-            renderer.Render();
+            body();
         }
+        finally
+        {
+            renderer.RenderSuppressed = prev;
+        }
+        renderer.Render();
     }
 
     /// <summary>
@@ -132,6 +138,24 @@ public class Window3D : Window
     /// </summary>
     public Renderer3D Renderer => _renderer
         ?? throw new InvalidOperationException("Renderer is not yet available.");
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Func<bool> shouldContinue, Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(renderFrame);
+        return RunAsync(shouldContinue, () => renderFrame(this.Renderer), cancellationToken);
+    }
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Action<Renderer3D> renderFrame, CancellationToken cancellationToken = default)
+        => RunAsync(static () => true, renderFrame, cancellationToken);
 
     private bool TryGetRenderer([NotNullWhen(true)] out GpuRenderer? renderer)
     {

@@ -12,27 +12,30 @@ public class Scene2D : Container2D
     private Window2D? _window;
 
     /// <summary>
-    /// Runs the scene until canceled or another exit condition is reached.
+    /// Runs the scene on a dedicated render thread until canceled or
+    /// another exit condition is reached. The returned task completes
+    /// when the loop exits, so multiple scenes / windows can be
+    /// composed via <see cref="Task.WhenAll(Task[])"/>.
     /// </summary>
     public async Task RunAsync(Window2D window, CancellationToken cancellationToken = default)
     {
         _window = window;
-        var rd = window.Renderer;
 
         try
         {
-            // Animate the scene until exit condition
-            while (!cancellationToken.IsCancellationRequested && !ShouldExit())
-            {
-                var context = rd.GetUpdateContext();
-                this.Update(in context);
-                this.Draw(rd);               
-                await window.NextFrameAsync(cancellationToken);
-            }       
+            await window.RunAsync(
+                shouldContinue: () => !ShouldExit(),
+                renderFrame: rd =>
+                {
+                    var context = rd.GetUpdateContext();
+                    this.Update(in context);
+                    this.Draw(rd);
+                },
+                cancellationToken);
         }
         finally
         {
-            _window = null;           
+            _window = null;
         }
     }
 
