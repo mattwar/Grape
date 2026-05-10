@@ -36,6 +36,7 @@ window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 using var source = Image.Load(SampleAsset("blitter.png"));
 
 // Bake the static effects once. Each is a new image owning its own
+
 // pixels; remember to dispose them (the `using` declarations do).
 using var blurred    = source.Blur(6f);
 using var shadowed   = source.DropShadow(8, 12, 6, 6, new Color(0, 0, 0, 200));
