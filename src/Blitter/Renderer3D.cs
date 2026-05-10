@@ -235,6 +235,13 @@ public abstract class Renderer3D
     protected virtual float GetTargetAspectRatio() => 16f / 9f;
 
     /// <summary>
+    /// Override in concrete renderers to expose the current render
+    /// target's pixel dimensions. Used by features that need exact
+    /// pixel coordinates (e.g. screen-space debug text).
+    /// </summary>
+    protected virtual (int Width, int Height) GetTargetSize() => (1920, 1080);
+
+    /// <summary>
     /// Builds a per-frame <see cref="UpdateContext3D"/> snapshotting this
     /// renderer's clock. Convenience for the common case where one loop
     /// drives both update and render; standalone simulations should
@@ -505,6 +512,126 @@ public abstract class Renderer3D
 
     /// <summary>Queues ASCII debug text for drawing at the given world-space transform.</summary>
     public abstract void DrawDebugText(string text, in Matrix4x4 transform);
+
+    private bool _debugDrawEnabled;
+
+    /// <summary>
+    /// When true, this renderer draws primitives queued via
+    /// <see cref="DebugDraw"/> as an overlay each frame.
+    /// </summary>
+    // In multi-renderer apps, enable on exactly one renderer; if more
+    // than one is enabled, only the first to flush each frame sees the
+    // queued primitives.
+    public bool DebugDrawEnabled
+    {
+        get => _debugDrawEnabled;
+        set
+        {
+            if (_debugDrawEnabled == value) return;
+            _debugDrawEnabled = value;
+            if (value) Interlocked.Increment(ref DebugDraw.ConsumerCount);
+            else       Interlocked.Decrement(ref DebugDraw.ConsumerCount);
+        }
+    }
+
+    // Cached line mesh reused across frames; storage grows as needed
+    // via Mesh<T>.Update.
+    private Mesh<ColorVertex3D>? _debugDrawLineMesh;
+
+    // Drains DebugDraw's queued lines into the cached mesh and queues
+    // it as a normal scene-aware draw. Concrete renderers call this
+    // once per frame before iterating their command list, so debug
+    // primitives ride the configured camera, viewport, and depth state.
+    protected void FlushDebugDraw()
+    {
+        if (!_debugDrawEnabled) return;
+
+        var lines = DebugDraw.TakeLines();
+        if (lines.Count > 0)
+        {
+            _debugDrawLineMesh ??= Mesh.Create<ColorVertex3D>(
+                ReadOnlySpan<ColorVertex3D>.Empty, Topology.LineList);
+
+            var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(lines);
+            _debugDrawLineMesh.Update(span);
+
+            // Identity model: ApplyRenderArgs composes the camera VP into
+            // the transform field, so debug lines share the scene's view-
+            // projection.
+            DrawMesh(
+                _debugDrawLineMesh,
+                ShaderSets.PositionColorWithTransform,
+                new TransformArgs(Matrix4x4.Identity));
+        }
+
+        var texts = DebugDraw.TakeTexts();
+        var worldTexts = DebugDraw.TakeWorldTexts();
+        if (texts.Count > 0 || worldTexts.Count > 0)
+        {
+            var (w, h) = GetTargetSize();
+            if (w > 0 && h > 0)
+            {
+                // Push depth-mode override so screen text and billboards
+                // ignore the depth buffer (always on top, never chewed up
+                // by world geometry sitting at similar clip-space z).
+                using var _ = PushState();
+                DepthMode = DepthMode.Overlay;
+
+                foreach (var t in texts)
+                {
+                    DrawScreenText(t.Text, t.X, t.Y, t.PixelHeight, w, h);
+                }
+
+                if (worldTexts.Count > 0 && Camera is { } camera)
+                {
+                    var vp = camera.GetViewProjection(AspectRatio);
+                    foreach (var wt in worldTexts)
+                    {
+                        // Project the anchor through the camera VP to clip
+                        // space; skip when behind the near plane (w <= 0)
+                        // or off-screen in z.
+                        var clip = Vector4.Transform(
+                            new Vector4(wt.WorldPosition, 1f), vp);
+                        if (clip.W <= 0f) continue;
+
+                        var invW = 1f / clip.W;
+                        var ndcX = clip.X * invW;
+                        var ndcY = clip.Y * invW;
+                        var ndcZ = clip.Z * invW;
+                        if (ndcZ < -1f || ndcZ > 1f) continue;
+
+                        // NDC -> top-left pixel coords, then apply the
+                        // user's pixel offset, snapped to integer pixels.
+                        var px = MathF.Round((ndcX * 0.5f + 0.5f) * w + wt.OffsetX);
+                        var py = MathF.Round((1f - (ndcY * 0.5f + 0.5f)) * h + wt.OffsetY);
+
+                        DrawScreenText(wt.Text, px, py, wt.PixelHeight, w, h);
+                    }
+                }
+            }
+        }
+    }
+
+    // Draws the bitmap text at the given top-left pixel position by
+    // composing the final clip-space transform directly. The local
+    // glyph mesh has y=1 at the glyph top and y=0 at the baseline,
+    // x advancing one unit per character.
+    private void DrawScreenText(string text, float x, float y, float pixelHeight, int targetW, int targetH)
+    {
+        float sx = pixelHeight * 2f / targetW;          // local x unit -> clip x
+        float sy = pixelHeight * 2f / targetH;          // local y unit -> clip y
+        float tx = x * 2f / targetW - 1f;                // local (0,*) -> clip x at left edge
+        float ty = 1f - (y + pixelHeight) * 2f / targetH; // local (*,0) -> clip y at baseline
+
+        // Final transform: local (lx, ly) -> clip (sx*lx + tx, sy*ly + ty, 0, 1).
+        var transform = new Matrix4x4(
+            sx, 0f, 0f, 0f,
+            0f, sy, 0f, 0f,
+            0f, 0f, 1f, 0f,
+            tx, ty, 0f, 1f);
+
+        DrawDebugText(text, transform);
+    }
 
     /// <summary>
     /// When true, calls to <see cref="Render"/> become no-ops. Used by

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
+  (lines, rays, axes, boxes, spheres); opt in per renderer via
+  `Renderer3D.DebugDrawEnabled`.
+- `DebugDraw.DrawText` for screen-space overlay text, with an
+  interpolated-string overload that skips formatting entirely when
+  the overlay is disabled (no allocation, no boxing).
+- `DebugDraw.DrawText3D` for billboarded labels anchored at a world
+  position; hidden when the anchor is behind the camera.
 - `Application.ScheduleTick(period, callback)` registers a periodic
   callback driven by the application event loop, allocation-free.
 - `PeriodicAwaiter` provides an allocation-free `ValueTask`-based

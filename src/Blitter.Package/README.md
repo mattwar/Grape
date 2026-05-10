@@ -2,7 +2,7 @@
 
 **Blitter** is a small, friendly 2D & 3D graphics programming library for .NET, built on top of [SDL3](https://www.libsdl.org/) (via the [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) bindings) and integrated with [SkiaSharp](https://github.com/mono/SkiaSharp). It wraps SDL3 in clean, idiomatic C# so you can focus on drawing things and making them move instead of wrestling with native interop and low-level GPU concepts.
 
-> ⚠️ **Early days.** Blitter is an ongoing project. The API is unstable and will likely change.
+> ⚠️ **Early days.** Blitter is in ongoing development. The API will likely go through changes. Use at your own risk — and have fun.
 
 ## What's in the box
 
