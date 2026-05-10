@@ -23,6 +23,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 using SkiaSharp;
 
 const int CellSize  = 96;
@@ -98,11 +99,13 @@ using (var canvas = new SKCanvas(atlas))
     }
 }
 
-// Snapshot the SkiaSharp atlas into a Blitter Image. The Image owns
-// its own pixels from this point forward; the SKBitmap is no longer
-// needed and could be disposed.
+// Snapshot the SkiaSharp atlas into a Blitter Image, then wrap that
+// Image in an Atlas so glyph cells can be looked up by index instead
+// of recomputing src rects on every blit. The Atlas takes ownership
+// of the Image (default), so disposing the atlas releases everything.
 var atlasImage = atlas.ToImage();
 atlas.Dispose();
+var atlasGrid = Atlas.Grid(atlasImage, AtlasCols, AtlasRows);
 
 // Confetti state. Each piece picks an atlas cell, a screen position,
 // a velocity, a rotation rate, and a scale.
@@ -126,7 +129,7 @@ window.Rendering += (w, rd) =>
     // Show the atlas itself in the top-left so the source material is
     // obvious. Renders the whole image to a fixed-size destination.
     int previewSize = Math.Min(width, height) / 4;
-    rd.DrawImage(atlasImage, new Rect(20, 20, previewSize, previewSize));
+    rd.DrawImage(atlasGrid.Image, new Rect(20, 20, previewSize, previewSize));
 
     // Caption -- pure Renderer2D, no Skia involved.
     rd.DrawColor = new Color(180, 190, 210);
@@ -141,15 +144,11 @@ window.Rendering += (w, rd) =>
         if (c.Pos.Y - c.Size > height)
             c = SpawnConfetti(rng, initial: false);
 
-        // Source rect: one cell of the atlas. Destination rect: a
-        // square at the confetti's position. The atlas Image's GPU
-        // texture is uploaded once and reused for every blit.
-        int idx = c.AtlasIndex;
-        int srcCol = idx % AtlasCols;
-        int srcRow = idx / AtlasCols;
-        var src = new Rect(srcCol * CellSize, srcRow * CellSize, CellSize, CellSize);
+        // Source rect comes from the Atlas; destination is a square at
+        // the confetti's position. The atlas Image's GPU texture is
+        // uploaded once and reused for every blit.
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
-        rd.DrawImage(atlasImage, src, dst);
+        atlasGrid.Draw(rd, c.AtlasIndex, dst);
     }
 
     w.Invalidate();

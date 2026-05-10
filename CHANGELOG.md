@@ -38,8 +38,22 @@ All notable changes to this project will be documented in this file.
   SkiaSharp `SKCanvas`; scratch bitmap/canvas/image pooled per renderer.
 - `SKBitmap.ToImage()` extension snapshots a Skia bitmap into a Blitter
   `Image` for use with `DrawImage` (one GPU upload, reused per call).
-- New samples: `SkiaCanvas`, `SkiaBitmap` showcasing the SkiaSharp
-  rendering integration.
+- `Blitter.Bits.Atlas` pairs an `Image` with a list of pixel-space
+  rectangles (and an optional name → index map) for sprite-sheet draws.
+- `Atlas.Grid(image, columns, rows)` slices an image into a uniform
+  grid of cells indexed in row-major order.
+- `Blitter.Bits.Font` bakes a SkiaSharp typeface into a monospace glyph
+  atlas with `DrawText` for both `Renderer2D` and `Renderer3D`.
+- `Font.Load(path|stream, ...)` loads a `.ttf`/`.otf` file for portable
+  cross-platform rendering; `Font(IEnumerable<string>, ...)` takes a
+  CSS-style family-fallback list and uses the first installed match.
+- `Font` constructors take an optional `charset` string for arbitrary
+  Unicode coverage (default `FontCharsets.AsciiPrintable`); surrogate
+  pairs in input strings are handled via `Rune` iteration.
+- `FontCharsets` exposes reusable charset constants (`AsciiPrintable`,
+  `Digits`, `UppercaseLatin`, `LowercaseLatin`).
+- New samples: `SkiaCanvas`, `SkiaBitmap`, `FontText` showcasing the
+  SkiaSharp rendering integration and `Blitter.Bits.Font`.
 
 ### Changed
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.

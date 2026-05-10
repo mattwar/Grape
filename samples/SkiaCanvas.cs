@@ -136,7 +136,7 @@ static void DrawWaveRibbon(SKCanvas canvas, float width, float height, float t)
     for (int i = 0; i <= samples; i++)
     {
         float u = i / (float)samples;
-        float x = pad + u * w;
+        float x = pad + u * w; 
         float y = waveCenter
                 + MathF.Sin(u * MathF.Tau * 2 + t * 1.7f) * waveAmplitude * 0.65f
                 + MathF.Sin(u * MathF.Tau * 0.7f - t * 1.1f) * waveAmplitude * 0.35f;
