@@ -1,16 +1,11 @@
 namespace Blitter.Bits;
 
 /// <summary>
-/// An <see cref="Image"/> paired with a list of pixel-space rectangles
-/// that name regions inside it. Useful for sprite sheets, glyph atlases,
-/// and any other case where one texture upload backs many discrete
-/// draws (each <see cref="Renderer2D.DrawImage(Image, Rect, Rect)"/>
-/// uses the same GPU texture, so the cost is one upload + N draws).
-/// Regions can be looked up by index and, optionally, by name.
+/// A collection of regions over a single <see cref="Image"/>.
 /// </summary>
 public sealed class Atlas : IDisposable
 {
-    private readonly Rect[] _rects;
+    private readonly Rect[] _regions;
     private readonly Dictionary<string, int>? _names;
     private readonly bool _ownsImage;
     private bool _disposed;
@@ -19,15 +14,13 @@ public sealed class Atlas : IDisposable
     public Image Image { get; }
 
     /// <summary>Number of regions in the atlas.</summary>
-    public int Count => _rects.Length;
+    public int Count => _regions.Length;
 
     /// <summary>Looks up a region by zero-based index.</summary>
-    public Rect this[int index] => _rects[index];
+    public Rect this[int index] => _regions[index];
 
     /// <summary>
-    /// Looks up a region by name. Throws <see cref="KeyNotFoundException"/>
-    /// if the name was not registered, or <see cref="InvalidOperationException"/>
-    /// if this atlas has no name map.
+    /// Looks up a region by name.
     /// </summary>
     public Rect this[string name]
     {
@@ -35,34 +28,29 @@ public sealed class Atlas : IDisposable
         {
             if (_names is null)
                 throw new InvalidOperationException("Atlas has no name map.");
-            return _rects[_names[name]];
+            return _regions[_names[name]];
         }
     }
 
     /// <summary>
-    /// Wraps an image with an explicit list of regions. By default the atlas
-    /// takes ownership of <paramref name="image"/> and disposes it when the
-    /// atlas is disposed; pass <paramref name="ownsImage"/> = <c>false</c>
-    /// when the image is shared with other consumers.
+    /// Constructs an <see cref="Atlas"/> from an image and a set of regions.
     /// </summary>
-    public Atlas(Image image, ReadOnlySpan<Rect> rects, bool ownsImage = true)
-        : this(image, rects, names: null, ownsImage)
+    public Atlas(Image image, ReadOnlySpan<Rect> regions, bool ownsImage = true)
+        : this(image, regions, names: null, ownsImage)
     {
     }
 
     /// <summary>
-    /// Wraps an image with an explicit list of regions and a name-to-index
-    /// map. The map is copied; the atlas does not retain a reference to the
-    /// caller's dictionary.
+    /// Constructs an <see cref="Atlas"/> from an image, a set of regions, and an optional name-to-index map.   
     /// </summary>
     public Atlas(
         Image image,
-        ReadOnlySpan<Rect> rects,
+        ReadOnlySpan<Rect> regions,
         IReadOnlyDictionary<string, int>? names,
         bool ownsImage = true)
     {
         ArgumentNullException.ThrowIfNull(image);
-        _rects = rects.ToArray();
+        _regions = regions.ToArray();
         Image = image;
         _ownsImage = ownsImage;
 
@@ -71,21 +59,16 @@ public sealed class Atlas : IDisposable
             _names = new Dictionary<string, int>(names.Count, StringComparer.Ordinal);
             foreach (var kv in names)
             {
-                if ((uint)kv.Value >= (uint)_rects.Length)
+                if ((uint)kv.Value >= (uint)_regions.Length)
                     throw new ArgumentOutOfRangeException(nameof(names),
-                        $"Name '{kv.Key}' maps to index {kv.Value} which is outside [0, {_rects.Length}).");
+                        $"Name '{kv.Key}' maps to index {kv.Value} which is outside [0, {_regions.Length}).");
                 _names.Add(kv.Key, kv.Value);
             }
         }
     }
 
     /// <summary>
-    /// Splits <paramref name="image"/> into a uniform grid of
-    /// <paramref name="columns"/> × <paramref name="rows"/> cells. Each
-    /// cell becomes one region, indexed in row-major order
-    /// (<c>row * columns + col</c>). Cell size is derived from the image
-    /// size; use the other <c>Grid</c> overload when the image has padding
-    /// rows/columns past the last cell.
+    /// Creates an <see cref="Atlas"/> by splitting an <see cref="Image"/> into a uniform grid of regions.
     /// </summary>
     public static Atlas Grid(Image image, int columns, int rows, bool ownsImage = true)
     {
@@ -97,12 +80,7 @@ public sealed class Atlas : IDisposable
     }
 
     /// <summary>
-    /// Splits <paramref name="image"/> into a uniform grid using an
-    /// explicit cell size. Use this overload when the image dimensions
-    /// don't divide evenly, or when only the top-left
-    /// (<paramref name="columns"/> * <paramref name="cellWidth"/>,
-    /// <paramref name="rows"/> * <paramref name="cellHeight"/>) sub-region
-    /// of the image is meaningful.
+    /// Creates an <see cref="Atlas"/> by splitting an <see cref="Image"/> into a uniform grid of regions.
     /// </summary>
     public static Atlas Grid(
         Image image,
@@ -154,7 +132,7 @@ public sealed class Atlas : IDisposable
     public bool Draw(Renderer2D renderer, int index, Rect destination)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        return renderer.DrawImage(Image, _rects[index], destination);
+        return renderer.DrawImage(Image, _regions[index], destination);
     }
 
     /// <summary>Draws the named region into <paramref name="destination"/>.</summary>

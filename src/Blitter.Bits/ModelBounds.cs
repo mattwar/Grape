@@ -3,15 +3,12 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Bounds helpers for <see cref="Model"/>. Each call walks every submesh's
-/// vertex data; nothing is cached on the model. Store the result yourself
-/// (e.g. next to your model reference) if you need bounds repeatedly.
+/// Helpers to compute bounds for a <see cref="Model"/>.
 /// </summary>
 public static class ModelBounds
 {
     /// <summary>
-    /// AABB that encloses every submesh of <paramref name="model"/> in
-    /// model-local space (no transform applied).
+    /// The bounding box that encloses every submesh of the <paramref name="model"/>.
     /// </summary>
     public static BoundingBox ComputeBoundingBox(this Model model)
     {
@@ -23,10 +20,7 @@ public static class ModelBounds
     }
 
     /// <summary>
-    /// AABB that encloses <paramref name="model"/> after
-    /// <paramref name="transform"/> is applied. Each submesh's local AABB
-    /// is transformed individually before the union, which is tighter
-    /// than transforming a single union AABB once.
+    /// The bounding box that encloses the transformed bounding boxes of each submesh of the <paramref name="model"/>.
     /// </summary>
     public static BoundingBox ComputeBoundingBox(this Model model, Matrix4x4 transform)
     {
@@ -38,8 +32,7 @@ public static class ModelBounds
     }
 
     /// <summary>
-    /// Bounding sphere over every vertex in every submesh, in model-local
-    /// space. Walks each vertex once (no intermediate array).
+    /// The bounding sphere that encloses every submesh of the <paramref name="model"/>.
     /// </summary>
     public static BoundingSphere ComputeBoundingSphere(this Model model)
     {
@@ -72,6 +65,45 @@ public static class ModelBounds
         return new BoundingSphere(center, MathF.Sqrt(maxSq));
     }
 
-    /// <summary>The AABB-center of <paramref name="model"/> in model-local space.</summary>
-    public static Vector3 ComputeCenter(this Model model) => model.ComputeBoundingBox().Center;
+    /// <summary>
+    /// The center of the bounding box of the <paramref name="model"/>.
+    /// </summary>
+    public static Vector3 ComputeCenter(this Model model) => 
+        model.ComputeBoundingBox().Center;
+
+    /// <summary>
+    /// The bounding boxes for each submesh of <paramref name="model"/>.
+    /// </summary>
+    public static BoundingBox[] ComputeBoundingBoxes(this Model model, Matrix4x4 transform)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var boxes = new BoundingBox[model.Submeshes.Count];
+        for (int i = 0; i < boxes.Length; i++)
+            boxes[i] = model.Submeshes[i].Mesh.ComputeBoundingBox().Transform(transform);
+        return boxes;
+    }
+
+    /// <summary>
+    /// The bounding boxes for each submesh of <paramref name="model"/>.
+    /// </summary>
+    public static BoundingBox[] ComputeBoundingBoxes(this Model model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        var boxes = new BoundingBox[model.Submeshes.Count];
+        for (int i = 0; i < boxes.Length; i++)
+            boxes[i] = model.Submeshes[i].Mesh.ComputeBoundingBox();
+        return boxes;
+    }
+
+    /// <summary>
+    /// The occupied bounding boxes for each submesh of <paramref name="model"/>.
+    /// </summary>
+    public static BoundingBox[] ComputeOccupiedBoxes(
+        this Model model,
+        float voxelSize,
+        MeshOccupancyMode mode = MeshOccupancyMode.Accurate)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return MeshOccupancy.ComputeForModel(model, voxelSize, mode);
+    }
 }

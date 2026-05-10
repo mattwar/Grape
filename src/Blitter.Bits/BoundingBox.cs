@@ -3,10 +3,7 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Axis-aligned bounding box (AABB) defined by its min and max corners.
-/// Empty boxes use a sentinel <see cref="Min"/> &gt; <see cref="Max"/> so
-/// that <see cref="Encapsulate(Vector3)"/> on an empty box yields a degenerate
-/// box at the supplied point.
+/// An axis-aligned bounding box (AABB).
 /// </summary>
 public readonly struct BoundingBox : IEquatable<BoundingBox>
 {
@@ -20,9 +17,7 @@ public readonly struct BoundingBox : IEquatable<BoundingBox>
     }
 
     /// <summary>
-    /// The sentinel "empty" box: <see cref="Min"/> = +infinity,
-    /// <see cref="Max"/> = -infinity. Use as the seed when accumulating
-    /// bounds with <see cref="Encapsulate(Vector3)"/>.
+    /// The sentinel "empty" box.
     /// </summary>
     public static BoundingBox Empty { get; } = new(
         new Vector3(float.PositiveInfinity),
@@ -60,8 +55,8 @@ public readonly struct BoundingBox : IEquatable<BoundingBox>
     }
 
     /// <summary>
-    /// Builds an AABB from a vertex span. Works with any vertex struct that
-    /// implements <see cref="IPositionVertex3D"/>.
+    /// Builds an <see cref="BoundingBox"/> from a vertex span. 
+    /// Works with any vertex type that implements <see cref="IPositionVertex3D"/>.
     /// </summary>
     public static BoundingBox FromVertices<TVertex>(ReadOnlySpan<TVertex> vertices)
         where TVertex : unmanaged, IPositionVertex3D
@@ -110,10 +105,7 @@ public readonly struct BoundingBox : IEquatable<BoundingBox>
         Min.Z <= other.Max.Z && Max.Z >= other.Min.Z;
 
     /// <summary>
-    /// Returns the AABB that bounds this box after applying
-    /// <paramref name="matrix"/>. Computes by transforming all eight corners
-    /// (correct for any affine matrix, including non-uniform scale and
-    /// rotation).
+    /// Returns the <see cref="BoundingBox"/> that bounds this box after applying the transform <paramref name="matrix"/>.
     /// </summary>
     public BoundingBox Transform(Matrix4x4 matrix)
     {

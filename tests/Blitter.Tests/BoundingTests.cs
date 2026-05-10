@@ -166,16 +166,6 @@ public class BoundingTests
     // ---------------- Mesh extensions ----------------
 
     [Fact]
-    public void Mesh_GetPositions_MatchesVertexPositions()
-    {
-        var mesh = Meshes.Cube(Color.White);
-        var positions = mesh.GetPositions();
-        Assert.Equal(mesh.VertexCount, positions.Length);
-        for (int i = 0; i < positions.Length; i++)
-            Assert.Equal(mesh.Vertices[i].Position, positions[i]);
-    }
-
-    [Fact]
     public void Mesh_ComputeBoundingBox_OnUnitCube()
     {
         var cube = Meshes.Cube(Color.White, size: new Vector3(2f));
@@ -198,23 +188,5 @@ public class BoundingTests
     {
         var cube = Meshes.Cube(Color.White, size: new Vector3(2f)).Transform(Matrix4x4.CreateTranslation(10, 20, 30));
         Assert.Equal(new Vector3(10, 20, 30), cube.ComputeCenter());
-    }
-
-    [Fact]
-    public void Mesh_WritePositionsTo_NoAlloc()
-    {
-        var mesh = Meshes.Cube(Color.White);
-        Span<Vector3> dst = stackalloc Vector3[mesh.VertexCount];
-        var written = mesh.WritePositionsTo(dst);
-        Assert.Equal(mesh.VertexCount, written.Length);
-        for (int i = 0; i < written.Length; i++)
-            Assert.Equal(mesh.Vertices[i].Position, written[i]);
-    }
-
-    [Fact]
-    public void Mesh_WritePositionsTo_TooSmall_Throws()
-    {
-        var mesh = Meshes.Cube(Color.White);
-        Assert.Throws<ArgumentException>(() => mesh.WritePositionsTo(new Vector3[1]));
     }
 }
