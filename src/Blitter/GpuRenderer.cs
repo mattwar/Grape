@@ -91,6 +91,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // pass. Reading the public Antialiasing property mid-frame won't
     // change what the GPU is doing for that frame.
     private SDL.GPUSampleCount _currentSampleCount = SDL.GPUSampleCount.SampleCount1;
+    private uint _currentTargetWidth;
+    private uint _currentTargetHeight;
     // One vertex buffer per DrawDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -249,6 +251,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height))
         {
             _currentSampleCount = MapAntialiasing(Antialiasing);
+            _currentTargetWidth = width;
+            _currentTargetHeight = height;
             EnsureDepthTexture(width, height, _currentSampleCount);
             EnsureMsaaColorTexture(width, height, _colorFormat, _currentSampleCount);
         }
@@ -342,6 +346,21 @@ internal class GpuRenderer : Renderer3D, IDisposable
             return base.GetTargetAspectRatio();
         var (width, height) = _window.Size;
         return height > 0 ? (float)width / height : base.GetTargetAspectRatio();
+    }
+
+    /// <inheritdoc/>
+    protected override (int Width, int Height) GetTargetSize()
+    {
+        // Prefer the live swapchain pixel size cached at BeginFrame --
+        // that's the actual framebuffer; Window.Size returns logical
+        // DIPs which differ on high-DPI displays.
+        if (_currentTargetWidth > 0 && _currentTargetHeight > 0)
+            return ((int)_currentTargetWidth, (int)_currentTargetHeight);
+
+        if (_window is null)
+            return base.GetTargetSize();
+        var (width, height) = _window.Size;
+        return (width, height);
     }
 
     /// <summary>
@@ -551,8 +570,6 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// Internal entry point for textured rendering with an explicit sampler.
-    /// Used by <see cref="DrawDebugText"/> to pin nearest-neighbour
-    /// filtering on the debug font atlas.
     /// </summary>
     internal void DrawTexturedMeshCore<TVertex>(
         Mesh<TVertex> mesh,
@@ -751,12 +768,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
             verts[o + 5] = tr;
         }
 
-        // Pin debug-font sampling to nearest-neighbour clamp so glyph cells
-        // don't bleed across UV boundaries even with linear filtering.
+        // Linear filter on the debug atlas: glyphs are upscaled vs. their
+        // 8x8 source cells and sub-pixel motion under nearest filtering
+        // produces visible per-glyph rasterisation jitter that reads as a
+        // slant. Linear softens the edges slightly but stays stable as
+        // labels move.
         var sampler = _debugTextSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
         {
-            MinFilter = SDL.GPUFilter.Nearest,
-            MagFilter = SDL.GPUFilter.Nearest,
+            MinFilter = SDL.GPUFilter.Linear,
+            MagFilter = SDL.GPUFilter.Linear,
             MipmapMode = SDL.GPUSamplerMipmapMode.Nearest,
             AddressModeU = SDL.GPUSamplerAddressMode.ClampToEdge,
             AddressModeV = SDL.GPUSamplerAddressMode.ClampToEdge,

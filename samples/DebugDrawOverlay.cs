@@ -86,6 +86,19 @@ window.Rendering += (w, rd) =>
     // be sprinkled freely in update/render code.
     DebugDraw.DrawLine(Vector3.Zero, orbit, Color.Magenta);
 
+    // Billboarded label that tracks the orbiting sphere. Hidden when
+    // the anchor is behind the camera.
+    DebugDraw.DrawText3D(orbit, $"orbit t={t,5:F1}", offsetY: -28f);
+    DebugDraw.DrawText3D(Vector3.Zero, "origin", offsetY: -28f);
+
+    // Screen-space text. Uses an interpolated string handler so when
+    // DebugDraw.IsActive is false (e.g. F3 toggled it off), the
+    // formatting work is skipped entirely -- no allocation, no boxing.
+    var fps = 1.0 / Math.Max(rd.ElapsedSinceLastRender.TotalSeconds, 1e-6);
+    DebugDraw.DrawText($"fps {fps,5:F1}", 12, 12);
+    DebugDraw.DrawText($"orbit ({orbit.X,6:F2}, {orbit.Y,6:F2}, {orbit.Z,6:F2})", 12, 32);
+    DebugDraw.DrawText("F3 toggles DebugDraw", 12, 52);
+
     w.Invalidate();
 };
 

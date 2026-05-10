@@ -1,4 +1,5 @@
 using System.Numerics;
+using Blitter.Utilities;
 
 namespace Blitter;
 
@@ -11,7 +12,15 @@ public static class DebugDraw
     // Producers append under _gate; the active renderer swaps the whole
     // list out on flush so its upload doesn't block further appends.
     private static List<ColorVertex3D> _lines = new(capacity: 4096);
+    private static List<ScreenText> _texts = new(capacity: 64);
+    private static List<WorldText> _worldTexts = new(capacity: 64);
     private static readonly object _gate = new();
+
+    internal readonly record struct ScreenText(
+        string Text, float X, float Y, float PixelHeight);
+
+    internal readonly record struct WorldText(
+        string Text, Vector3 WorldPosition, float PixelHeight, float OffsetX, float OffsetY);
 
     // Ref-counted: incremented when a renderer enables, decremented on
     // disable. When zero, all Draw* calls early-out so the static is
@@ -128,6 +137,117 @@ public static class DebugDraw
 
             var snapshot = _lines;
             _lines = new List<ColorVertex3D>(snapshot.Capacity);
+            return snapshot;
+        }
+    }
+
+    // Same swap-and-clear contract as TakeLines, for the screen-space
+    // text buffer.
+    internal static List<ScreenText> TakeTexts()
+    {
+        lock (_gate)
+        {
+            if (_texts.Count == 0)
+                return _texts;
+
+            var snapshot = _texts;
+            _texts = new List<ScreenText>(snapshot.Capacity);
+            return snapshot;
+        }
+    }
+
+    // ---- Screen-space text --------------------------------------------
+
+    /// <summary>Default pixel height used for screen-space text when none is given.</summary>
+    public const float DefaultTextHeight = 24f;
+
+    /// <summary>Queues screen-space text at pixel position (<paramref name="x"/>, <paramref name="y"/>) measured from the top-left.</summary>
+    public static void DrawText(string text, float x, float y, float pixelHeight = DefaultTextHeight)
+    {
+        if (!IsActive) return;
+        if (string.IsNullOrEmpty(text)) return;
+
+        lock (_gate)
+        {
+            _texts.Add(new ScreenText(text, x, y, pixelHeight));
+        }
+    }
+
+    /// <summary>
+    /// Queues screen-space text built from an interpolated string. When
+    /// <see cref="IsActive"/> is false the interpolation is skipped
+    /// entirely -- no string, no boxing, no allocation.
+    /// </summary>
+    public static void DrawText(
+        ref DebugTextInterpolatedStringHandler text,
+        float x, float y,
+        float pixelHeight = DefaultTextHeight)
+    {
+        if (!text.Enabled) return;
+        var s = text.ToStringAndClear();
+        if (s.Length == 0) return;
+
+        lock (_gate)
+        {
+            _texts.Add(new ScreenText(s, x, y, pixelHeight));
+        }
+    }
+
+    // ---- Billboarded world-space text ---------------------------------
+
+    /// <summary>
+    /// Queues a billboarded text label anchored at <paramref name="worldPosition"/>.
+    /// The label always faces the camera at a fixed pixel size and is
+    /// hidden when the anchor is behind the camera.
+    /// </summary>
+    public static void DrawText3D(
+        Vector3 worldPosition,
+        string text,
+        float pixelHeight = DefaultTextHeight,
+        float offsetX = 0f,
+        float offsetY = 0f)
+    {
+        if (!IsActive) return;
+        if (string.IsNullOrEmpty(text)) return;
+
+        lock (_gate)
+        {
+            _worldTexts.Add(new WorldText(text, worldPosition, pixelHeight, offsetX, offsetY));
+        }
+    }
+
+    /// <summary>
+    /// Interpolated-string overload of <see cref="DrawText3D(Vector3,string,float,float,float)"/>;
+    /// formatting is skipped entirely when no renderer is consuming.
+    /// </summary>
+    public static void DrawText3D(
+        Vector3 worldPosition,
+        ref DebugTextInterpolatedStringHandler text,
+        float pixelHeight = DefaultTextHeight,
+        float offsetX = 0f,
+        float offsetY = 0f)
+    {
+        if (!text.Enabled) return;
+        var s = text.ToStringAndClear();
+        if (s.Length == 0) return;
+
+        lock (_gate)
+        {
+            _worldTexts.Add(new WorldText(s, worldPosition, pixelHeight, offsetX, offsetY));
+        }
+    }
+
+    // Same swap-and-clear contract as TakeLines, for the world-space
+    // (billboarded) text buffer.
+    internal static List<WorldText> TakeWorldTexts()
+    {
+        lock (_gate)
+        {
+            if (_worldTexts.Count == 0)
+                return _worldTexts;
+
+            var snapshot = _worldTexts;
+            _worldTexts = new List<WorldText>(snapshot.Capacity);
             return snapshot;
         }
     }
