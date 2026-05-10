@@ -15,7 +15,7 @@
 SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Blitter exists to give .NET developers a small, approachable surface for:
 
 - Opening a window
-- Drawing 2D sprites and primitives
+- Drawing 2D images and primitives
 - Drawing 3D meshes with custom shaders
 - Reading keyboard, mouse, gamepad, and touch input
 - Playing audio
@@ -25,12 +25,17 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 
 ## Features
 
-- **`Window2D`** — bitmap/sprite-style 2D rendering
-- **`Window3D`** — GPU-accelerated 3D rendering with custom shaders (compiled via SDL_shadercross from HLSL/SPIR-V)
-- **Input** — keyboard, mouse, gamepad, and touch via simple events
-- **Audio** — load and play WAV data
-- **Images** — load PNG, JPEG, BMP, and more (via SkiaSharp); manipulate pixels; set color keys; draw with the SkiaSharp canvas API.
-- **`Blitter.Blocks`** — a tiny scene-graph layer (sprites, props, panels, scenes) on top of `Window2D`. This is really experimental and may get removed.
+- **`Window2D`** - bitmap/sprite-style 2D rendering
+- **`Window3D`** - GPU-accelerated 3D rendering
+- **SkiaSharp** Integration - Fonts, Filters, Canvas and more
+- **Input** - keyboard, mouse, gamepad, and touch via simple events
+- **Audio** - load and play WAV data
+- **Images** - load, save, manipulate pixels, apply filters
+- **Shaders** - load, save, dynamic compilation
+- **`Blitter.Bits`** - beyond the basics: useful tidbits for graphical apps
+- **`Blitter.Blocks`** - building blocks: sprites, scenes, panels and more
+
+The SDL3 and other native binaries are pulled in automatically; there is nothing to install separately.
 
 ## Installation
 
@@ -123,7 +128,8 @@ More examples live in [samples/](samples/) — each is a single `.cs` file you c
 | Project | What it is |
 | --- | --- |
 | `Blitter` | Core library: windows, rendering (BMP), input, audio. |
-| `Blitter.Blocks` | Components (sprites, scenes, panels). |
+| `Blitter.Bits` | Beyond the basics: useful tidbits for graphical apps |
+| `Blitter.Blocks` | Building blocks: sprites, scenes, panels and more |
 | `Blitter.Package` | Packaging project — bundles `Blitter` and `Blitter.Blocks` into the `Blitter` NuGet package. |
 
 ## Building from Source

@@ -6,14 +6,17 @@
 
 ## What's in the box
 
-- **`Window2D`** — bitmap/sprite-style 2D rendering
-- **`Window3D`** — GPU-accelerated 3D rendering with custom shaders (HLSL/SPIR-V via SDL_shadercross)
-- **Input** — keyboard, mouse, gamepad, and touch via simple events
-- **Audio** — load and play WAV data
-- **Images** — load PNG, JPEG, BMP, etc. (via SkiaSharp); pixel manipulation; SkiaSharp canvas drawing
-- **`Blitter.Blocks`** — a small experimentalcomponent library (sprites, props, panels, scenes)
+- **`Window2D`** - bitmap/sprite-style 2D rendering
+- **`Window3D`** - GPU-accelerated 3D rendering
+- **SkiaSharp** Integration - Fonts, Filters, Canvas and more
+- **Input** - keyboard, mouse, gamepad, and touch via simple events
+- **Audio** - load and play WAV data
+- **Images** - load, save, manipulate pixels, apply filters
+- **Shaders** - load, save, dynamic compilation
+- **`Blitter.Bits`** - beyond the basics: useful tidbits for graphical apps
+- **`Blitter.Blocks`** - building blocks: sprites, scenes, panels and more
 
-The native SDL3 binaries are pulled in automatically — there is nothing to install separately. Targets **.NET 9**.
+The SDL3 and other native binaries are pulled in automatically; there is nothing to install separately.
 
 ## A 2D example
 
