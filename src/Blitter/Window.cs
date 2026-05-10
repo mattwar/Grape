@@ -135,6 +135,13 @@ public abstract class Window : IDisposable
             var id = Interlocked.Exchange(ref _window, 0);
             if (id != 0)
             {
+                _renderTick?.Dispose();
+                _renderTick = null;
+                _heartBeatTick?.Dispose();
+                _heartBeatTick = null;
+                _frameAwaiter?.Dispose();
+                _frameAwaiter = null;
+
                 OnDispose();
 
                 foreach (var resource in _resources)
@@ -720,57 +727,42 @@ public abstract class Window : IDisposable
     }
 
     private readonly object _heartBeatGate = new object();
-    private int _heartBeatGeneration;   // incremented on every rate change    
-    private CancellationTokenSource? _heartBeatCancellation;
+    private IDisposable? _heartBeatTick;
+    private long _heartBeatStartTs;
+    private long _heartBeatLastTs;
 
     private void SetHeartBeatRate(TimeSpan rate)
     {
         lock (_heartBeatGate)
         {
-            // Cancel any in-flight loop. We don't wait â€” old loops self-terminate.
-            _heartBeatCancellation?.Cancel();
-            _heartBeatCancellation?.Dispose();
-            _heartBeatCancellation = null;
+            _heartBeatTick?.Dispose();
+            _heartBeatTick = null;
 
-            var generation = ++_heartBeatGeneration;
-            if (rate <= TimeSpan.Zero) 
+            if (rate <= TimeSpan.Zero)
                 return;
 
-            var cts = new CancellationTokenSource();
-            _heartBeatCancellation = cts;
-            _ = RunHeartbeatAsync(rate, generation, cts.Token);
+            _heartBeatStartTs = Stopwatch.GetTimestamp();
+            _heartBeatLastTs = _heartBeatStartTs;
+            _heartBeatTick = Application.Current.ScheduleTick(rate, OnHeartBeatTick);
         }
     }
 
-    private async Task RunHeartbeatAsync(TimeSpan rate, int generation, CancellationToken ct)
+    private void OnHeartBeatTick()
     {
-        using var timer = new PeriodicTimer(rate);
-        var startTs = Stopwatch.GetTimestamp();
-        try
+        if (IsClosed)
         {
-            var lastBeatTime = startTs;
-
-            while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
-            {
-                if (IsClosed) 
-                    break;
-
-                // If a newer loop has been started, abandon ours silently.
-                if (Volatile.Read(ref _heartBeatGeneration) != generation) 
-                    break;
-
-                var nowTs = Stopwatch.GetTimestamp();
-                var elapsedSinceStart = Stopwatch.GetElapsedTime(startTs, nowTs);
-                var elapsedSinceLastBeat = Stopwatch.GetElapsedTime(lastBeatTime, nowTs);
-                lastBeatTime = nowTs;
-
-                OnHeartBeat(new HeartBeatEventArgs(elapsedSinceStart, elapsedSinceLastBeat));
-            }
+            // Window was closed while the tick was registered; tear it down.
+            _heartBeatTick?.Dispose();
+            _heartBeatTick = null;
+            return;
         }
-        catch (OperationCanceledException) 
-        { 
-            /* expected on rate change / dispose */ 
-        }
+
+        var nowTs = Stopwatch.GetTimestamp();
+        var elapsedSinceStart = Stopwatch.GetElapsedTime(_heartBeatStartTs, nowTs);
+        var elapsedSinceLastBeat = Stopwatch.GetElapsedTime(_heartBeatLastTs, nowTs);
+        _heartBeatLastTs = nowTs;
+
+        OnHeartBeat(new HeartBeatEventArgs(elapsedSinceStart, elapsedSinceLastBeat));
     }
 
     public event HeartBeatEventHandler? HeartBeat;
@@ -806,21 +798,29 @@ public abstract class Window : IDisposable
     /// </summary>
     public TimeSpan MinRenderInterval
     {
-        get => _frameTimer.Period;
+        get => _minRenderInterval;
         set
         {
             if (value < TimeSpan.Zero)
                 value = TimeSpan.Zero;
-            _frameTimer.Period = value;
-            // Wake the loop so it picks up the new period on the next tick.
-            _frameTickWake?.Cancel();
+            if (value == _minRenderInterval)
+                return;
+            _minRenderInterval = value;
+
+            // If the render tick is already registered, re-register it
+            // at the new period so the next tick fires at the updated
+            // cadence.
+            if (_renderTick is not null)
+            {
+                _renderTick.Dispose();
+                _renderTick = Application.Current.ScheduleTick(_minRenderInterval, OnRenderTick);
+            }
         }
     }
 
-    private readonly AsyncPeriodicTimer _frameTimer = new(TimeSpan.FromSeconds(1.0 / 60));
+    private TimeSpan _minRenderInterval = TimeSpan.FromSeconds(1.0 / 60);
     private int _invalidationRequested;
-    private bool _renderLoopRunning;
-    private CancellationTokenSource? _frameTickWake;
+    private IDisposable? _renderTick;
 
     /// <summary>
     /// Invalidates the window, requesting a new render. The render runs
@@ -838,56 +838,39 @@ public abstract class Window : IDisposable
 
     private void EnsureRenderLoopStarted()
     {
-        // Start the render loop on first invalidation. The loop runs on
-        // the application thread and uses the periodic timer between
-        // ticks, so it costs essentially nothing while idle.
-        if (_renderLoopRunning)
+        // Register the render tick on first invalidation. The tick runs
+        // on the application thread; while idle (no invalidations) it
+        // just polls the request flag at the configured cadence.
+        if (_renderTick is not null)
             return;
-        _renderLoopRunning = true;
-        Application.Current.Post(_ => _ = RunRenderLoopAsync(), null);
+        _renderTick = Application.Current.ScheduleTick(_minRenderInterval, OnRenderTick);
     }
 
-    private async Task RunRenderLoopAsync()
+    private void OnRenderTick()
     {
-        try
+        if (IsClosed)
         {
-            while (!IsClosed)
-            {
-                if (Interlocked.Exchange(ref _invalidationRequested, 0) == 1)
-                {
-                    try
-                    {
-                        RaiseRenderingEvent();
-                    }
-                    catch
-                    {
-                        // Swallow handler exceptions so they don't tear down
-                        // the render loop. Specific failures should be
-                        // diagnosed by the handlers themselves.
-                    }
-                }
+            _renderTick?.Dispose();
+            _renderTick = null;
+            return;
+        }
 
-                _frameTickWake = new CancellationTokenSource();
-                try
-                {
-                    await _frameTimer.NextPeriod(_frameTickWake.Token).ConfigureAwait(true);
-                }
-                catch (TaskCanceledException)
-                {
-                    // MaxFrameRate changed; recompute on next loop iteration.
-                }
-                finally
-                {
-                    _frameTickWake.Dispose();
-                    _frameTickWake = null;
-                }
+        if (Interlocked.Exchange(ref _invalidationRequested, 0) == 1)
+        {
+            try
+            {
+                RenderFrame(_renderingEventBody ??= () => RaiseRenderingEvent());
+            }
+            catch
+            {
+                // Swallow handler exceptions so they don't tear down
+                // the render loop. Specific failures should be
+                // diagnosed by the handlers themselves.
             }
         }
-        finally
-        {
-            _renderLoopRunning = false;
-        }
     }
+
+    private Action? _renderingEventBody;
 
     /// <summary>
     /// Awaits the start of the next frame tick, paced by
@@ -896,14 +879,110 @@ public abstract class Window : IDisposable
     /// event-driven path would use.
     /// </summary>
     /// <remarks>
-    /// Successive calls align to absolute period boundaries, so the
-    /// cadence stays steady even when individual frames overrun.
+    /// Allocation-free per iteration: the returned <see cref="ValueTask"/>
+    /// is backed by a reusable <see cref="PeriodicAwaiter"/> driven by the
+    /// application's tick scheduler. <paramref name="cancellationToken"/>
+    /// is observed only at call time — callers should re-check it (or
+    /// <see cref="IsClosed"/>) at the top of their loop body.
     /// </remarks>
-    public Task NextFrameAsync(CancellationToken cancellationToken = default)
-        => _frameTimer.NextPeriod(cancellationToken);
+    public ValueTask NextFrameAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (IsClosed)
+            return ValueTask.CompletedTask;
+        return EnsureFrameAwaiter().WaitForNextAsync();
+    }
 
-     /// <summary>
-    /// Raise the rendering event.
+    /// <summary>
+    /// Synchronously blocks the calling thread until the start of the
+    /// next frame tick, paced by <see cref="MinRenderInterval"/>. Use
+    /// this in a manual render loop owned by a thread other than the
+    /// application thread (e.g. the user's main thread) so the loop
+    /// stays on its own thread instead of being shifted by an
+    /// <c>await</c> continuation.
+    /// </summary>
+    public void WaitForNextFrame(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (IsClosed)
+            return;
+        EnsureFrameAwaiter().Wait(cancellationToken);
+    }
+
+    private PeriodicAwaiter EnsureFrameAwaiter()
+    {
+        // (Re)create the awaiter when MinRenderInterval changes so the
+        // tick cadence always matches the current setting.
+        var awaiter = _frameAwaiter;
+        if (awaiter is null || awaiter.Period != _minRenderInterval)
+        {
+            awaiter?.Dispose();
+            awaiter = new PeriodicAwaiter(_minRenderInterval);
+            _frameAwaiter = awaiter;
+        }
+        return awaiter;
+    }
+
+    private PeriodicAwaiter? _frameAwaiter;
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Func<bool> shouldContinue, Action renderFrame, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(renderFrame);
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                while (!IsClosed && !cancellationToken.IsCancellationRequested && shouldContinue())
+                {
+                    RenderFrame(renderFrame);
+                    if (IsClosed || cancellationToken.IsCancellationRequested)
+                        break;
+                    WaitForNextFrame(cancellationToken);
+                }
+                tcs.TrySetResult();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                tcs.TrySetCanceled(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                tcs.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = $"Blitter.RenderLoop ({Title})",
+        };
+        thread.Start();
+        return tcs.Task;
+    }
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Action renderFrame, CancellationToken cancellationToken = default)
+        => RunAsync(static () => true, renderFrame, cancellationToken);
+
+    /// <summary>
+    /// Invokes <paramref name="body"/> in a frame-rendering context:
+    /// any draws queued on the window's renderer are flushed once
+    /// <paramref name="body"/> returns, and stray <c>Render()</c> calls
+    /// from inside it are suppressed so they don't double-present.
+    /// </summary>
+    protected abstract void RenderFrame(Action body);
+
+    /// <summary>
+    /// Raises the <c>Rendering</c> event on derived classes; called
+    /// automatically by the event-driven render loop.
     /// </summary>
     protected abstract void RaiseRenderingEvent();
 

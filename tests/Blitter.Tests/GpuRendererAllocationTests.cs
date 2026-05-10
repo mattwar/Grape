@@ -11,25 +11,28 @@ namespace Blitter.Tests;
 [Trait("Category", "Gpu")]
 public class GpuRendererAllocationTests
 {
-    // Per-frame allocation budget (bytes). The eventual goal is 0 (or
-    // close to it); the current value is a baseline above today's
-    // measured per-frame allocations, set so the test catches *new*
-    // regressions while existing allocations are tracked down. Ratchet
-    // this number down as those leaks are fixed.
-    // Per-frame allocation budget (bytes). The eventual goal is 0 (or
-    // close to it); the current value is a baseline above today's
-    // measured per-frame allocations, set so the test catches *new*
-    // regressions while existing allocations are tracked down. Ratchet
-    // this number down as those leaks are fixed.
-    private const long PerFrameAllocationBudget = 64;
+    // Per-frame allocation slope budget (bytes/frame). We measure at two
+    // different frame counts and assert on the *marginal* bytes per extra
+    // frame. Fixed-cost background noise (xunit infra, finalizer thread,
+    // GC bookkeeping, SDL pump) appears in both measurements and cancels
+    // out in the subtraction, so the slope reflects only work that actually
+    // scales with frame count. The eventual goal is ~0; small positive (or
+    // negative) values are jitter.
+    private const double PerFrameSlopeBudget = 8.0;
+
+    // Frame counts for the two measurement runs. The gap (high - low)
+    // must be large enough that the absolute allocation difference
+    // dominates measurement jitter.
+    private const int LowFrames = 256;
+    private const int HighFrames = 2048;
 
     [Fact]
     public void DrawMesh_DoesNotAllocatePerFrame()
     {
         // Run from the test thread (not the app thread) so this also
         // covers the cross-thread Application.Current.Send marshaling
-        // path. The allocation budget assumes that path is alloc-free
-        // in steady state.
+        // path. The slope budget assumes that path is alloc-free in
+        // steady state.
         RunAllocationTest();
     }
 
@@ -50,41 +53,46 @@ public class GpuRendererAllocationTests
 
         var transform = Matrix4x4.CreateScale(0.8f);
 
-        // Warmup: absorb one-time costs (JIT, pipeline cache, command
-        // pool growth, mesh GPU upload, scratch buffer rentals).
-        const int WarmupFrames = 8;
-        for (var i = 0; i < WarmupFrames; i++)
+        void RunFrame()
         {
             renderer.Configure(Color.Black);
             renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
             renderer.Render();
         }
 
-        // Measured run.
-        const int MeasuredFrames = 64;
+        // Warmup: absorb one-time costs (JIT, pipeline cache, command
+        // pool growth, mesh GPU upload, scratch buffer rentals). Run
+        // past the tiered compilation tier1->tier2 recompilation
+        // threshold (~1000 hot calls) so the one-time JIT working-memory
+        // allocation doesn't land in the measurement window.
+        for (var i = 0; i < 2048; i++)
+            RunFrame();
 
+        // Two measurements at different lengths so the slope cancels
+        // fixed-cost background noise. Process-wide counter:
+        // GetTotalAllocatedBytes(precise: true) sees every thread, which
+        // matters because GpuRenderer marshals work onto the app thread.
+        var lowBytes = MeasureAllocated(RunFrame, LowFrames);
+        var highBytes = MeasureAllocated(RunFrame, HighFrames);
+
+        var slope = (double)(highBytes - lowBytes) / (HighFrames - LowFrames);
+
+        Assert.True(
+            slope <= PerFrameSlopeBudget,
+            $"Per-frame allocation slope {slope:N2} B/frame exceeds budget {PerFrameSlopeBudget:N2} B/frame " +
+            $"(low: {lowBytes:N0} B over {LowFrames} frames; high: {highBytes:N0} B over {HighFrames} frames).");
+    }
+
+    private static long MeasureAllocated(Action body, int iterations)
+    {
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
-        // Process-wide counter: GpuRenderer marshals the actual render
-        // work onto the application thread via Application.Current.Send,
-        // so a per-thread counter would miss the bulk of the allocations.
-        // GetTotalAllocatedBytes(precise: true) sees every thread.
         var before = GC.GetTotalAllocatedBytes(precise: true);
-        for (var i = 0; i < MeasuredFrames; i++)
-        {
-            renderer.Configure(Color.Black);
-            renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
-            renderer.Render();
-        }
-        var allocated = GC.GetTotalAllocatedBytes(precise: true) - before;
-
-        var perFrame = (double)allocated / MeasuredFrames;
-        Assert.True(
-            perFrame <= PerFrameAllocationBudget,
-            $"Per-frame allocation {perFrame:N1} bytes exceeds budget {PerFrameAllocationBudget} bytes " +
-            $"({allocated:N0} bytes over {MeasuredFrames} frames).");
+        for (var i = 0; i < iterations; i++)
+            body();
+        return GC.GetTotalAllocatedBytes(precise: true) - before;
     }
 
     // Diagnostic test that splits the per-frame work into Configure /

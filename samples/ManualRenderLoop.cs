@@ -24,24 +24,22 @@ var window = new Window3D
 {
     Title = "Manual Render Loop",
     BackgroundColor = new Color(0, 0, 32),
-    FullScreen = true
+    FullScreen = true,
 };
 
-while (!window.IsClosed && !Keyboard.IsDown(Key.Escape))
-{
-    var r = window.Renderer;
-    var seconds = (float)r.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = window.Size;
-    var aspect = (float)height / width;
-    var transform =
-        Matrix4x4.CreateRotationZ(seconds) *
-        Matrix4x4.CreateScale(0.8f) *
-        Matrix4x4.CreateScale(aspect, 1f, 1f);
+// Run until the user presses Escape (in addition to the default
+// "window closed" exit). Any predicate works here.
+await window.RunAsync(
+    shouldContinue: () => !Keyboard.IsDown(Key.Escape),
+    renderFrame: r =>
+    {
+        var seconds = (float)r.ElapsedSinceStart.TotalSeconds;
+        var (width, height) = window.Size;
+        var aspect = (float)height / width;
+        var transform =
+            Matrix4x4.CreateRotationZ(seconds) *
+            Matrix4x4.CreateScale(0.8f) *
+            Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    r.DrawMesh(triangle, transform);
-    r.Render();
-
-    await window.NextFrameAsync();
-}
-
-window.Close();
+        r.DrawMesh(triangle, transform);
+    });

@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 using Blitter.Devices;
 using Blitter.Events;
@@ -313,6 +314,10 @@ public class Application : IDisposable
 
     private void RunEventLoop()
     {
+        // Default poll cadence so we re-check SDL events even when there
+        // are no scheduled ticks or pending work items.
+        const int MaxIdleWaitMs = 16;
+
         while (!IsShutdown && !_quitRequested)
         {
             while (SDL.PollEvent(out var e))
@@ -325,13 +330,165 @@ public class Application : IDisposable
 
             DrainWorkQueue();
 
-            // Wait briefly for new work or until the next 16ms tick to
-            // re-poll SDL events. _wakeSignal is set by EnqueueWork so
-            // cross-thread Send/Post wake up immediately.
-            _wakeSignal.Wait(16);
+            var nowTs = Stopwatch.GetTimestamp();
+            var nextTickTs = ProcessDueTicks(nowTs);
+
+            int waitMs = MaxIdleWaitMs;
+            if (nextTickTs != long.MaxValue)
+            {
+                var deltaTicks = nextTickTs - Stopwatch.GetTimestamp();
+                if (deltaTicks <= 0)
+                {
+                    waitMs = 0;
+                }
+                else
+                {
+                    var deltaMs = (deltaTicks * 1000L) / Stopwatch.Frequency;
+                    waitMs = (int)Math.Min(MaxIdleWaitMs, Math.Max(0, deltaMs));
+                }
+            }
+
+            // Wait until new work, the next due tick, or the idle poll
+            // interval. _wakeSignal is set by EnqueueWork and by tick
+            // (un)registration so cross-thread callers wake the loop
+            // immediately.
+            if (waitMs > 0)
+                _wakeSignal.Wait(waitMs);
             _wakeSignal.Reset();
         }
     }
+
+    #region Tick scheduling
+
+    // Periodic callbacks driven from inside the event loop. Used by
+    // Window's render and heartbeat loops so they don't have to allocate
+    // a Task per wait via PeriodicTimer / Task.Delay.
+    private readonly object _ticksLock = new();
+    private readonly List<AppTick> _ticks = new();
+    private AppTick[] _tickSnapshotBuffer = new AppTick[4];
+
+    /// <summary>
+    /// Schedules <paramref name="callback"/> to be invoked on the
+    /// application thread every <paramref name="period"/>. Dispose the
+    /// returned handle to unregister. Steady-state allocation-free.
+    /// </summary>
+    public IDisposable ScheduleTick(TimeSpan period, Action callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        if (period < TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(period));
+
+        var tick = new AppTick(this, callback, period);
+        lock (_ticksLock)
+        {
+            _ticks.Add(tick);
+        }
+        _wakeSignal.Set();
+        return tick;
+    }
+
+    private void UnregisterTick(AppTick tick)
+    {
+        lock (_ticksLock)
+        {
+            _ticks.Remove(tick);
+        }
+        _wakeSignal.Set();
+    }
+
+    private long ProcessDueTicks(long nowTs)
+    {
+        int count;
+        AppTick[] buffer;
+        lock (_ticksLock)
+        {
+            count = _ticks.Count;
+            if (count == 0)
+                return long.MaxValue;
+            if (_tickSnapshotBuffer.Length < count)
+                _tickSnapshotBuffer = new AppTick[Math.Max(count, _tickSnapshotBuffer.Length * 2)];
+            _ticks.CopyTo(_tickSnapshotBuffer, 0);
+            buffer = _tickSnapshotBuffer;
+        }
+
+        long nextDeadlineTs = long.MaxValue;
+        for (var i = 0; i < count; i++)
+        {
+            var tick = buffer[i];
+            buffer[i] = null!; // release reference held by the snapshot buffer
+
+            if (tick.Disposed)
+                continue;
+
+            if (nowTs >= tick.NextTickTs)
+            {
+                try
+                {
+                    tick.Callback();
+                }
+                catch
+                {
+                    // Swallow handler exceptions so they don't tear down
+                    // the event loop. Specific failures should be
+                    // diagnosed by the handlers themselves.
+                }
+
+                if (tick.Disposed)
+                    continue;
+
+                // Advance from now (drift-resistant: skip missed ticks).
+                tick.NextTickTs = nowTs + tick.PeriodStopwatchTicks;
+            }
+
+            if (tick.NextTickTs < nextDeadlineTs)
+                nextDeadlineTs = tick.NextTickTs;
+        }
+
+        return nextDeadlineTs;
+    }
+
+    private sealed class AppTick : IDisposable
+    {
+        private readonly Application _app;
+        public Action Callback { get; }
+        public long PeriodStopwatchTicks { get; private set; }
+        public long NextTickTs;
+        public bool Disposed;
+
+        public AppTick(Application app, Action callback, TimeSpan period)
+        {
+            _app = app;
+            this.Callback = callback;
+            this.Period = period;
+        }
+
+        public TimeSpan Period
+        {
+            get => StopwatchTicksToTimeSpan(this.PeriodStopwatchTicks);
+            set
+            {
+                this.PeriodStopwatchTicks = TimeSpanToStopwatchTicks(value);
+                this.NextTickTs = Stopwatch.GetTimestamp() + this.PeriodStopwatchTicks;
+                _app._wakeSignal.Set();
+            }
+        }
+
+        public void Dispose()
+        {
+            if (this.Disposed)
+                return;
+            this.Disposed = true;
+            _app.UnregisterTick(this);
+        }
+
+        private static long TimeSpanToStopwatchTicks(TimeSpan ts)
+            => (long)(ts.Ticks * ((double)Stopwatch.Frequency / TimeSpan.TicksPerSecond));
+
+        private static TimeSpan StopwatchTicksToTimeSpan(long sw)
+            => TimeSpan.FromTicks((long)(sw * ((double)TimeSpan.TicksPerSecond / Stopwatch.Frequency)));
+    }
+
+    #endregion
 
     /// <summary>
     /// Executes the callback asynchronously on the application's main thread.

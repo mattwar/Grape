@@ -63,22 +63,29 @@ public class Window2D : Window
         var renderer = _renderer;
         var handler = _renderingHandler;
         if (renderer != null && handler != null)
+            handler.Invoke(this, renderer);
+    }
+
+    protected override void RenderFrame(Action body)
+    {
+        var renderer = _renderer;
+        if (renderer == null)
+            return;
+
+        // The window owns the single per-frame Render() flush. Stray
+        // Render() calls from inside the body are suppressed so they
+        // don't double-present.
+        var prev = renderer.RenderSuppressed;
+        renderer.RenderSuppressed = true;
+        try
         {
-            // The window owns the single per-frame Render() flush in the
-            // event-driven path. Stray Render() calls from inside the
-            // handler are suppressed so they don't double-present.
-            var prev = renderer.RenderSuppressed;
-            renderer.RenderSuppressed = true;
-            try
-            {
-                handler.Invoke(this, renderer);
-            }
-            finally
-            {
-                renderer.RenderSuppressed = prev;
-            }
-            renderer.Render();
+            body();
         }
+        finally
+        {
+            renderer.RenderSuppressed = prev;
+        }
+        renderer.Render();
     }
 
     /// <summary>
@@ -87,6 +94,24 @@ public class Window2D : Window
     /// </summary>
     public Renderer2D Renderer => _renderer
         ?? throw new InvalidOperationException("Renderer is not yet available.");
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until <paramref name="shouldContinue"/> returns false, the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Func<bool> shouldContinue, Action<Renderer2D> renderFrame, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(shouldContinue);
+        ArgumentNullException.ThrowIfNull(renderFrame);
+        return RunAsync(shouldContinue, () => renderFrame(this.Renderer), cancellationToken);
+    }
+
+    /// <summary>
+    /// Animates the window by repeatedly calling <paramref name="renderFrame"/> on each frame tick
+    /// until the window is closed, or <paramref name="cancellationToken"/> fires.
+    /// </summary>
+    public Task RunAsync(Action<Renderer2D> renderFrame, CancellationToken cancellationToken = default)
+        => RunAsync(static () => true, renderFrame, cancellationToken);
 
     /// <summary>
     /// A 2D renderer that draws into a <see cref="Window2D"/>'s swapchain.
