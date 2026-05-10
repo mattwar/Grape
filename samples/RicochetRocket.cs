@@ -21,7 +21,13 @@ using Blitter.Blocks;
 static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
     => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
 
-var window = new Window2D
+// Fixed design surface. The renderer letterboxes this into whatever
+// the actual window size is, so the playfield stays a constant
+// 1920x1080 regardless of monitor resolution or fullscreen toggles.
+const int DesignW = 1920;
+const int DesignH = 1080;
+
+var window = new Window2D(DesignW, DesignH)
 {
     Title = "Ricochet Rocket",
     BackgroundColor = new Color(0, 20, 0, 0),
@@ -29,16 +35,14 @@ var window = new Window2D
     CloseKey = Key.Escape,
 };
 
-var icon = Image.Load(SampleAsset("Blitter.bmp"));
-icon.SetAlpha(0, icon.GetPixel(0, 0));
-window.Icon = icon;
+window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 var rocketImage = Image.Load(SampleAsset("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
-var rocket = new Sprite2D(rocketImage, window.Size.Width / 2, window.Size.Height / 2, 0.2f)
+var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 {
     Speed = 600f,
-    Heading = 45f,
+    Heading = 45f
 };
 
 var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
@@ -74,7 +78,7 @@ window.Rendering += (w, rd) =>
             rocket.ChangeVelocity((vx, vy) => (Math.Abs(vx), vy));
             bounce = true;
         }
-        else if (rocket.CenterX > w.Size.Width)
+        else if (rocket.CenterX > DesignW)
         {
             rocket.ChangeVelocity((vx, vy) => (-Math.Abs(vx), vy));
             bounce = true;
@@ -86,7 +90,7 @@ window.Rendering += (w, rd) =>
             rocket.ChangeVelocity((vx, vy) => (vx, Math.Abs(vy)));
             bounce = true;
         }
-        else if (rocket.CenterY > w.Size.Height)
+        else if (rocket.CenterY > DesignH)
         {
             rocket.ChangeVelocity((vx, vy) => (vx, -Math.Abs(vy)));
             bounce = true;
@@ -108,7 +112,7 @@ window.Rendering += (w, rd) =>
     rd.DrawDebugText(
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
-        scale: 4f);
+        scale: 2f);
 
     w.Invalidate(); // request the next rendering
 };

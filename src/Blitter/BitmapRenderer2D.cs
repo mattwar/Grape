@@ -209,6 +209,13 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
+    public override void SetLogicalSize(int width, int height, LogicalPresentation mode)
+    {
+        if (IsDisposed)
+            return;
+        SDL.SetRenderLogicalPresentation(_rendererId, width, height, (SDL.RendererLogicalPresentation)mode);
+    }
+
     public override Rect LogicalRepresentationRect
     {
         get

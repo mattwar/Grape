@@ -8,14 +8,15 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates how to use a SkiaSharp-rendered atlas with Blitter:
-// build the atlas once with Skia, convert it to a Blitter Image, then
-// blit slices of it hundreds of times per frame as falling confetti.
+// Demonstrates how tightly SkiaSharp integrates with Blitter:
+// `Image.DrawCanvas(canvas => ...)` hands you an SKCanvas pointing
+// at the image's pixels, so you can use any Skia drawing code to
+// build textures the renderer can blit. Here we bake an atlas once
+// at startup, then blit cells of it hundreds of times per frame as
+// falling confetti.
 //
-// The conversion (`bitmap.ToImage()`) happens once at startup. After
-// that the Image owns the pixels and `DrawImage` is the standard
-// renderer call -- the GPU texture for the atlas is created on first
-// use and reused for every confetti blit.
+// If you already have an SKBitmap from another source (PNG decode,
+// procedural pipeline, etc.), `bitmap.ToImage()` adopts it instead.
 //
 // For per-frame procedural drawing (where the pixels actually change
 // every frame) use `Renderer2D.DrawCanvas(rect, action)` instead;
@@ -33,8 +34,13 @@ const int AtlasW    = CellSize * AtlasCols;
 const int AtlasH    = CellSize * AtlasRows;
 const int ConfettiCount = 320;
 
-// Build the atlas once. Per cell: a diagonal gradient backdrop and
-// an anti-aliased character centered on top.
+// All draws inside the rendering callback work in this fixed design
+// space. The renderer's ViewPort + Scale letterbox it into whatever
+// the actual window size is, so the layout stays aspect-correct on
+// resize / fullscreen.
+const int DesignW = 960;
+const int DesignH = 540;
+
 char[] glyphs =
 [
     'B','L','I','T',
@@ -51,11 +57,13 @@ SKColor[] hues =
     new(0xFF, 0xFF, 0x6B), new(0x6B, 0xFF, 0x9E), new(0xFF, 0x6B, 0x4E), new(0x4E, 0x6B, 0xFF),
 ];
 
-var atlasInfo = new SKImageInfo(AtlasW, AtlasH, SKColorType.Rgba8888, SKAlphaType.Unpremul);
-var atlas = new SKBitmap(atlasInfo);
-using (var canvas = new SKCanvas(atlas))
+// Build the atlas once. Per cell: a diagonal gradient backdrop and
+// an anti-aliased character centered on top. `Image.DrawCanvas`
+// gives us an SKCanvas pointing at the image's pixels -- everything
+// inside the lambda is plain SkiaSharp code.
+var atlasImage = Image.Create(AtlasW, AtlasH);
+atlasImage.DrawCanvas(canvas =>
 {
-    canvas.Clear(SKColors.Transparent);
     using var typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold);
     using var font = new SKFont(typeface, CellSize * 0.7f);
     using var glyphPaint = new SKPaint
@@ -97,14 +105,12 @@ using (var canvas = new SKCanvas(atlas))
                 SKTextAlign.Center, font, glyphPaint);
         }
     }
-}
+});
 
-// Snapshot the SkiaSharp atlas into a Blitter Image, then wrap that
-// Image in an Atlas so glyph cells can be looked up by index instead
-// of recomputing src rects on every blit. The Atlas takes ownership
-// of the Image (default), so disposing the atlas releases everything.
-var atlasImage = atlas.ToImage();
-atlas.Dispose();
+// Wrap the image in an Atlas so glyph cells can be looked up by
+// index instead of recomputing src rects on every blit. The Atlas
+// takes ownership of the Image (default), so disposing the atlas
+// releases everything.
 var atlasGrid = Atlas.Grid(atlasImage, AtlasCols, AtlasRows);
 
 // Confetti state. Each piece picks an atlas cell, a screen position,
@@ -121,14 +127,20 @@ var window = new Window2D(960, 540)
     CloseKey = Key.Escape,
 };
 
+// Tell the renderer to treat the surface as a fixed DesignW x DesignH
+// drawing area and letterbox it into whatever the window grows to.
+// All draws inside the rendering callback now use design coordinates;
+// SDL handles scaling, centering, and letterbox bars (filled with the
+// window's BackgroundColor).
+window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
+
 window.Rendering += (w, rd) =>
 {
-    var (width, height) = w.Size;
     float dt = (float)rd.ElapsedSinceLastRender.TotalSeconds;
 
     // Show the atlas itself in the top-left so the source material is
     // obvious. Renders the whole image to a fixed-size destination.
-    int previewSize = Math.Min(width, height) / 4;
+    int previewSize = Math.Min(DesignW, DesignH) / 4;
     rd.DrawImage(atlasGrid.Image, new Rect(20, 20, previewSize, previewSize));
 
     // Caption -- pure Renderer2D, no Skia involved.
@@ -141,7 +153,7 @@ window.Rendering += (w, rd) =>
         ref var c = ref confetti[i];
         c.Pos += c.Vel * dt;
         c.Vel.Y += 220f * dt;
-        if (c.Pos.Y - c.Size > height)
+        if (c.Pos.Y - c.Size > DesignH)
             c = SpawnConfetti(rng, initial: false);
 
         // Source rect comes from the Atlas; destination is a square at
@@ -166,9 +178,9 @@ static Confetti SpawnConfetti(Random rng, bool initial)
         // populated immediately; otherwise spawn just above the top
         // edge so recycled pieces fall in.
         Pos = new Vector2(
-            (float)rng.NextDouble() * 960f,
+            (float)rng.NextDouble() * DesignW,
             initial
-                ? (float)rng.NextDouble() * 540f
+                ? (float)rng.NextDouble() * DesignH
                 : -size - (float)rng.NextDouble() * 200f),
         Vel = new Vector2(
             ((float)rng.NextDouble() - 0.5f) * 80f,

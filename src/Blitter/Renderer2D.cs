@@ -108,6 +108,17 @@ public abstract class Renderer2D
     /// <summary>The portion of the rendering target where draws are performed.</summary>
     public abstract Rect ViewPort { get; set; }
 
+    /// <summary>
+    /// Configures a fixed logical drawing surface that the renderer
+    /// scales to fit the actual output. After calling this, all draws
+    /// use coordinates in the (<paramref name="width"/>,
+    /// <paramref name="height"/>) space and the renderer handles
+    /// scaling, centering, and letterbox bars automatically.
+    /// Pass <see cref="LogicalPresentation.Disabled"/> with any size
+    /// to turn it off.
+    /// </summary>
+    public abstract void SetLogicalSize(int width, int height, LogicalPresentation mode);
+
     #endregion
 
     #region Frame

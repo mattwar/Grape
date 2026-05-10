@@ -30,7 +30,13 @@ public sealed class Image : IDisposable
     /// </summary>
     public bool Mipmaps { get; }
 
-    public static Image Create(int width, int height, PixelFormat format, bool mipmaps = false)
+    /// <summary>
+    /// Creates a new image of the given size. The default format,
+    /// <see cref="PixelFormat.ABGR8888"/>, is the 32-bpp RGBA layout used
+    /// throughout Blitter; pass an explicit format only for specialized
+    /// surfaces (paletted, YUV, 16-bit, float, etc.).
+    /// </summary>
+    public static Image Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
     {
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
