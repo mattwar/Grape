@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -129,7 +129,7 @@ window.Rendering += (w, rd) =>
     // Backdrop drawn opaque (default DepthMode.Solid + BlendMode.Alpha
     // is fine here -- the quad's vertices have alpha=255 so it acts
     // opaque and writes depth normally).
-    rd.DrawMesh(backdrop, ShaderSets.PositionColorWithTransform, viewProjection);
+    rd.DrawMesh(backdrop, Shaders.PositionColorWithTransform, viewProjection);
 
     // Four wide thin bands stacked vertically. Bands are well
     // separated by visible gaps so the bare backdrop shows through
@@ -164,7 +164,7 @@ window.Rendering += (w, rd) =>
             // get discarded on the equal-depth comparison and you only
             // see the gradient backdrop.
             rd.DepthMode = DepthMode.Overlay;
-            rd.DrawMesh(sample.Mesh, ShaderSets.PositionColorWithTransform, transform);
+            rd.DrawMesh(sample.Mesh, Shaders.PositionColorWithTransform, transform);
         }
     }
 

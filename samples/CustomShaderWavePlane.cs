@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -25,7 +25,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Blitter;
-using Blitter.Shaders;
 
 const int subdivisions = 96;       // grid resolution along each axis
 const float planeSize  = 12f;      // world-space side length of the plane
@@ -64,8 +63,8 @@ var plane = Mesh.Create(verts, indices);
 // ----- Custom shader. Position-only vertex layout in, animated wave +
 // height-coloured fragments out.
 
-var waveSet = new ShaderSet<Vertex3D, WaveArgs>(
-    """
+var waveShader = new Shader<Vertex3D, WaveArgs>(
+    vertex: """
     cbuffer VP   : register(b0, space1) { float4x4 viewProjection; };
     cbuffer Wave : register(b1, space1) { float4 waveParams;       }; // x=time, y=amplitude, z=frequency
 
@@ -146,7 +145,7 @@ window.Rendering += (w, rd) =>
         // culling here.
         rd.CullMode = CullMode.None;
 
-        rd.DrawMesh(plane, waveSet, new WaveArgs
+        rd.DrawMesh(plane, waveShader, new WaveArgs
         {
             // ViewProjection is filled in by the renderer via IUniformArgs.
             WaveParams = new Vector4(

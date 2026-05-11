@@ -1,6 +1,6 @@
-namespace Blitter.Tests;
+﻿namespace Blitter.Tests;
 
-public class ShaderSetsBuiltInTests
+public class ShadersBuiltInTests
 {
     [Fact]
     public void LitColor_FragmentShader_DeclaresPointLightStorageBuffer()
@@ -11,7 +11,7 @@ public class ShaderSetsBuiltInTests
         // as a storage buffer, the GpuRenderer will silently fail to
         // bind anything, the shader will read garbage, and lit scenes
         // will look wrong without an obvious cause -- catch it here.
-        var f = ShaderSets.LitColor.Fragment.GetResources();
+        var f = Shaders.LitColor.Fragment.GetResources();
 
         Assert.Equal(1u, f.NumStorageBuffers);
         Assert.Equal(0u, f.NumSamplers);
@@ -23,7 +23,7 @@ public class ShaderSetsBuiltInTests
     [Fact]
     public void LitColor_VertexShader_HasNoTexturesOrStorage()
     {
-        var v = ShaderSets.LitColor.Vertex.GetResources();
+        var v = Shaders.LitColor.Vertex.GetResources();
 
         Assert.Equal(0u, v.NumStorageBuffers);
         Assert.Equal(0u, v.NumSamplers);
@@ -41,7 +41,7 @@ public class ShaderSetsBuiltInTests
         // texture takes slot 0). If reflection ever miscounts these,
         // the renderer will fail to bind something and the resulting
         // visual breakage won't be obvious -- catch it here.
-        var f = ShaderSets.LitTexture.Fragment.GetResources();
+        var f = Shaders.LitTexture.Fragment.GetResources();
 
         Assert.Equal(1u, f.NumSamplers);
         Assert.Equal(1u, f.NumStorageBuffers);
@@ -52,7 +52,7 @@ public class ShaderSetsBuiltInTests
     [Fact]
     public void LitTexture_VertexShader_HasNoTexturesOrStorage()
     {
-        var v = ShaderSets.LitTexture.Vertex.GetResources();
+        var v = Shaders.LitTexture.Vertex.GetResources();
 
         Assert.Equal(0u, v.NumStorageBuffers);
         Assert.Equal(0u, v.NumSamplers);

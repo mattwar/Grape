@@ -1,10 +1,10 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Blitter;
 
 /// <summary>
-/// Per-draw arguments for <see cref="ShaderSets.LitColor"/>. Carries the
+/// Per-draw arguments for <see cref="Shaders.LitColor"/>. Carries the
 /// model matrix the user supplies and lighting fields that the renderer
 /// fills in from <see cref="Renderer3D.Camera"/>,
 /// <see cref="Renderer3D.AmbientLight"/>,

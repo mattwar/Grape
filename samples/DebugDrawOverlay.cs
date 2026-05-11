@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -64,7 +64,7 @@ window.Rendering += (w, rd) =>
     var t = (float)rd.ElapsedSinceStart.TotalSeconds;
 
     // The "real" scene: one lit cube.
-    rd.DrawMesh(cube, ShaderSets.LitColor, new LitArgs(Matrix4x4.CreateRotationY(t * 0.5f)));
+    rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(Matrix4x4.CreateRotationY(t * 0.5f)));
 
     // ---- Debug overlay --------------------------------------------
 

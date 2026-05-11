@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace Blitter;
 
@@ -45,7 +45,7 @@ public sealed class Submesh
 /// <see cref="Model.Load(string)"/> for OBJ files) or assembled
 /// directly. Drawing is one call: <see cref="Draw"/> walks every
 /// submesh, applies its material, and queues the draw through
-/// <see cref="ShaderSets.LitTexture"/>.
+/// <see cref="Shaders.LitTexture"/>.
 /// </summary>
 public sealed class Model : IDisposable
 {
@@ -116,7 +116,7 @@ public sealed class Model : IDisposable
             // Today's behavior: the texture is what varies per-draw;
             // tint is whatever the vertex carries.
             var texture = sub.Material.DiffuseTexture ?? _whitePlaceholder;
-            renderer.DrawMesh(sub.Mesh, texture, ShaderSets.LitTexture, args);
+            renderer.DrawMesh(sub.Mesh, texture, Shaders.LitTexture, args);
         }
     }
 

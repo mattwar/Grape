@@ -1,8 +1,7 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
-using Blitter.Shaders;
 using Blitter.Utilities;
 
 namespace Blitter;
@@ -32,7 +31,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private readonly HashSet<Image> _failedTextureUploads = new();
     private readonly HashSet<Cubemap> _failedCubemapUploads = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
-    private readonly Dictionary<Shader, GpuShader> _stageShaders = new();
+    private readonly Dictionary<StageShader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
     private readonly PoolMap _commandPools = new();
 
@@ -78,7 +77,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
 
     // Multisample color scratch target. Allocated only when the active
-    // antialiasing level is greater than 1×; the render pass writes into
+    // antialiasing level is greater than 1Ã—; the render pass writes into
     // this texture and resolves it down to the actual color target
     // (swapchain image, owned image, etc.) at end-of-pass.
     private GpuTexture? _msaaColorTexture;
@@ -454,7 +453,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Queues a mesh for drawing using the given shader.
     /// </summary>
-    public override void DrawMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
+    public override void DrawMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -469,11 +468,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// Queues a mesh for drawing using a shader that takes a typed per-draw arguments
     /// value. The bytes of <paramref name="args"/> are split across
     /// stage/slot pairs as described by
-    /// <see cref="ShaderSet{TVertex,TArgs}.ArgsLayout"/>.
+    /// <see cref="Shader{TVertex,TArgs}.ArgsLayout"/>.
     /// </summary>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -498,7 +497,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex> shader)
+        Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -516,7 +515,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -530,14 +529,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Cubemap variant of <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Image, ShaderSet{TVertex})"/>.
+    /// Cubemap variant of <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Image, Shader{TVertex})"/>.
     /// The shader's fragment-stage texture binding (slot 0) must be a
     /// <c>TextureCube</c> rather than a <c>Texture2D</c>.
     /// </summary>
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
-        ShaderSet<TVertex> shader)
+        Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
@@ -550,12 +549,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Cubemap variant of <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Image, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// Cubemap variant of <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Image, Shader{TVertex,TArgs}, in TArgs)"/>.
     /// </summary>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -574,7 +573,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     internal void DrawTexturedMeshCore<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex> shader,
+        Shader<TVertex> shader,
         GpuSampler? sampler)
         where TVertex : unmanaged
     {
@@ -591,7 +590,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         GpuSampler? sampler,
         in TArgs args)
         where TVertex : unmanaged
@@ -610,7 +609,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <inheritdoc/>
     public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
     {
@@ -621,7 +620,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         Image texture,
-        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
     {
@@ -632,7 +631,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private void QueueInstanced<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         Image? texture,
-        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
         where TVertex : unmanaged
@@ -693,7 +692,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Renders ASCII debug text using SDL's built-in 8x8 bitmap font, on a
     /// strip of textured quads. The font atlas is built once on first use
-    /// (one quad per character, sampled from a shared 128×64 image).
+    /// (one quad per character, sampled from a shared 128Ã—64 image).
     /// </summary>
     /// <param name="text">The text to render. Non-ASCII characters render
     /// as the glyph at code 0.</param>
@@ -798,7 +797,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         DrawTexturedMeshCore(
             mesh,
             atlas,
-            ShaderSets.PositionTextureWithTransform,
+            Shaders.PositionTextureWithTransform,
             sampler,
             in argsTransform);
     }
@@ -1140,7 +1139,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     if (command.Cubemap is { } failedCubemap && _failedCubemapUploads.Contains(failedCubemap))
                         continue;
 
-                    var shader = command.Shader;
+                    var shader = command.Pipeline;
                     var vsGpu = GetOrCreateGpuShader(shader.Vertex);
                     var fsGpu = GetOrCreateGpuShader(shader.Fragment);
                     var pipeline = GetOrCreatePipeline(
@@ -1825,7 +1824,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         renderPass.SetScissor(new SDL.Rect { X = x, Y = y, W = w, H = h });
     }
 
-    private GpuShader GetOrCreateGpuShader(Shader stage)
+    private GpuShader GetOrCreateGpuShader(StageShader stage)
     {
         if (_stageShaders.TryGetValue(stage, out var existing))
             return existing;
@@ -1838,7 +1837,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Code = code,
             Entrypoint = stage.Entrypoint,
             Format = MapShaderFormat(format),
-            Stage = stage.Kind == ShaderKind.Vertex
+            Stage = stage is VertexShader
                 ? SDL.GPUShaderStage.Vertex
                 : SDL.GPUShaderStage.Fragment,
             NumSamplers = resources.NumSamplers,
@@ -2224,7 +2223,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private abstract record DrawCommand
     {
         public Mesh Mesh { get; private protected set; } = null!;
-        public ShaderSet Shader { get; private protected set; } = null!;
+        public Shader Pipeline { get; private protected set; } = null!;
         public Image? Texture { get; private protected set; }
         public Cubemap? Cubemap { get; private protected set; }
         public GpuSampler? Sampler { get; private protected set; }
@@ -2293,7 +2292,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         public void Init(
             Mesh mesh, 
-            ShaderSet shader,
+            Shader shader,
             Image? texture,
             Cubemap? cubemap,
             GpuSampler? sampler,
@@ -2306,7 +2305,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Rect? clipRect)
         {
             this.Mesh = mesh;
-            this.Shader = shader;
+            this.Pipeline = shader;
             this.Texture = texture;
             this.Cubemap = cubemap;
             this.Sampler = sampler;
@@ -2344,7 +2343,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         public void Init(
             Mesh mesh, 
-            ShaderSet shader,            
+            Shader shader,            
             Image? texture,
             Cubemap? cubemap,
             GpuSampler? sampler,
@@ -2359,7 +2358,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             TArgs args)
         {
             this.Mesh = mesh;
-            this.Shader = shader;
+            this.Pipeline = shader;
             this.Texture = texture;
             this.Cubemap = cubemap;
             this.Sampler = sampler;
@@ -2440,7 +2439,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         public void Init(
             Mesh mesh, 
-            ShaderSet shader,
+            Shader shader,
             Image? texture,
             Cubemap? cubemap,
             GpuSampler? sampler,
@@ -2458,7 +2457,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             )
         {
             this.Mesh = mesh;
-            this.Shader = shader;
+            this.Pipeline = shader;
             this.Texture = texture;
             this.Cubemap = cubemap;
             this.Sampler = sampler;

@@ -1,4 +1,4 @@
-# Changelog
+﻿# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -96,6 +96,16 @@ All notable changes to this project will be documented in this file.
   SkiaSharp rendering integration and `Blitter.Bits.Font`.
 
 ### Changed
+- Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
+  `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
+- Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of
+  `Shader<,>`, not a subclass — instanced shaders can't be passed to
+  non-instanced draw overloads).
+- The per-stage shader type is now `StageShader` (abstract) with
+  concrete `VertexShader` and `FragmentShader` subclasses; pass these
+  directly instead of constructing a stage with a `ShaderKind`.
+- Promoted everything in the `Blitter.Shaders` namespace into
+  `Blitter`; drop `using Blitter.Shaders;`.
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
 - Window render-tick and heartbeat loops are now allocation-free per
   tick (no per-iteration `Task.Delay` / `PeriodicTimer` waits).
@@ -156,14 +166,14 @@ All notable changes to this project will be documented in this file.
 - `Renderer3D.Wireframe` toggle deriving deduped edge indices on demand.
 - Per-draw `BlendMode` (`Alpha`/`Opaque`/`Additive`/`Multiply`).
 - `Renderer3D.Viewport` and `ClipRect` (scissor).
-- Hardware instancing via `InstancedShaderSet<TVertex,TArgs,TInstance>` and `Renderer3D.DrawMesh(... instances)`.
+- Hardware instancing via `Shader<TVertex,TArgs,TInstance>` and `Renderer3D.DrawMesh(... instances)`.
 - Built-in instanced shaders: `PositionInstanced`, `PositionColorInstanced`, `PositionTextureInstanced`.
 - Mipmap chains + anisotropic filtering via `Image.Mipmaps` flag (auto-generated on the GPU).
 - `Cubemap` type + `Image.Flip` / `Image.Rotate` helpers + `Shaders.Skybox` shader set.
 - MSAA via `Renderer3D.Antialiasing` (`None`/`X2`/`X4`/`X8`).
 - `Camera3D` (`PerspectiveCamera`, `OrthographicCamera`) integrated as `Renderer3D.Camera`.
 - Lighting: `Renderer3D.AmbientLight`, `DirectionalLight`, `PointLights` consumed via `IUniformArgs<TSelf>`.
-- Built-in lit shaders: `ShaderSets.LitColor`, `ShaderSets.LitTexture` with `LitArgs`.
+- Built-in lit shaders: `Shaders.LitColor`, `Shaders.LitTexture` with `LitArgs`.
 - `PushState()` returning a scoped `StateScope` snapshotting all renderer state.
 - New samples: `OrbitingTetrahedra`, `OverlayTetrahedron`, `CullingComparison`, `IndexedCube`, `LinesAndTriangles`, `WireframeCube`, `TriangleSwarm`, `TriangleSwarmInstanced`, `MipmapsAnimated`, `Skybox`, `Antialiasing`, `BlendModes`, `SplitScreen3D`, `ClippedScene`, `LitCube`, `OrbitingLight`, `PointLights`, `LoadObjModel`, `StanfordBunny`.
 
@@ -171,7 +181,7 @@ All notable changes to this project will be documented in this file.
 - Folded `Grape.SkiaSharp` into `Grape`; SkiaSharp is now a core dep.
 - `Image.Load` dispatches by extension: `.bmp` via SDL, others via SkiaSharp.
 - `Image.Save` dispatches by extension: `.bmp` via SDL, `.png`/`.jpg`/`.webp` via SkiaSharp.
-- Split monolithic `Events.cs`, `GpuDevice.cs`, and `Shader.cs` into per-type files.
+- Split monolithic `Events.cs`, `GpuDevice.cs`, and `StageShader.cs` into per-type files.
 - Flattened `Graphics/` and `System/` subfolders into the project root.
 
 ### Removed

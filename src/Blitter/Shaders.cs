@@ -1,26 +1,14 @@
-using System.Numerics;
-using Blitter.Shaders;
+﻿using System.Numerics;
 
 namespace Blitter;
 
 /// <summary>
-/// The vertex/fragment shader pairs Blitter ships with. Each shader is
-/// described as inline HLSL source and only compiled to the format the GPU
-/// device needs on first draw, courtesy of <see cref="Shader"/>'s lazy
-/// compilation pipeline. Construction is essentially free -- the cost is
-/// just a few string references and small layout objects -- so all sets are
-/// pre-built as singletons at class-load time.
+/// Built-in shaders for basic functionality.
 /// </summary>
-/// <remarks>
-/// <para>
-/// Resource bindings follow SDL3 GPU's SPIR-V conventions: vertex uniform
-/// buffers live in <c>register(b0, space1)</c>; fragment textures and
-/// samplers share <c>space2</c>. <c>SDL_shadercross</c> rewrites these
-/// bindings appropriately for DXIL and MSL when those formats are produced.
-/// </para>
-/// </remarks>
-public static class ShaderSets
+public static class Shaders
 {
+    #region Source and Args
+
     // ---- HLSL sources (kept as strings so we don't need any embedded
     // resources or build-time compilation steps). The DXC -> SPIR-V path is
     // run lazily on first GetCode/GetResources call.
@@ -499,7 +487,7 @@ public static class ShaderSets
         }
         """;
 
-    // ---- Instanced ShaderSets. Per-vertex inputs take the same TEXCOORDn
+    // ---- Instanced Shaders. Per-vertex inputs take the same TEXCOORDn
     // slots as the non-instanced variants. Per-instance inputs follow on
     // higher slots: a float4x4 transform consumes four consecutive
     // semantic indices (one per row), then the float4 tint. The per-call
@@ -613,70 +601,70 @@ public static class ShaderSets
         }
         """;
 
-    // ---- Per-stage Shader instances. Several sets share a fragment stage
+    // ---- Per-stage StageShader instances. Several sets share a fragment stage
     // (e.g. SolidColor is used by both PositionColor variants), so we cache
     // each stage shader as a singleton to keep GPU upload bookkeeping
     // identity-keyed and cheap.
 
-    private static readonly Shader PositionColorVert =
-        new(ShaderKind.Vertex, PositionColorVertHlsl);
+    private static readonly VertexShader PositionColorVert =
+        new(PositionColorVertHlsl);
 
-    private static readonly Shader PositionColorWithTransformVert =
-        new(ShaderKind.Vertex, PositionColorWithTransformVertHlsl);
+    private static readonly VertexShader PositionColorWithTransformVert =
+        new(PositionColorWithTransformVertHlsl);
 
-    private static readonly Shader PositionTextureVert =
-        new(ShaderKind.Vertex, PositionTextureVertHlsl);
+    private static readonly VertexShader PositionTextureVert =
+        new(PositionTextureVertHlsl);
 
-    private static readonly Shader PositionTextureWithTransformVert =
-        new(ShaderKind.Vertex, PositionTextureWithTransformVertHlsl);
+    private static readonly VertexShader PositionTextureWithTransformVert =
+        new(PositionTextureWithTransformVertHlsl);
 
-    private static readonly Shader SolidColorFrag =
-        new(ShaderKind.Fragment, SolidColorFragHlsl);
+    private static readonly FragmentShader SolidColorFrag =
+        new(SolidColorFragHlsl);
 
-    private static readonly Shader PositionTextureFrag =
-        new(ShaderKind.Fragment, PositionTextureFragHlsl);
+    private static readonly FragmentShader PositionTextureFrag =
+        new(PositionTextureFragHlsl);
 
-    private static readonly Shader SkyboxVert =
-        new(ShaderKind.Vertex, SkyboxVertHlsl);
+    private static readonly VertexShader SkyboxVert =
+        new(SkyboxVertHlsl);
 
-    private static readonly Shader SkyboxFrag =
-        new(ShaderKind.Fragment, SkyboxFragHlsl);
+    private static readonly FragmentShader SkyboxFrag =
+        new(SkyboxFragHlsl);
 
-    private static readonly Shader PositionVert =
-        new(ShaderKind.Vertex, PositionVertHlsl);
+    private static readonly VertexShader PositionVert =
+        new(PositionVertHlsl);
 
-    private static readonly Shader PositionWithTransformVert =
-        new(ShaderKind.Vertex, PositionWithTransformVertHlsl);
+    private static readonly VertexShader PositionWithTransformVert =
+        new(PositionWithTransformVertHlsl);
 
-    private static readonly Shader SolidColorUniformFrag =
-        new(ShaderKind.Fragment, SolidColorUniformFragHlsl);
+    private static readonly FragmentShader SolidColorUniformFrag =
+        new(SolidColorUniformFragHlsl);
 
-    private static readonly Shader WhiteFrag =
-        new(ShaderKind.Fragment, WhiteFragHlsl);
+    private static readonly FragmentShader WhiteFrag =
+        new(WhiteFragHlsl);
 
-    private static readonly Shader LitColorVert =
-        new(ShaderKind.Vertex, LitColorVertHlsl);
+    private static readonly VertexShader LitColorVert =
+        new(LitColorVertHlsl);
 
-    private static readonly Shader LitColorFrag =
-        new(ShaderKind.Fragment, LitColorFragHlsl);
+    private static readonly FragmentShader LitColorFrag =
+        new(LitColorFragHlsl);
 
-    private static readonly Shader LitTextureVert =
-        new(ShaderKind.Vertex, LitTextureVertHlsl);
+    private static readonly VertexShader LitTextureVert =
+        new(LitTextureVertHlsl);
 
-    private static readonly Shader LitTextureFrag =
-        new(ShaderKind.Fragment, LitTextureFragHlsl);
+    private static readonly FragmentShader LitTextureFrag =
+        new(LitTextureFragHlsl);
 
-    private static readonly Shader PositionInstancedVert =
-        new(ShaderKind.Vertex, PositionInstancedVertHlsl);
+    private static readonly VertexShader PositionInstancedVert =
+        new(PositionInstancedVertHlsl);
 
-    private static readonly Shader PositionColorInstancedVert =
-        new(ShaderKind.Vertex, PositionColorInstancedVertHlsl);
+    private static readonly VertexShader PositionColorInstancedVert =
+        new(PositionColorInstancedVertHlsl);
 
-    private static readonly Shader PositionTextureInstancedVert =
-        new(ShaderKind.Vertex, PositionTextureInstancedVertHlsl);
+    private static readonly VertexShader PositionTextureInstancedVert =
+        new(PositionTextureInstancedVertHlsl);
 
-    private static readonly Shader PositionTextureTintedFrag =
-        new(ShaderKind.Fragment, PositionTextureTintedFragHlsl);
+    private static readonly FragmentShader PositionTextureTintedFrag =
+        new(PositionTextureTintedFragHlsl);
 
     /// <summary>
     /// A single-element <see cref="ShaderArgsLayout"/> describing a 4x4
@@ -709,19 +697,20 @@ public static class ShaderSets
         new ShaderArgElement(ShaderArgStage.Fragment, 1, ShaderArgKind.Float4),    // LightDirection
         new ShaderArgElement(ShaderArgStage.Fragment, 2, ShaderArgKind.Float4),    // LightColor
         new ShaderArgElement(ShaderArgStage.Fragment, 3, ShaderArgKind.Float4));   // PointLightCount
+    #endregion
 
     /// <summary>
     /// Position-only vertices, no transform; emits opaque white. Positions
     /// must already be in normalized device coordinates.
     /// </summary>
-    public static ShaderSet<Vertex3D> Position { get; } =
+    public static Shader<Vertex3D> Position { get; } =
         new(PositionVert, WhiteFrag, Vertex3D.ShaderVertexLayout);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
     /// opaque white.
     /// </summary>
-    public static ShaderSet<Vertex3D, TransformArgs> PositionWithTransform { get; } =
+    public static Shader<Vertex3D, TransformArgs> PositionWithTransform { get; } =
         new(PositionWithTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -729,7 +718,7 @@ public static class ShaderSets
     /// per-draw fragment color. Pair with
     /// <see cref="TransformAndFColorArgs"/>.
     /// </summary>
-    public static ShaderSet<Vertex3D, TransformAndFColorArgs> PositionWithTransformAndColor { get; } =
+    public static Shader<Vertex3D, TransformAndFColorArgs> PositionWithTransformAndColor { get; } =
         new(PositionWithTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
 
     /// <summary>
@@ -738,7 +727,7 @@ public static class ShaderSets
     /// coordinates (the visible cube is -1 to 1 on each axis). Useful for
     /// screen-space drawing or testing.
     /// </summary>
-    public static ShaderSet<ColorVertex3D> PositionColor { get; } =
+    public static Shader<ColorVertex3D> PositionColor { get; } =
         new(PositionColorVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout);
 
     /// <summary>
@@ -750,13 +739,13 @@ public static class ShaderSets
     /// <see cref="Matrix4x4"/> field) rather than a bare
     /// <see cref="Matrix4x4"/> so this shader works with
     /// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
-    /// ShaderSet{TVertex,TArgs}, in TArgs)"/>: pass a model matrix and
+    /// Shader{TVertex,TArgs}, in TArgs)"/>: pass a model matrix and
     /// the renderer composes <see cref="Renderer3D.Camera"/> into it.
     /// Existing callers passing <c>model * viewProjection</c> continue
     /// to work via the implicit <see cref="Matrix4x4"/> → <see
     /// cref="TransformArgs"/> conversion.
     /// </remarks>
-    public static ShaderSet<ColorVertex3D, TransformArgs> PositionColorWithTransform { get; } =
+    public static Shader<ColorVertex3D, TransformArgs> PositionColorWithTransform { get; } =
         new(PositionColorWithTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -764,7 +753,7 @@ public static class ShaderSets
     /// the vertex texture coordinate, with no transformation. Positions must
     /// already be in normalized device coordinates.
     /// </summary>
-    public static ShaderSet<TextureVertex3D> PositionTexture { get; } =
+    public static Shader<TextureVertex3D> PositionTexture { get; } =
         new(PositionTextureVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout);
 
     /// <summary>
@@ -772,7 +761,7 @@ public static class ShaderSets
     /// model-view-projection matrix, sampling the bound texture using the
     /// vertex texture coordinate.
     /// </summary>
-    public static ShaderSet<TextureVertex3D, TransformArgs> PositionTextureWithTransform { get; } =
+    public static Shader<TextureVertex3D, TransformArgs> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -790,7 +779,7 @@ public static class ShaderSets
     /// for rotation + uniform scale + translation. Non-uniform scales need
     /// a custom shader using a true inverse-transpose normal matrix.
     /// </remarks>
-    public static ShaderSet<LitVertex3D, LitArgs> LitColor { get; } =
+    public static Shader<LitVertex3D, LitArgs> LitColor { get; } =
         new(LitColorVert, LitColorFrag, LitVertex3D.ShaderVertexLayout, LightingArgsLayout);
 
     /// <summary>
@@ -810,7 +799,7 @@ public static class ShaderSets
     /// supplying a 1x1 white texture falls back to "vertex tint only";
     /// both white = unlit-looking flat white surface lit only by ambient.
     /// </remarks>
-    public static ShaderSet<LitTextureVertex3D, LitArgs> LitTexture { get; } =
+    public static Shader<LitTextureVertex3D, LitArgs> LitTexture { get; } =
         new(LitTextureVert, LitTextureFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout);
 
     /// <summary>
@@ -826,7 +815,7 @@ public static class ShaderSets
     /// 1.0 ensures the skybox draws behind opaque geometry without
     /// special depth state.
     /// </summary>
-    public static ShaderSet<Vertex3D, Matrix4x4> Skybox { get; } =
+    public static Shader<Vertex3D, Matrix4x4> Skybox { get; } =
         new(SkyboxVert, SkyboxFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
 
     /// <summary>
@@ -844,7 +833,7 @@ public static class ShaderSets
     /// The per-call uniform is the camera view-projection matrix; each
     /// instance contributes its own world transform and color.
     /// </summary>
-    public static InstancedShaderSet<Vertex3D, Matrix4x4, TransformAndColorInstance> PositionInstanced { get; } =
+    public static Shader<Vertex3D, Matrix4x4, TransformAndColorInstance> PositionInstanced { get; } =
         new(PositionInstancedVert, SolidColorFrag,
             Vertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
@@ -855,7 +844,7 @@ public static class ShaderSets
     /// per-vertex color is multiplied by the per-instance color, so a
     /// white-color instance shows the mesh's baked colors unchanged.
     /// </summary>
-    public static InstancedShaderSet<ColorVertex3D, Matrix4x4, TransformAndColorInstance> PositionColorInstanced { get; } =
+    public static Shader<ColorVertex3D, Matrix4x4, TransformAndColorInstance> PositionColorInstanced { get; } =
         new(PositionColorInstancedVert, SolidColorFrag,
             ColorVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
@@ -865,7 +854,7 @@ public static class ShaderSets
     /// Instanced variant of <see cref="PositionTextureWithTransform"/>:
     /// the texture sample is multiplied by the per-instance color.
     /// </summary>
-    public static InstancedShaderSet<TextureVertex3D, Matrix4x4, TransformAndColorInstance> PositionTextureInstanced { get; } =
+    public static Shader<TextureVertex3D, Matrix4x4, TransformAndColorInstance> PositionTextureInstanced { get; } =
         new(PositionTextureInstancedVert, PositionTextureTintedFrag,
             TextureVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,

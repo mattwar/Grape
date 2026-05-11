@@ -1,6 +1,6 @@
-namespace Blitter.Shaders;
+﻿namespace Blitter;
 
-/// <summary>Pipeline stage a <see cref="Shader"/> targets.</summary>
+/// <summary>Pipeline stage a <see cref="StageShader"/> targets.</summary>
 public enum ShaderKind
 {
     Vertex,

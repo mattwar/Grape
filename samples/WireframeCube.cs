@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -81,7 +81,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, modelLeft * viewProjection);
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
     // Right cube: wireframe. The renderer builds a deduped edge index
@@ -93,7 +93,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.Wireframe = true;
-        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, modelRight * viewProjection);
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelRight * viewProjection);
     }
 
     // Labels.

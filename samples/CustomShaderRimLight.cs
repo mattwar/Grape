@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -32,7 +32,6 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using Blitter;
 using Blitter.Bits;
-using Blitter.Shaders;
 
 // A high-tessellation sphere reads rim shading the most clearly.
 var sphere = Meshes.Sphere(new Color(40, 90, 180), radius: 1.2f, latitudeSegments: 64, longitudeSegments: 96);
@@ -40,7 +39,7 @@ var torus  = Meshes.Torus(new Color(180, 60, 40), majorRadius: 0.9f, minorRadius
 
 // ----- Custom shader. Pairs with LitVertex3D (position + normal + color).
 
-var rimSet = new ShaderSet<LitVertex3D, RimArgs>(
+var rimShader = new Shader<LitVertex3D, RimArgs>(
     vertex: """
     cbuffer Model : register(b0, space1) { float4x4 model;          };
     cbuffer VP    : register(b1, space1) { float4x4 viewProjection; };
@@ -139,7 +138,7 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateRotationY(t * 0.4f) *
         Matrix4x4.CreateTranslation(-1.4f, 0f, 0f);
     var rimPower = 2.5f + 1.5f * MathF.Sin(t * 0.8f); // 1.0 .. 4.0
-    rd.DrawMesh(sphere, rimSet, new RimArgs
+    rd.DrawMesh(sphere, rimShader, new RimArgs
     {
         Model      = sphereModel,
         // ViewProjection filled in by the renderer via IUniformArgs.
@@ -153,7 +152,7 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateRotationX(t * 0.6f) *
         Matrix4x4.CreateRotationY(t * 0.3f) *
         Matrix4x4.CreateTranslation(1.4f, 0f, 0f);
-    rd.DrawMesh(torus, rimSet, new RimArgs
+    rd.DrawMesh(torus, rimShader, new RimArgs
     {
         Model      = torusModel,
         CameraPos  = new Vector4(camera.Position, 1f),

@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -84,7 +84,7 @@ atlasImage.DrawCanvas(canvas =>
             using var bg = new SKPaint
             {
                 IsAntialias = true,
-                Shader = SKShader.CreateLinearGradient(
+                StageShader = SKShader.CreateLinearGradient(
                     start: new SKPoint(rect.Left, rect.Top),
                     end:   new SKPoint(rect.Right, rect.Bottom),
                     colors: [hues[idx], hues[(idx + 5) % hues.Length]],

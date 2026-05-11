@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace Blitter.Tests;
 
@@ -56,7 +56,7 @@ public class GpuRendererAllocationTests
         void RunFrame()
         {
             renderer.Configure(Color.Black);
-            renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
+            renderer.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
             renderer.Render();
         }
 
@@ -121,7 +121,7 @@ public class GpuRendererAllocationTests
         for (var i = 0; i < 8; i++)
         {
             renderer.Configure(Color.Black);
-            renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
+            renderer.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
             renderer.Render();
         }
 
@@ -138,7 +138,7 @@ public class GpuRendererAllocationTests
         var configureBytes = Measure(() => renderer.Configure(Color.Black));
         var queueRenderBytes = Measure(() =>
         {
-            renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
+            renderer.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
             renderer.Render();
         });
 

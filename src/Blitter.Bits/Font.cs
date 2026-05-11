@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -342,7 +342,7 @@ public sealed class Font : IDisposable
         using (renderer.PushState())
         {
             renderer.CullMode = CullMode.None;
-            renderer.DrawMesh(mesh, _atlas.Image, ShaderSets.PositionTextureWithTransform, in args);
+            renderer.DrawMesh(mesh, _atlas.Image, Shaders.PositionTextureWithTransform, in args);
         }
     }
 

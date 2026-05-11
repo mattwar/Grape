@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace Blitter;
 
@@ -15,7 +15,7 @@ namespace Blitter;
 /// The motivating problem: many shaders want the renderer's camera
 /// composed into their per-draw transform, and many will want a
 /// directional light, an ambient color, and so on. Encoding each
-/// trait as a separate sub-class of <see cref="ShaderSet{TVertex,TArgs}"/>
+/// trait as a separate sub-class of <see cref="Shader{TVertex,TArgs}"/>
 /// would explode the type system (one subclass per trait combination)
 /// and would force a new <c>DrawMesh</c> overload for every
 /// combination.

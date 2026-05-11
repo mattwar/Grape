@@ -1,6 +1,6 @@
-namespace Blitter.Shaders;
+﻿namespace Blitter;
 
-/// <summary>Bytecode format of a <see cref="Shader"/>.</summary>
+/// <summary>Bytecode format of a <see cref="StageShader"/>.</summary>
 public enum ShaderFormat
 {
     Spirv,

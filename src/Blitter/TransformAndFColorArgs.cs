@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Blitter;
@@ -6,7 +6,7 @@ namespace Blitter;
 /// <summary>
 /// Per-draw arguments combining a 4x4 transform with a floating-point
 /// RGBA color (0..1 per channel). Pairs with
-/// <see cref="ShaderSets.PositionWithTransformAndColor"/>. The "F" prefix
+/// <see cref="Shaders.PositionWithTransformAndColor"/>. The "F" prefix
 /// follows SDL's <c>SDL_FColor</c> convention -- it's the same idea as
 /// <see cref="TransformAndColorInstance"/>, just at float precision instead of
 /// 8 bits per channel.

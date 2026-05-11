@@ -1,6 +1,6 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 
-namespace Blitter.Shaders;
+namespace Blitter;
 
 /// <summary>
 /// Describes the layout of vertices in a mesh.

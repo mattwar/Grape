@@ -1,12 +1,11 @@
-using Blitter.Shaders;
-
+﻿
 namespace Blitter;
 
 /// <summary>
 /// Convenience overloads for <see cref="Renderer3D"/> that pick a sensible
 /// built-in shader based on the mesh's vertex type. For arbitrary vertex
 /// types or custom shaders, call <see cref="Renderer3D.DrawMesh{TVertex}(Mesh{TVertex},
-/// ShaderSet{TVertex})"/> directly.
+/// Shader{TVertex})"/> directly.
 /// </summary>
 public static class Renderer3DExtensions
 {
@@ -14,41 +13,41 @@ public static class Renderer3DExtensions
     public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, ShaderSets.Position);
+        renderer.DrawMesh(mesh, Shaders.Position);
     }
 
     /// <summary>Draws a position-only mesh with the given position transform.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<Vertex3D> mesh, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, ShaderSets.PositionWithTransform, in transform);
+        renderer.DrawMesh(mesh, Shaders.PositionWithTransform, in transform);
     }
 
     /// <summary>Draws a position &amp; color mesh.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, ShaderSets.PositionColor);
+        renderer.DrawMesh(mesh, Shaders.PositionColor);
     }
 
     /// <summary>Draws a position &amp; color mesh with the given position transform.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<ColorVertex3D> mesh, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, ShaderSets.PositionColorWithTransform, in transform);
+        renderer.DrawMesh(mesh, Shaders.PositionColorWithTransform, in transform);
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, texture, ShaderSets.PositionTexture);
+        renderer.DrawMesh(mesh, texture, Shaders.PositionTexture);
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture and position transform.</summary>
     public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
-        renderer.DrawMesh(mesh, texture, ShaderSets.PositionTextureWithTransform, in transform);
+        renderer.DrawMesh(mesh, texture, Shaders.PositionTextureWithTransform, in transform);
     }
 }

@@ -1,4 +1,4 @@
-namespace Blitter.Shaders;
+﻿namespace Blitter;
 
 /// <summary>
 /// Resource counts a shader stage exposes to the pipeline. Must match what

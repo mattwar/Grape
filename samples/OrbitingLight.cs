@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -91,7 +91,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(bigCube, ShaderSets.LitColor, new LitArgs(bigModel));
+        rd.DrawMesh(bigCube, Shaders.LitColor, new LitArgs(bigModel));
     }
 
     // Marker: small unlit white cube parked at the light's orbit
@@ -104,7 +104,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(marker, ShaderSets.PositionColorWithTransform, markerModel);
+        rd.DrawMesh(marker, Shaders.PositionColorWithTransform, markerModel);
     }
 
     w.Invalidate();

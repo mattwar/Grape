@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -32,7 +32,7 @@ image.Render3D(new Color(0, 0, 32), renderer =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    renderer.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
+    renderer.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
 });
 
 var path = Path.Combine(AppContext.BaseDirectory, "RenderToImage.bmp");

@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -97,7 +97,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, ShaderSets.PositionColorWithTransform, model);
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, model);
     }
 
     // Caption sits in front of everything regardless of depth.

@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -20,7 +20,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Blitter;
-using Blitter.Shaders;
 
 // ----- Fullscreen quad in NDC (-1..1 on X and Y, z=0). UVs go 0..1
 // across so the fragment shader has a built-in coordinate to work with.
@@ -35,7 +34,7 @@ var quad = Mesh.Create<TextureVertex3D>(
     );
 
 // ----- Custom shader.
-var plasmaSet = new ShaderSet<TextureVertex3D, PlasmaArgs>(
+var plasmaShader = new Shader<TextureVertex3D, PlasmaArgs>(
     vertex: """
     struct Input  { float3 Position : TEXCOORD0; float2 TexCoord : TEXCOORD1; };
     struct Output { float2 TexCoord : TEXCOORD0; float4 Position : SV_Position; };
@@ -114,7 +113,7 @@ window.Rendering += (w, rd) =>
         // a winding convention.
         rd.CullMode = CullMode.None;
 
-        rd.DrawMesh(quad, plasmaSet, new PlasmaArgs
+        rd.DrawMesh(quad, plasmaShader, new PlasmaArgs
         {
             Frame = new Vector4(t, aspect, 0f, 0f),
         });
