@@ -58,6 +58,17 @@ public class ShaderSet<TVertex> : ShaderSet where TVertex : unmanaged
         : base(vertex, fragment, vertexLayout)
     {
     }
+
+    public ShaderSet(
+        string vertex,
+        string fragment,
+        ShaderVertexLayout vertexLayout)
+        : this(
+            new Shader(ShaderKind.Vertex, vertex),
+            new Shader(ShaderKind.Fragment, fragment),
+            vertexLayout)
+    {
+    }
 }
 
 /// <summary>
@@ -95,6 +106,19 @@ public sealed class ShaderSet<TVertex, TArgs> : ShaderSet<TVertex>
                 nameof(argsLayout));
 
         ArgsLayout = argsLayout;
+    }
+
+    public ShaderSet(
+        string vertex,
+        string fragment,
+        ShaderVertexLayout vertexLayout,
+        ShaderArgsLayout argsLayout)
+        : this(
+            new Shader(ShaderKind.Vertex, vertex),
+            new Shader(ShaderKind.Fragment, fragment),
+            vertexLayout,
+            argsLayout)
+    {       
     }
 
     /// <summary>
