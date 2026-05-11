@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -39,7 +39,7 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateScale(0.8f) *
         Matrix4x4.CreateScale(aspect, 1f, 1f);
 
-    rd.DrawMesh(triangle, ShaderSets.PositionColorWithTransform, transform);
+    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
 
     w.Invalidate(); // schedule the next frame
 };

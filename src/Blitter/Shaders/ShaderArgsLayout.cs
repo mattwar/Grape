@@ -1,6 +1,6 @@
-using System.Collections.Immutable;
+﻿using System.Collections.Immutable;
 
-namespace Blitter.Shaders;
+namespace Blitter;
 
 /// <summary>Stage a uniform slot belongs to.</summary>
 public enum ShaderArgStage
@@ -46,7 +46,7 @@ public sealed record ShaderArgElement(ShaderArgStage Stage, int Slot, ShaderArgK
 }
 
 /// <summary>
-/// Describes the per-draw arguments a <see cref="ShaderSet{TVertex,TArgs}"/>
+/// Describes the per-draw arguments a <see cref="Shader{TVertex,TArgs}"/>
 /// expects. Each <see cref="ShaderArgElement"/> corresponds to one field of the
 /// matching <c>TArgs</c> struct, in declaration order; the renderer reads
 /// each field's bytes and pushes them to the named (stage, slot).

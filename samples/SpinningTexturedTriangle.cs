@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -47,7 +47,7 @@ window.Rendering += (w, rd) =>
     rd.DrawMesh(
         triangle,
         checker,
-        ShaderSets.PositionTextureWithTransform,
+        Shaders.PositionTextureWithTransform,
         transform);
 
     w.Invalidate(); // schedule the next frame

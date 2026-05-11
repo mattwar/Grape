@@ -1,5 +1,4 @@
-using Blitter.Shaders;
-
+﻿
 namespace Blitter.Tests;
 
 public class ShaderArgsLayoutTests

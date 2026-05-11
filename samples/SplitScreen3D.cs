@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -82,8 +82,8 @@ void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
     var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
     var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
 
-    r.DrawMesh(tetraA, ShaderSets.PositionColorWithTransform, modelA * viewProjection);
-    r.DrawMesh(tetraB, ShaderSets.PositionColorWithTransform, modelB * viewProjection);
+    r.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
+    r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 }
 
 window.Rendering += (w, rd) =>

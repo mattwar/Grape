@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -149,20 +149,20 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
 
         // Lit ground.
-        rd.DrawMesh(ground, ShaderSets.LitColor, new LitArgs(Matrix4x4.Identity));
+        rd.DrawMesh(ground, Shaders.LitColor, new LitArgs(Matrix4x4.Identity));
 
         // Lit boxes.
         foreach (var p in boxes)
         {
-            rd.DrawMesh(box, ShaderSets.LitColor, new LitArgs(Matrix4x4.CreateTranslation(p)));
+            rd.DrawMesh(box, Shaders.LitColor, new LitArgs(Matrix4x4.CreateTranslation(p)));
         }
 
         // Unlit markers, one per light. Use PositionColorWithTransform
         // so they show their flat color regardless of lighting -- a
         // clear visual anchor for "the light is *here*."
-        rd.DrawMesh(redMarkerMesh,   ShaderSets.PositionColorWithTransform, Matrix4x4.CreateTranslation(redPos));
-        rd.DrawMesh(greenMarkerMesh, ShaderSets.PositionColorWithTransform, Matrix4x4.CreateTranslation(greenPos));
-        rd.DrawMesh(blueMarkerMesh,  ShaderSets.PositionColorWithTransform, Matrix4x4.CreateTranslation(bluePos));
+        rd.DrawMesh(redMarkerMesh,   Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(redPos));
+        rd.DrawMesh(greenMarkerMesh, Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(greenPos));
+        rd.DrawMesh(blueMarkerMesh,  Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(bluePos));
     }
 
     w.Invalidate();

@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -67,7 +67,7 @@ window.Rendering += (w, rd) =>
         // walk the per-draw bookkeeping for every iteration of this
         // loop -- contrast with the single submission used by the
         // instanced version.
-        rd.DrawMesh(mesh, ShaderSets.PositionColorWithTransform, transform);
+        rd.DrawMesh(mesh, Shaders.PositionColorWithTransform, transform);
     }
 
     w.Invalidate(); // schedule the next frame

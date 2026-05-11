@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Blitter;
@@ -19,8 +19,8 @@ namespace Blitter;
 /// </para>
 /// <para>
 /// When the args struct is passed through
-/// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
-/// ShaderSet{TVertex,TArgs}, in TArgs)"/> with a non-null
+/// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex},
+/// Shader{TVertex,TArgs}, in TArgs)"/> with a non-null
 /// <see cref="Renderer3D.Camera"/>, the value the GPU sees is
 /// <c>Matrix * camera.GetViewProjection(aspect)</c> -- so the
 /// caller passes a model matrix and the shader receives an MVP.

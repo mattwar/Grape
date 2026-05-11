@@ -1,4 +1,4 @@
-using System.Numerics;
+﻿using System.Numerics;
 
 namespace Blitter;
 
@@ -18,6 +18,7 @@ namespace Blitter;
 /// </para>
 /// <para>
 /// A camera is a CPU-side helper -- it doesn't interact with the GPU directly.
+/// </para>
 /// </remarks>
 public abstract class Camera
 {
@@ -69,7 +70,7 @@ public abstract class Camera
     /// <see cref="GetViewProjection"/> but with the camera's
     /// translation stripped out so the skybox stays centred on the
     /// camera regardless of where the camera moves. Pair with
-    /// <see cref="ShaderSets.Skybox"/> and a unit cube mesh.
+    /// <see cref="Shaders.Skybox"/> and a unit cube mesh.
     /// </summary>
     public Matrix4x4 GetSkyboxViewProjection(float aspectRatio)
     {

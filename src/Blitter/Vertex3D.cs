@@ -1,6 +1,5 @@
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
-using Blitter.Shaders;
 
 namespace Blitter;
 
@@ -25,7 +24,7 @@ public readonly struct Vertex3D : IPositionVertex3D
 
     /// <summary>
     /// The shader-side vertex layout that pairs with this vertex struct.
-    /// Reused by every <see cref="ShaderSet{TVertex}"/> built over
+    /// Reused by every <see cref="Shader{TVertex}"/> built over
     /// <see cref="Vertex3D"/> so all such pipelines see the same attribute
     /// description.
     /// </summary>
@@ -64,7 +63,7 @@ public readonly struct ColorVertex3D : IPositionVertex3D
 
 /// <summary>
 /// A vertex that carries a position and a texture coordinate. Matches the
-/// vertex input of the bundled <c>PositionTexture</c> ShaderSets.
+/// vertex input of the bundled <c>PositionTexture</c> Shaders.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public readonly struct TextureVertex3D : IPositionVertex3D
@@ -94,7 +93,7 @@ public readonly struct TextureVertex3D : IPositionVertex3D
 
 /// <summary>
 /// A vertex that carries a position, a world-space normal, and a baked
-/// per-vertex color. Pairs with <see cref="ShaderSets.LitColor"/> -- the
+/// per-vertex color. Pairs with <see cref="Shaders.LitColor"/> -- the
 /// shader runs Lambertian lighting against the renderer's
 /// <see cref="Renderer3D.DirectionalLight"/> and
 /// <see cref="Renderer3D.AmbientLight"/> using the normal, then modulates
@@ -132,9 +131,9 @@ public readonly struct LitVertex3D : IPositionVertex3D
 /// <summary>
 /// A vertex that carries everything a textured + lit surface needs:
 /// position, world-space normal, texture coordinate, and a baked
-/// per-vertex tint. Pairs with <see cref="ShaderSets.LitTexture"/> -- the
+/// per-vertex tint. Pairs with <see cref="Shaders.LitTexture"/> -- the
 /// shader runs the same Lambertian + point-light math as
-/// <see cref="ShaderSets.LitColor"/>, but starts from
+/// <see cref="Shaders.LitColor"/>, but starts from
 /// <c>diffuseTexture(uv) * vertexColor</c> instead of just the vertex
 /// color. This is the unified vertex type produced by the OBJ loader:
 /// missing normals are fabricated from face geometry, missing UVs

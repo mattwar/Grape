@@ -1,6 +1,5 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Numerics;
-using Blitter.Shaders;
 
 namespace Blitter;
 
@@ -32,7 +31,7 @@ public abstract class Renderer3D
     public TimeSpan ElapsedSinceStart => Stopwatch.GetElapsedTime(_startTs);
 
     /// <summary>
-    /// Elapsed wall-clock time since the last call to <see cref="GpuRenderer.Render"/>
+    /// Elapsed wall-clock time since the last call to <see cref="Render"/>
     /// (or since renderer creation if no frame has been rendered yet),
     /// clamped by <see cref="MaxFrameDelta"/> so a long pause doesn't
     /// teleport time-integrated state.
@@ -171,8 +170,8 @@ public abstract class Renderer3D
 
     /// <summary>
     /// The camera used to compose view-projection matrices for
-    /// <see cref="DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
-    /// ShaderSet{TVertex,TArgs}, in TArgs)"/>. <see langword="null"/>
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// Shader{TVertex,TArgs}, in TArgs)"/>. <see langword="null"/>
     /// (the default) means scene-aware draws skip applying any view-
     /// projection transform -- the args struct's transform field, if
     /// any, is sent to the GPU unchanged.
@@ -277,23 +276,23 @@ public abstract class Renderer3D
     }
 
     /// <summary>
-    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex}"/>.
+    /// Queues a mesh for drawing using a compatible <see cref="Shader{TVertex}"/>.
     /// </summary>
-    public abstract void DrawMesh<TVertex>(Mesh<TVertex> mesh, ShaderSet<TVertex> shader)
+    public abstract void DrawMesh<TVertex>(Mesh<TVertex> mesh, Shader<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>
-    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/>
+    /// Queues a mesh for drawing using a compatible <see cref="Shader{TVertex,TArgs}"/>
     /// with the given per-draw arguments. The args struct is forwarded to the
     /// shader unchanged -- no renderer state (camera, lights, ...) is composed
     /// into it. This is the escape hatch for shaders whose arg layout doesn't
     /// fit <see cref="IUniformArgs{TSelf}"/>; prefer
-    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// when your args struct can opt in.
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
@@ -302,15 +301,15 @@ public abstract class Renderer3D
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex> shader)
+        Shader<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>Raw textured draw with no scene composition. See
-    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.</summary>
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.</summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
@@ -319,30 +318,30 @@ public abstract class Renderer3D
     /// Cubemap variant of the textured draw overload. The shader's
     /// fragment-stage texture binding (slot 0) must declare a
     /// <c>TextureCube</c> rather than a <c>Texture2D</c>; pair this
-    /// with <see cref="ShaderSets.Skybox"/> or another cubemap shader.
+    /// with <see cref="Shaders.Skybox"/> or another cubemap shader.
     /// </summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
-        ShaderSet<TVertex> shader)
+        Shader<TVertex> shader)
         where TVertex : unmanaged;
 
     /// <summary>
     /// Raw cubemap draw with no scene composition. See
-    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
-    /// Used by <see cref="ShaderSets.Skybox"/>, which needs a translation-stripped
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// Used by <see cref="Shaders.Skybox"/>, which needs a translation-stripped
     /// view-projection that the regular camera composition can't supply.
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged;
 
     /// <summary>
-    /// Queues a mesh for drawing using a compatible <see cref="ShaderSet{TVertex,TArgs}"/>
+    /// Queues a mesh for drawing using a compatible <see cref="Shader{TVertex,TArgs}"/>
     /// with the given per-draw arguments, composing the renderer's
     /// <see cref="Camera"/> view-projection (and, in the future, lights,
     /// ambient, time, ...) into the args struct via
@@ -365,12 +364,12 @@ public abstract class Renderer3D
     /// <para>
     /// For args layouts that <em>can't</em> implement <see cref="IUniformArgs{TSelf}"/>
     /// (e.g. a bare <see cref="System.Numerics.Matrix4x4"/>), use
-    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>.
+    /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
     /// </para>
     /// </remarks>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged, IUniformArgs<TArgs>
@@ -381,13 +380,13 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Scene-aware textured draw. See
-    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// for trait-application behavior.
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged, IUniformArgs<TArgs>
@@ -398,13 +397,13 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Scene-aware cubemap draw. See
-    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ShaderSet{TVertex,TArgs}, in TArgs)"/>
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// for trait-application behavior.
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Cubemap cubemap,
-        ShaderSet<TVertex, TArgs> shader,
+        Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
         where TArgs : unmanaged, IUniformArgs<TArgs>
@@ -488,7 +487,7 @@ public abstract class Renderer3D
     /// </remarks>
     public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
         where TVertex : unmanaged
@@ -503,7 +502,7 @@ public abstract class Renderer3D
     public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
         Image texture,
-        InstancedShaderSet<TVertex, TArgs, TInstance> shader,
+        Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
         where TVertex : unmanaged
@@ -560,7 +559,7 @@ public abstract class Renderer3D
             // projection.
             DrawMesh(
                 _debugDrawLineMesh,
-                ShaderSets.PositionColorWithTransform,
+                Shaders.PositionColorWithTransform,
                 new TransformArgs(Matrix4x4.Identity));
         }
 

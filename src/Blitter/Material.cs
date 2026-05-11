@@ -1,10 +1,10 @@
-namespace Blitter;
+﻿namespace Blitter;
 
 /// <summary>
 /// Visual properties of a surface, separate from its geometry.
 /// Conceptually a "skin" -- swap one in to repaint the same vertices.
 /// Today this only covers a flat diffuse color and an optional diffuse
-/// texture, which together drive <see cref="ShaderSets.LitTexture"/>.
+/// texture, which together drive <see cref="Shaders.LitTexture"/>.
 /// </summary>
 public sealed class Material
 {

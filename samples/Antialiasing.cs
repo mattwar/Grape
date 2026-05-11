@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -85,7 +85,7 @@ window.Rendering += (w, rd) =>
     var model = Matrix4x4.CreateRotationZ(t * 0.1f);
     var viewProjection = camera.GetViewProjection(aspect);
 
-    rd.DrawMesh(wheel, ShaderSets.PositionColorWithTransform, model * viewProjection);
+    rd.DrawMesh(wheel, Shaders.PositionColorWithTransform, model * viewProjection);
 
     DrawLabel(rd, $"Antialiasing: {levels[levelIndex]}", yOffset: -0.85f, viewProjection);
     DrawLabel(rd, "Press SPACE to cycle (None / X2 / X4 / X8)", yOffset: -0.95f, viewProjection);

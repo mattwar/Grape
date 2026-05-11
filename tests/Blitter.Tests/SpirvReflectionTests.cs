@@ -1,5 +1,4 @@
-using System.Buffers.Binary;
-using Blitter.Shaders;
+﻿using System.Buffers.Binary;
 
 namespace Blitter.Tests;
 

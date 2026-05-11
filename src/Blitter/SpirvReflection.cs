@@ -1,7 +1,6 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Collections.Immutable;
 using System.Text;
-using Blitter.Shaders;
 
 namespace Blitter;
 
@@ -16,7 +15,7 @@ internal sealed record SpirvShaderInfo(
 
 /// <summary>
 /// A small SPIR-V binary reflector. Walks a SPIR-V module to extract the
-/// information SDL3 GPU needs to create a <see cref="Shader"/> from raw
+/// information SDL3 GPU needs to create a <see cref="StageShader"/> from raw
 /// bytes -- the stage kind, entry-point name, and resource counts -- so
 /// callers don't have to track that metadata separately when loading
 /// precompiled shaders.

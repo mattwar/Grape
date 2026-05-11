@@ -1,4 +1,4 @@
-#:package Blitter@*-*
+﻿#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -63,7 +63,7 @@ window.Rendering += (w, rd) =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, ShaderSets.LitColor, new LitArgs(model));
+        rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(model));
     }
 
     w.Invalidate();
