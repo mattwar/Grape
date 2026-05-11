@@ -10,6 +10,9 @@ All notable changes to this project will be documented in this file.
   state at the start of each `Window.RenderFrame`.
 - `Mouse.WasJustPressed` / `WasJustReleased` for `MouseButton` and
   `Mouse.Delta` (desktop-pixel cursor delta since previous frame).
+- `Keyboard.Direction(neg, pos)` returns a signed scalar from a pair
+  of held keys, and `Keyboard.Direction2D(left, right, down, up)`
+  returns a unit-length 2D direction (diagonals normalized).
 - `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
   (lines, rays, axes, boxes, spheres); opt in per renderer via
   `Renderer3D.DebugDrawEnabled`.

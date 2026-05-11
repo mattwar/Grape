@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Blitter;
 
 /// <summary>
@@ -222,6 +224,60 @@ public static class Keyboard
     /// <inheritdoc cref="WasJustReleased(PhysicalKey)"/>
     public static bool WasJustReleased(Key key) =>
         WasJustReleased((PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)key, out _));
+
+    /// <summary>
+    /// Returns a signed 1D direction from a pair of held keys:
+    /// <c>+1</c> if <paramref name="positive"/> is held, 
+    /// <c>-1</c> if <paramref name="negative"/> is held, 
+    /// and <c>0</c> if neither or both are held. 
+    /// Multiply by speed and frame time to drive movement along a single axis.
+    /// </summary>
+    public static float Direction(PhysicalKey negative, PhysicalKey positive)
+    {
+        // Read the per-frame snapshot rather than live SDL state so the
+        // result agrees with WasJustPressed/Released within the same frame.
+        var n = IsHeldSnapshot(negative) ? 1 : 0;
+        var p = IsHeldSnapshot(positive) ? 1 : 0;
+        return p - n;
+    }
+
+    /// <inheritdoc cref="Direction(PhysicalKey, PhysicalKey)"/>
+    public static float Direction(Key negative, Key positive) =>
+        Direction(
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)negative, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)positive, out _));
+
+    /// <summary>
+    /// Returns a normalized 2D direction from four held keys (e.g. WASD or arrows). 
+    /// Diagonals are normalized so they don't move faster than cardinal directions. 
+    /// Returns <see cref="Vector2.Zero"/> when no keys (or opposing keys) are held.
+    /// </summary>
+    public static Vector2 Direction2D(
+        PhysicalKey left, PhysicalKey right,
+        PhysicalKey down, PhysicalKey up)
+    {
+        var v = new Vector2(
+            Direction(left, right),
+            Direction(down, up));
+        var lenSq = v.LengthSquared();
+        return lenSq > 0f ? v / MathF.Sqrt(lenSq) : Vector2.Zero;
+    }
+
+    /// <inheritdoc cref="Direction2D(PhysicalKey, PhysicalKey, PhysicalKey, PhysicalKey)"/>
+    public static Vector2 Direction2D(
+        Key left, Key right,
+        Key down, Key up) =>
+        Direction2D(
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)left, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)right, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)down, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)up, out _));
+
+    private static bool IsHeldSnapshot(PhysicalKey physicalKey)
+    {
+        var idx = (int)physicalKey;
+        return (uint)idx < (uint)_currentState.Length && _currentState[idx];
+    }
 
     // Test seam: lets the unit tests drive the snapshot state directly
     // instead of standing up an SDL window.
