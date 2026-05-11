@@ -165,6 +165,71 @@ public static class Keyboard
             await Task.Yield();
         }
     }
+
+    // ---------------- Edge detection ----------------
+
+    // Per-frame snapshots populated by Input.BeginFrame, which runs
+    // once per Window.RenderFrame call. WasJustPressed/Released compare
+    // these two arrays.
+    private static bool[] _currentState = Array.Empty<bool>();
+    private static bool[] _previousState = Array.Empty<bool>();
+
+    internal static void BeginFrame()
+    {
+        var live = SDL.GetKeyboardState(out var numKeys);
+        if (_currentState.Length != numKeys)
+        {
+            _currentState = new bool[numKeys];
+            _previousState = new bool[numKeys];
+            // First frame: treat the live state as the baseline so no
+            // spurious "just pressed" edges fire on startup.
+            live.CopyTo(_currentState);
+            live.CopyTo(_previousState);
+            return;
+        }
+        // Promote current -> previous, then snapshot live -> current.
+        Array.Copy(_currentState, _previousState, numKeys);
+        live.CopyTo(_currentState);
+    }
+
+    /// <summary>
+    /// Returns true only on the frame the physical key transitioned
+    /// from up to down. Use this for one-shot actions (jump, fire,
+    /// toggle) that should not autorepeat while held.
+    /// </summary>
+    public static bool WasJustPressed(PhysicalKey physicalKey)
+    {
+        var idx = (int)physicalKey;
+        return (uint)idx < (uint)_currentState.Length
+            && _currentState[idx] && !_previousState[idx];
+    }
+
+    /// <summary>
+    /// Returns true only on the frame the physical key transitioned
+    /// from down to up.
+    /// </summary>
+    public static bool WasJustReleased(PhysicalKey physicalKey)
+    {
+        var idx = (int)physicalKey;
+        return (uint)idx < (uint)_currentState.Length
+            && !_currentState[idx] && _previousState[idx];
+    }
+
+    /// <inheritdoc cref="WasJustPressed(PhysicalKey)"/>
+    public static bool WasJustPressed(Key key) =>
+        WasJustPressed((PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)key, out _));
+
+    /// <inheritdoc cref="WasJustReleased(PhysicalKey)"/>
+    public static bool WasJustReleased(Key key) =>
+        WasJustReleased((PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)key, out _));
+
+    // Test seam: lets the unit tests drive the snapshot state directly
+    // instead of standing up an SDL window.
+    internal static void SetTestSnapshot(bool[] previous, bool[] current)
+    {
+        _previousState = previous;
+        _currentState = current;
+    }
 }
 
 /// <summary>

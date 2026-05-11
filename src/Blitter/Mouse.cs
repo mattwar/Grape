@@ -107,4 +107,72 @@ public static class Mouse
         _ = Application.Current;
         SDL.WarpMouseInWindow(window.WindowId, position.X, position.Y);
     }
+
+    // ---------------- Edge detection / per-frame deltas ----------------
+
+    private static MouseButtons _currentButtons;
+    private static MouseButtons _previousButtons;
+    private static Vector2 _currentPosition;
+    private static Vector2 _previousPosition;
+    private static bool _hasFrameSnapshot;
+
+    internal static void BeginFrame()
+    {
+        var buttons = (MouseButtons)SDL.GetGlobalMouseState(out var x, out var y);
+        var pos = new Vector2(x, y);
+        if (!_hasFrameSnapshot)
+        {
+            _previousButtons = _currentButtons = buttons;
+            _previousPosition = _currentPosition = pos;
+            _hasFrameSnapshot = true;
+            return;
+        }
+        _previousButtons = _currentButtons;
+        _previousPosition = _currentPosition;
+        _currentButtons = buttons;
+        _currentPosition = pos;
+    }
+
+    /// <summary>
+    /// Cursor movement in desktop pixels since the previous frame.
+    /// Zero on the first frame and whenever the cursor hasn't moved.
+    /// </summary>
+    public static Vector2 Delta => _currentPosition - _previousPosition;
+
+    /// <summary>
+    /// Returns true only on the frame the given mouse button
+    /// transitioned from up to down.
+    /// </summary>
+    public static bool WasJustPressed(MouseButton button)
+    {
+        var bit = (uint)button;
+        if (bit == 0) return false;
+        var mask = (MouseButtons)(1u << ((int)bit - 1));
+        return (_currentButtons & mask) != 0 && (_previousButtons & mask) == 0;
+    }
+
+    /// <summary>
+    /// Returns true only on the frame the given mouse button
+    /// transitioned from down to up.
+    /// </summary>
+    public static bool WasJustReleased(MouseButton button)
+    {
+        var bit = (uint)button;
+        if (bit == 0) return false;
+        var mask = (MouseButtons)(1u << ((int)bit - 1));
+        return (_currentButtons & mask) == 0 && (_previousButtons & mask) != 0;
+    }
+
+    // Test seam: lets the unit tests drive the snapshot state directly
+    // instead of standing up an SDL window.
+    internal static void SetTestSnapshot(
+        MouseButtons previousButtons, MouseButtons currentButtons,
+        Vector2 previousPosition, Vector2 currentPosition)
+    {
+        _previousButtons = previousButtons;
+        _currentButtons = currentButtons;
+        _previousPosition = previousPosition;
+        _currentPosition = currentPosition;
+        _hasFrameSnapshot = true;
+    }
 }

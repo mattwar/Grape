@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [0.4.0] 2026-05-10
 
 ### Added
+- `Keyboard.WasJustPressed` / `WasJustReleased` (overloads for both
+  `Key` and `PhysicalKey`) latch one-frame edges by snapshotting
+  state at the start of each `Window.RenderFrame`.
+- `Mouse.WasJustPressed` / `WasJustReleased` for `MouseButton` and
+  `Mouse.Delta` (desktop-pixel cursor delta since previous frame).
 - `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
   (lines, rays, axes, boxes, spheres); opt in per renderer via
   `Renderer3D.DebugDrawEnabled`.
