@@ -28,6 +28,24 @@ All notable changes to this project will be documented in this file.
   (and properly transforms normals via the inverse-transpose).
 - `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
   meshes into one for static-batching / mesh composition.
+- `Mesh<T>.Translate`, `Scale`, `Rotate`, `RotateX`/`Y`/`Z` shortcut
+  transforms over `Mesh<T>.Transform`.
+- `Mesh<T>.FlipWinding()` reverses triangle winding for indexed and
+  unindexed `TriangleList` meshes.
+- `Mesh<T>.FlipNormals()` negates per-vertex normals on lit vertex
+  meshes (`LitVertex3D` / `LitTextureVertex3D`).
+- `Mesh<T>.RecalculateNormals(smooth)` rebuilds per-vertex normals
+  from triangle geometry for lit vertex meshes; flat mode expands
+  indexed meshes to unindexed so each face carries its own normal.
+- `Model.RecalculateNormals(smooth)` applies the same to every
+  submesh.
+- `Model.Transform`, `Translate`, `Scale`, `Rotate`, `RotateX`/`Y`/`Z`
+  bake a transform into a model's submesh vertices, returning a new
+  `Model` (source unchanged).
+- `Model.CenterOnOrigin()` translates a model so its bounding box
+  center sits at the origin.
+- `Model.NormalizeSize(targetMaxSize)` uniformly scales a model so
+  its longest bounding-box axis matches the target size.
 - `BoundingBox` and `BoundingSphere` value types with intersection,
   containment, encapsulation, and matrix-transform helpers.
 - `BoundingRect` and `BoundingCircle` 2D counterparts (in
