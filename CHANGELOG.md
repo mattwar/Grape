@@ -5,17 +5,19 @@ All notable changes to this project will be documented in this file.
 ## [0.4.0] 2026-05-10
 
 ### Added
-- `Keyboard.WasJustPressed` / `WasJustReleased` (overloads for both
-  `Key` and `PhysicalKey`) latch one-frame edges by snapshotting
-  state at the start of each `Window.RenderFrame`.
-- `Mouse.WasJustPressed` / `WasJustReleased` for `MouseButton` and
-  `Mouse.Delta` (desktop-pixel cursor delta since previous frame).
-- `Mouse.Delta` now reports SDL relative-motion delta when any
-  window has `Window.RelativeMouseMode` enabled, so FPS-style
-  mouselook keeps producing motion while the cursor is pinned.
-- `Keyboard.Direction(neg, pos)` returns a signed scalar from a pair
-  of held keys, and `Keyboard.Direction2D(left, right, down, up)`
-  returns a unit-length 2D direction (diagonals normalized).
+- `FrameInput` per-loop snapshot owner for keyboard / mouse edge
+  detection: `WasJustPressed`, `WasJustReleased`, `IsDown`,
+  `Direction(neg, pos)`, `Direction2D(left, right, down, up)`,
+  `MouseDelta`, `MousePosition`. Each instance maintains its own
+  previous/current snapshots, so independent loops (render, fixed
+  tick, replay) report edges against their own timelines.
+- `Window.Input` — auto-advanced `FrameInput` per window, updated
+  at the start of each rendered frame. Covers the 90% case with
+  zero glue.
+- `Mouse.Delta` (via `FrameInput.MouseDelta`) reports SDL
+  relative-motion delta when any window has `Window.RelativeMouseMode`
+  enabled, so FPS-style mouselook keeps producing motion while the
+  cursor is pinned.
 - `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
   (lines, rays, axes, boxes, spheres); opt in per renderer via
   `Renderer3D.DebugDrawEnabled`.

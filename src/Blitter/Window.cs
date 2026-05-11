@@ -986,6 +986,23 @@ public abstract class Window : IDisposable
     /// </summary>
     protected abstract void RaiseRenderingEvent();
 
+    private FrameInput? _input;
+
+    /// <summary>
+    /// Per-window input snapshot. Advances automatically at the start
+    /// of each rendered frame; query <c>WasJustPressed</c>, <c>Direction</c>,
+    /// <c>MouseDelta</c> etc. from inside the render body. Lazily created
+    /// on first access.
+    /// </summary>
+    public FrameInput Input => _input ??= new FrameInput();
+
+    /// <summary>
+    /// Advances the per-window <see cref="Input"/> snapshot if it has
+    /// been created. Called by <see cref="RenderFrame"/> overrides
+    /// before user code runs.
+    /// </summary>
+    protected void AdvanceInput() => _input?.Update();
+
     #endregion
 
     #region events

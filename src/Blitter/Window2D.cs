@@ -73,8 +73,7 @@ public class Window2D : Window
             return;
 
         // Snap input edges before user code observes them this frame.
-        Keyboard.BeginFrame();
-        Mouse.BeginFrame();
+        AdvanceInput();
 
         // The window owns the single per-frame Render() flush. Stray
         // Render() calls from inside the body are suppressed so they
