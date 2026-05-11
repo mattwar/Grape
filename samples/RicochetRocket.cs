@@ -47,27 +47,21 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 
 var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
 
-window.KeyDown += (_, e) =>
-{
-    switch (e.Key)
-    {
-        case Key.Left:
-            rocket.Heading = (rocket.Heading + 350f) % 360f;
-            break;
-        case Key.Right:
-            rocket.Heading = (rocket.Heading + 10f) % 360f;
-            break;
-        case Key.Up:
-            rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f);
-            break;
-        case Key.Down:
-            rocket.Speed = Math.Max(rocket.Speed - 50f, 0f);
-            break;
-    }
-};
-
 window.Rendering += (w, rd) =>
 {
+    // Per-frame input: edges for arrow-key tap response. Holding an
+    // arrow key only fires once per press, matching the original
+    // KeyDown event behavior.
+    var input = w.Input;
+    if (input.WasJustPressed(Key.Left))
+        rocket.Heading = (rocket.Heading + 350f) % 360f;
+    if (input.WasJustPressed(Key.Right))
+        rocket.Heading = (rocket.Heading + 10f) % 360f;
+    if (input.WasJustPressed(Key.Up))
+        rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
+    if (input.WasJustPressed(Key.Down))
+        rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
+
     if (rocket.Update(rd.GetUpdateContext()))
     {
         var bounce = false;

@@ -66,14 +66,13 @@ var window = new Window3D
 var levels = new[] { Antialiasing.None, Antialiasing.X2, Antialiasing.X4, Antialiasing.X8 };
 int levelIndex = 0;
 
-window.KeyDown += (_, e) =>
-{
-    if (e.Key == Key.Space)
-        levelIndex = (levelIndex + 1) % levels.Length;
-};
-
 window.Rendering += (w, rd) =>
 {
+    // Cycle AA mode on Space tap. WasJustPressed fires once per
+    // press, so holding Space won't blur through the modes.
+    if (w.Input.WasJustPressed(Key.Space))
+        levelIndex = (levelIndex + 1) % levels.Length;
+
     rd.Antialiasing = levels[levelIndex];
 
     var t = (float)rd.ElapsedSinceStart.TotalSeconds;
