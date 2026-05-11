@@ -216,4 +216,61 @@ public sealed class FrameInput
     /// (desktop / global coordinates).
     /// </summary>
     public Vector2 MousePosition => _currentMousePosition;
+
+    // -------- Internal previous-state accessors --------
+    // Used by InputActions to compute action-level edges (action
+    // transitions, rather than per-binding OR'd rising edges, which
+    // would double-fire when multiple bindings rise simultaneously).
+
+    internal bool WasPreviouslyDown(PhysicalKey key)
+    {
+        var idx = (int)key;
+        return (uint)idx < (uint)_previousKeys.Length && _previousKeys[idx];
+    }
+
+    internal bool WasPreviouslyDown(Key key) =>
+        WasPreviouslyDown((PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)key, out _));
+
+    internal bool WasPreviouslyDown(MouseButton button)
+    {
+        var bit = (uint)button;
+        if (bit == 0) return false;
+        var mask = (MouseButtons)(1u << ((int)bit - 1));
+        return (_previousMouseButtons & mask) != 0;
+    }
+
+    /// <summary>
+    /// Computes the previous-frame value of <see cref="Direction(PhysicalKey, PhysicalKey)"/>.
+    /// </summary>
+    internal float PreviousDirection(PhysicalKey negative, PhysicalKey positive)
+    {
+        var n = WasPreviouslyDown(negative) ? 1 : 0;
+        var p = WasPreviouslyDown(positive) ? 1 : 0;
+        return p - n;
+    }
+
+    internal float PreviousDirection(Key negative, Key positive) =>
+        PreviousDirection(
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)negative, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)positive, out _));
+
+    internal Vector2 PreviousDirection2D(
+        PhysicalKey left, PhysicalKey right,
+        PhysicalKey down, PhysicalKey up)
+    {
+        var v = new Vector2(
+            PreviousDirection(left, right),
+            PreviousDirection(down, up));
+        var lenSq = v.LengthSquared();
+        return lenSq > 0f ? v / MathF.Sqrt(lenSq) : Vector2.Zero;
+    }
+
+    internal Vector2 PreviousDirection2D(
+        Key left, Key right,
+        Key down, Key up) =>
+        PreviousDirection2D(
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)left, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)right, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)down, out _),
+            (PhysicalKey)SDL.GetScancodeFromKey((SDL.Keycode)up, out _));
 }

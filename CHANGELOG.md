@@ -14,6 +14,14 @@ All notable changes to this project will be documented in this file.
 - `Window.Input` — auto-advanced `FrameInput` per window, updated
   at the start of each rendered frame. Covers the 90% case with
   zero glue.
+- `InputActions` (Blitter.Bits) — named-action map over `FrameInput`
+  with multiple bindings per action (`Key`, `PhysicalKey`,
+  `MouseButton`, `KeyDirection`, `KeyDirection2D`).
+  `Bind` appends, `Rebind` replaces, `Clear` removes; action-level
+  edges (`WasJustPressed`/`WasJustReleased`) fire once even when
+  several bindings rise together.
+- `InputActions.ToJson` / `FromJson` for saved configs / rebindable
+  controls.
 - `Mouse.Delta` (via `FrameInput.MouseDelta`) reports SDL
   relative-motion delta when any window has `Window.RelativeMouseMode`
   enabled, so FPS-style mouselook keeps producing motion while the
