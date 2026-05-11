@@ -62,6 +62,189 @@ public readonly struct Color : IEquatable<Color>
 
     public Color WithAlpha(byte alpha) => new(R, G, B, alpha);
 
+    /// <summary>Returns this color with the red channel replaced.</summary>
+    public Color WithRed(byte red) => new(red, G, B, A);
+
+    /// <summary>Returns this color with the green channel replaced.</summary>
+    public Color WithGreen(byte green) => new(R, green, B, A);
+
+    /// <summary>Returns this color with the blue channel replaced.</summary>
+    public Color WithBlue(byte blue) => new(R, G, blue, A);
+
+    /// <summary>
+    /// Extracts the HSV components of this color (hue and saturation
+    /// and value all in [0, 1]). Alpha is returned as the fourth
+    /// element of the tuple, also normalized to [0, 1].
+    /// </summary>
+    public (float Hue, float Saturation, float Value, float Alpha) ToHsv()
+    {
+        float r = R / 255f, g = G / 255f, b = B / 255f;
+        float max = MathF.Max(r, MathF.Max(g, b));
+        float min = MathF.Min(r, MathF.Min(g, b));
+        float delta = max - min;
+
+        float h;
+        if (delta <= 0f) h = 0f;
+        else if (max == r) h = ((g - b) / delta) % 6f;
+        else if (max == g) h = (b - r) / delta + 2f;
+        else h = (r - g) / delta + 4f;
+        h /= 6f;
+        if (h < 0f) h += 1f;
+
+        float s = max <= 0f ? 0f : delta / max;
+        return (h, s, max, A / 255f);
+    }
+
+    /// <summary>
+    /// Linear interpolation between <paramref name="a"/> and
+    /// <paramref name="b"/> per channel (RGB and alpha) at parameter
+    /// <paramref name="t"/>. <paramref name="t"/> is clamped to [0, 1].
+    /// Interpolation happens in 8-bit sRGB space; for perceptually
+    /// uniform blending, convert to HSV first.
+    /// </summary>
+    public static Color Lerp(Color a, Color b, float t)
+    {
+        t = t < 0f ? 0f : (t > 1f ? 1f : t);
+        return new Color(
+            (byte)(a.R + (b.R - a.R) * t),
+            (byte)(a.G + (b.G - a.G) * t),
+            (byte)(a.B + (b.B - a.B) * t),
+            (byte)(a.A + (b.A - a.A) * t));
+    }
+
+    /// <summary>
+    /// Returns a darker variant of this color by mixing toward black
+    /// by <paramref name="amount"/> (0 = unchanged, 1 = pure black).
+    /// Alpha is preserved.
+    /// </summary>
+    public Color Darken(float amount)
+    {
+        amount = amount < 0f ? 0f : (amount > 1f ? 1f : amount);
+        float k = 1f - amount;
+        return new Color((byte)(R * k), (byte)(G * k), (byte)(B * k), A);
+    }
+
+    /// <summary>
+    /// Returns a lighter variant of this color by mixing toward white
+    /// by <paramref name="amount"/> (0 = unchanged, 1 = pure white).
+    /// Alpha is preserved.
+    /// </summary>
+    public Color Lighten(float amount)
+    {
+        amount = amount < 0f ? 0f : (amount > 1f ? 1f : amount);
+        return new Color(
+            (byte)(R + (255 - R) * amount),
+            (byte)(G + (255 - G) * amount),
+            (byte)(B + (255 - B) * amount),
+            A);
+    }
+
+    /// <summary>
+    /// Builds a color from a normalized RGBA <see cref="Vector4"/>
+    /// (each channel in [0, 1]; values are clamped). Inverse of the
+    /// implicit <see cref="Color"/>-to-<see cref="Vector4"/> conversion.
+    /// </summary>
+    public static Color FromVector4(Vector4 rgba) =>
+        new(
+            (byte)(Math.Clamp(rgba.X, 0f, 1f) * 255f),
+            (byte)(Math.Clamp(rgba.Y, 0f, 1f) * 255f),
+            (byte)(Math.Clamp(rgba.Z, 0f, 1f) * 255f),
+            (byte)(Math.Clamp(rgba.W, 0f, 1f) * 255f));
+
+    /// <summary>
+    /// Parses a CSS-style color string. Accepted formats:
+    /// <c>#rgb</c>, <c>#rgba</c>, <c>#rrggbb</c>, <c>#rrggbbaa</c>
+    /// (with or without the leading <c>#</c>), and
+    /// <c>rgb(r,g,b)</c> / <c>rgba(r,g,b,a)</c> where alpha is
+    /// either 0..255 or a float in [0, 1].
+    /// </summary>
+    public static Color Parse(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        if (TryParse(text, out var color)) return color;
+        throw new FormatException($"Could not parse color: \"{text}\".");
+    }
+
+    /// <inheritdoc cref="Parse(string)"/>
+    public static bool TryParse(string? text, out Color color)
+    {
+        color = default;
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var s = text.Trim();
+
+        if (s.StartsWith("rgb", StringComparison.OrdinalIgnoreCase))
+            return TryParseFunctional(s, out color);
+
+        if (s[0] == '#') s = s[1..];
+        if (!IsHex(s)) return false;
+        return s.Length switch
+        {
+            3 => TrySetHex(out color, ExpandNibble(s[0]), ExpandNibble(s[1]), ExpandNibble(s[2]), 255),
+            4 => TrySetHex(out color, ExpandNibble(s[0]), ExpandNibble(s[1]), ExpandNibble(s[2]), ExpandNibble(s[3])),
+            6 => TrySetHex(out color, ByteHex(s, 0), ByteHex(s, 2), ByteHex(s, 4), 255),
+            8 => TrySetHex(out color, ByteHex(s, 0), ByteHex(s, 2), ByteHex(s, 4), ByteHex(s, 6)),
+            _ => false,
+        };
+
+        static bool IsHex(string v)
+        {
+            foreach (var c in v)
+                if (!Uri.IsHexDigit(c)) return false;
+            return true;
+        }
+        static int ExpandNibble(char c) { var n = HexNibble(c); return (n << 4) | n; }
+        static int HexNibble(char c) => c <= '9' ? c - '0' : (c & ~0x20) - 'A' + 10;
+        static int ByteHex(string v, int i) => (HexNibble(v[i]) << 4) | HexNibble(v[i + 1]);
+        static bool TrySetHex(out Color c, int r, int g, int b, int a)
+        { c = new Color((byte)r, (byte)g, (byte)b, (byte)a); return true; }
+    }
+
+    private static bool TryParseFunctional(string s, out Color color)
+    {
+        color = default;
+        var open = s.IndexOf('(');
+        var close = s.IndexOf(')');
+        if (open < 0 || close <= open) return false;
+        var inside = s[(open + 1)..close];
+        var parts = inside.Split(',');
+        if (parts.Length is not 3 and not 4) return false;
+
+        if (!TryParseByteChannel(parts[0], out var r)) return false;
+        if (!TryParseByteChannel(parts[1], out var g)) return false;
+        if (!TryParseByteChannel(parts[2], out var b)) return false;
+        byte a = 255;
+        if (parts.Length == 4 && !TryParseAlphaChannel(parts[3], out a)) return false;
+
+        color = new Color(r, g, b, a);
+        return true;
+
+        static bool TryParseByteChannel(string p, out byte v)
+        {
+            v = 0;
+            if (!int.TryParse(p.Trim(), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var n)) return false;
+            if (n < 0 || n > 255) return false;
+            v = (byte)n;
+            return true;
+        }
+
+        static bool TryParseAlphaChannel(string p, out byte v)
+        {
+            v = 0;
+            var t = p.Trim();
+            // Accept either 0..255 integer or 0..1 float.
+            if (t.Contains('.') || t.Contains('e', StringComparison.OrdinalIgnoreCase))
+            {
+                if (!float.TryParse(t, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var f)) return false;
+                if (f < 0f || f > 1f) return false;
+                v = (byte)(f * 255f);
+                return true;
+            }
+            return TryParseByteChannel(t, out v);
+        }
+    }
+
     public void Deconstruct(out byte r, out byte g, out byte b, out byte a)
     {
         r = R;

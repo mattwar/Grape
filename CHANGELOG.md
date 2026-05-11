@@ -46,6 +46,25 @@ All notable changes to this project will be documented in this file.
   center sits at the origin.
 - `Model.NormalizeSize(targetMaxSize)` uniformly scales a model so
   its longest bounding-box axis matches the target size.
+- `MathG` static class in `Blitter.Bits` with BCL-complementary
+  helpers: `Saturate`, `InverseLerp`, `Remap`, `SmoothStep`,
+  `SmootherStep`, `Damp` (half-life exponential smoothing for
+  `float`/`Vector2`/`Vector3`), `MoveToward`, `WrapDegrees`/`Radians`,
+  `ShortestArcDegrees`/`Radians`, `DegreesToRadians`/`RadiansToDegrees`.
+- `MathG.ProjectOnPlane`, `ClampMagnitude`, `SignedAngle` for
+  `Vector3`; `LookRotation(forward, up)` quaternion builder; `TRS`
+  matrix composer.
+- `Easing` static class with the standard 30 easing curves
+  (In/Out/InOut variants of Sine, Quad, Cubic, Quart, Quint, Expo,
+  Circ, Back, Elastic, Bounce).
+- `Color.Lerp`, `ToHsv`, `WithRed/Green/Blue`, `Darken(amount)`,
+  `Lighten(amount)`, `FromVector4` (inverse of the existing implicit
+  `Color`-to-`Vector4` conversion).
+- `Color.Parse` / `Color.TryParse` accept `#rgb`, `#rgba`, `#rrggbb`,
+  `#rrggbbaa` (with or without `#`) and `rgb(r,g,b)` / `rgba(r,g,b,a)`
+  with either 0..255 or 0..1 alpha.
+- `Gradient` (in `Blitter.Bits`) — piecewise-linear color stops with
+  `Sample(t)` and a `FromColors` evenly-spaced constructor.
 - `BoundingBox` and `BoundingSphere` value types with intersection,
   containment, encapsulation, and matrix-transform helpers.
 - `BoundingRect` and `BoundingCircle` 2D counterparts (in
