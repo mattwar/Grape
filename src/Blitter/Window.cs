@@ -824,7 +824,7 @@ public abstract class Window : IDisposable
 
     /// <summary>
     /// Invalidates the window, requesting a new render. The render runs
-    /// on the next frame tick (see <see cref="MaxFrameRate"/>); multiple
+    /// on the next frame tick (see <see cref="MinRenderInterval"/>); multiple
     /// invalidations between ticks coalesce into a single render.
     /// </summary>
     public void Invalidate()

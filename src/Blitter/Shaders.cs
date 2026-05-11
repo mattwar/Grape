@@ -738,7 +738,7 @@ public static class Shaders
     /// The args type is <see cref="TransformArgs"/> (a single
     /// <see cref="Matrix4x4"/> field) rather than a bare
     /// <see cref="Matrix4x4"/> so this shader works with
-    /// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex},
     /// Shader{TVertex,TArgs}, in TArgs)"/>: pass a model matrix and
     /// the renderer composes <see cref="Renderer3D.Camera"/> into it.
     /// Existing callers passing <c>model * viewProjection</c> continue
@@ -811,7 +811,7 @@ public static class Shaders
     /// <c>samples/IndexedCube.cs</c>) and pass
     /// <see cref="Camera.GetSkyboxViewProjection(float)"/> as the
     /// per-draw transform so the skybox follows the camera. Use
-    /// <see cref="DepthMode.Default"/> -- the shader's depth output of
+    /// <see cref="DepthMode.Solid"/> -- the shader's depth output of
     /// 1.0 ensures the skybox draws behind opaque geometry without
     /// special depth state.
     /// </summary>

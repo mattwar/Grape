@@ -18,6 +18,7 @@ namespace Blitter;
 /// </para>
 /// <para>
 /// A camera is a CPU-side helper -- it doesn't interact with the GPU directly.
+/// </para>
 /// </remarks>
 public abstract class Camera
 {

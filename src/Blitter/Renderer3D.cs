@@ -31,7 +31,7 @@ public abstract class Renderer3D
     public TimeSpan ElapsedSinceStart => Stopwatch.GetElapsedTime(_startTs);
 
     /// <summary>
-    /// Elapsed wall-clock time since the last call to <see cref="GpuRenderer.Render"/>
+    /// Elapsed wall-clock time since the last call to <see cref="Render"/>
     /// (or since renderer creation if no frame has been rendered yet),
     /// clamped by <see cref="MaxFrameDelta"/> so a long pause doesn't
     /// teleport time-integrated state.
@@ -170,7 +170,7 @@ public abstract class Renderer3D
 
     /// <summary>
     /// The camera used to compose view-projection matrices for
-    /// <see cref="DrawSceneMesh{TVertex,TArgs}(Mesh{TVertex},
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex},
     /// Shader{TVertex,TArgs}, in TArgs)"/>. <see langword="null"/>
     /// (the default) means scene-aware draws skip applying any view-
     /// projection transform -- the args struct's transform field, if

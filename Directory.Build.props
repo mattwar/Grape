@@ -11,6 +11,12 @@
     <LangVersion>preview</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- Emit XML doc files alongside DLLs so IntelliSense in consuming
+         projects (samples, downstream NuGet users) sees /// comments.
+         CS1591 = "missing XML comment for publicly visible type or member";
+         we don't require docs on every public symbol. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <!-- Common metadata for any project that ends up packed -->

@@ -187,7 +187,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// A default linear-filtered, repeating sampler used by
-    /// <see cref="DrawMesh"/> when the caller does not supply one.
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Shader{TVertex})"/> when the caller does not supply one.
     /// </summary>
     internal GpuSampler DefaultSampler => _defaultSampler ??= _device.CreateSampler(new GpuSamplerCreateInfo
     {
@@ -232,7 +232,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     /// <summary>
     /// Acquires the swapchain image for the next frame and stages
-    /// per-frame state. Called at the top of <see cref="Render"/>.
+    /// per-frame state. Called at the top of <see cref="Renderer3D.Render"/>.
     /// </summary>
     private void BeginFrame()
     {

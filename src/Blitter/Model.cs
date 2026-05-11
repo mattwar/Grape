@@ -43,7 +43,7 @@ public sealed class Submesh
 /// A loaded 3D asset -- a list of <see cref="Submesh"/> plus the
 /// materials they share. Built by a loader (today
 /// <see cref="Model.Load(string)"/> for OBJ files) or assembled
-/// directly. Drawing is one call: <see cref="Draw"/> walks every
+/// directly. Drawing is one call: <see cref="Draw(Renderer3D)"/> walks every
 /// submesh, applies its material, and queues the draw through
 /// <see cref="Shaders.LitTexture"/>.
 /// </summary>

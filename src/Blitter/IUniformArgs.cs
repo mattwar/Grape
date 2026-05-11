@@ -25,7 +25,7 @@ namespace Blitter;
 /// getter/setter pair on this single interface. An args struct
 /// implements only the pairs it cares about; the rest stay
 /// <c>null</c>. The renderer's
-/// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}"/> overload
+/// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/> overload
 /// probes the non-null accessors at queue time and applies the
 /// renderer's matching state.
 /// </para>
@@ -42,7 +42,7 @@ namespace Blitter;
 /// New traits are added by appending more accessor pairs to this
 /// interface (their default of <c>null</c> keeps existing structs
 /// source-compatible) plus a matching apply step in
-/// <see cref="Renderer3D.DrawSceneMesh{TVertex,TArgs}"/>.
+/// <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.
 /// </para>
 /// </remarks>
 /// <typeparam name="TSelf">
