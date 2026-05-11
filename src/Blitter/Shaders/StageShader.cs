@@ -83,7 +83,7 @@ public abstract class StageShader
     }
 
     /// <summary>The pipeline stage this shader targets.</summary>
-    public ShaderKind Kind { get; }
+    internal ShaderKind Kind { get; }
 
     /// <summary>The entry-point function name within the shader source/bytecode.</summary>
     public string Entrypoint { get; }

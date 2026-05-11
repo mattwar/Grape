@@ -151,7 +151,7 @@ static void DrawWaveRibbon(SKCanvas canvas, float width, float height, float t)
         StrokeWidth = MathF.Max(2f, MathF.Min(width, height) * 0.025f),
         StrokeCap = SKStrokeCap.Round,
         IsAntialias = true,
-        StageShader = SKShader.CreateRadialGradient(
+        Shader = SKShader.CreateRadialGradient(
             center: new SKPoint(width * 0.5f, height * 0.5f),
             radius: width * 0.6f,
             colors: [new SKColor(0xFF, 0x6B, 0x9E), new SKColor(0x4E, 0x9C, 0xFF), new SKColor(0x6B, 0xFF, 0xC2)],

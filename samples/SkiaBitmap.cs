@@ -84,7 +84,7 @@ atlasImage.DrawCanvas(canvas =>
             using var bg = new SKPaint
             {
                 IsAntialias = true,
-                StageShader = SKShader.CreateLinearGradient(
+                Shader = SKShader.CreateLinearGradient(
                     start: new SKPoint(rect.Left, rect.Top),
                     end:   new SKPoint(rect.Right, rect.Bottom),
                     colors: [hues[idx], hues[(idx + 5) % hues.Length]],
