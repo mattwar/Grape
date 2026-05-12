@@ -32,14 +32,14 @@ using Blitter.Bits;
 //const string ModelFile = "teapot.obj";
 const string ModelFile = "bunny.obj";
 
-using var model = Model.Load(Asset.GetPathRelativeToCaller(ModelFile));
+var model = Model.Load(Asset.GetPathRelativeToCaller(ModelFile));
 
 // Center + scale the model into a unit-ish bounding sphere so it
 // frames the same way regardless of which classic asset is loaded
 // (bunny is millimeter-scale and offset; teapot is ~6 units wide).
-var (center, radius) = ComputeBounds(model);
-var fitTransform = Matrix4x4.CreateTranslation(-center)
-    .Scale(1f / radius);
+var sphere = model.ComputeBoundingSphere();
+var fitTransform = Matrix4x4.CreateTranslation(-sphere.Center)
+    .Scale(1f / (sphere.Radius == 0f ? 1f : sphere.Radius));
 
 var window = new Window3D
 {
@@ -80,24 +80,6 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        model.Draw(rd, fitTransform);
+        rd.DrawModel(model, fitTransform);
     }
-});// --- helpers ------------------------------------------------------
-
-static (Vector3 Center, float Radius) ComputeBounds(Model model)
-{
-    var min = new Vector3(float.PositiveInfinity);
-    var max = new Vector3(float.NegativeInfinity);
-    foreach (var sub in model.Submeshes)
-    {
-        // use the vertices to determine the bounding box
-        foreach (var v in sub.Mesh.Vertices)
-        {
-            min = Vector3.Min(min, v.Position);
-            max = Vector3.Max(max, v.Position);
-        }
-    }
-    var center = (min + max) * 0.5f;
-    var radius = (max - min).Length() * 0.5f;
-    return (center, radius == 0f ? 1f : radius);
-}
+});

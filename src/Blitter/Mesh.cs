@@ -17,6 +17,13 @@ public abstract class Mesh
     public abstract ReadOnlySpan<uint> Indices { get; }
 
     /// <summary>
+    /// The CLR type of this mesh's vertices (the <c>TVertex</c> in
+    /// <see cref="Mesh{TVertex}"/>). Lets non-generic code dispatch on
+    /// vertex format without reflection at every call.
+    /// </summary>
+    public abstract Type VertexType { get; }
+
+    /// <summary>
     /// How the mesh's vertices are grouped into rendered shapes
     /// (triangles, lines, points). Set at construction; immutable for
     /// the mesh's lifetime.
@@ -92,6 +99,8 @@ public class Mesh<TVertex> : Mesh
     public override int IndexCount => _indexCount;
 
     public override Topology Topology { get; }
+
+    public override Type VertexType => typeof(TVertex);
 
     /// <summary>
     /// Read-only view over the mesh's vertex data as the strongly-typed

@@ -23,7 +23,7 @@ using Blitter.Bits;
 
 // A small two-material model: an octahedron (bipyramid) with the four
 // upper faces in one color and the four lower faces in another. Two
-// materials -> two submeshes -> two draw calls under the hood, all
+// materials -> two parts -> two draw calls under the hood, all
 // invisible to the caller.
 const string Obj = """
     # Bipyramid centered on origin, ±1 along each axis.
@@ -71,14 +71,15 @@ var mtlPath = Path.Combine(tempDir.FullName, "gem.mtl");
 File.WriteAllText(objPath, Obj);
 File.WriteAllText(mtlPath, Mtl);
 
-using var model = Model.Load(objPath);
-Console.WriteLine($"Loaded {model.SourcePath}: {model.Submeshes.Count} submeshes");
-foreach (var sub in model.Submeshes)
+var model = Model.Load(objPath);
+Console.WriteLine($"Loaded {objPath}: {model.Parts.Length} parts");
+foreach (var sub in model.Parts)
 {
+    var lit = (LitTextureMaterial)sub.Material;
     Console.WriteLine(
         $"  '{sub.Name}': {sub.Mesh.VertexCount} verts, " +
-        $"material '{sub.Material.Name}' " +
-        $"Kd=({sub.Material.DiffuseColor.R},{sub.Material.DiffuseColor.G},{sub.Material.DiffuseColor.B})");
+        $"material '{lit.Name}' " +
+        $"Kd=({lit.DiffuseColor.R},{lit.DiffuseColor.G},{lit.DiffuseColor.B})");
 }
 
 var window = new Window3D
@@ -114,17 +115,12 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        // One call draws every submesh; the model walks them
-        // internally, picks Shaders.LitTexture, and binds the
-        // material texture (or a 1x1 white fallback) per submesh.
-        model.Draw(rd, transform);
+        // One call draws every part; the default materializer walks
+        // them internally, picks Shaders.LitTexture for each
+        // LitTextureMaterial, and binds the material texture (or a 1x1
+        // white fallback) per part.
+        rd.DrawModel(model, transform);
     }
 });
 
-try
-{
-    }
-finally
-{
-    try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }
-}
+try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }

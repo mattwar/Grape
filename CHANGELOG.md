@@ -2,6 +2,87 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- `ShaderTextureLayout` describes the texture/sampler bindings a shader's
+  fragment stage expects; exposed as `Shader.TextureLayout`. Defaults to
+  `SingleTexture2D` so existing single-texture shaders need no changes.
+- `Renderer3D.DrawMesh` / `DrawMeshRaw` overloads accepting
+  `ReadOnlySpan<Image>` for shaders that bind multiple 2D textures.
+  Available for the no-args, args, and instanced paths; texture count
+  and per-slot dimension are validated against the shader's
+  `TextureLayout`.
+- `Materializer` (Blitter.Bits): abstract base bridging `Material`-typed
+  surfaces to concrete shader invocations. Stateless; takes a
+  `Renderer3D` per call so a single instance serves any number of
+  renderers. Subclass to swap shading policy without touching meshes,
+  materials, or the underlying `Renderer3D`.
+- `StandardMaterializer` is the default policy (routes
+  `LitTextureMaterial` to `Shaders.LitTexture` /
+  `Shaders.LitTextureInstanced`); use
+  `StandardMaterializer.Default` -- the process-shared instance --
+  rather than constructing one. Custom subclasses still construct
+  normally.
+- `Renderer3D.DrawMesh(mesh, material, [transform], [materializer])`
+  and `Renderer3D.DrawModel(model, [transform], [materializer])`
+  extension methods (Blitter.Bits): material-aware draw surface
+  layered on top of the shader-typed `DrawMesh` overloads. Defaults
+  to `StandardMaterializer.Default`; pass any `Materializer` to
+  override per call. Instanced overloads take
+  `ReadOnlySpan<TInstance>` in place of `transform`.
+- `Renderer3D.DrawMesh(mesh, [transform | instances], [materializer])`
+  overloads that omit the material entirely, using the materializer's
+  new `Materializer.DefaultMaterial` (white `LitTextureMaterial` for
+  `StandardMaterializer`). Lets `rd.DrawMesh(cubeMesh, instances)`
+  draw a per-instance-tinted batch with no material boilerplate.
+- `LitTextureMaterial` concrete material kind carrying `DiffuseColor` /
+  `DiffuseTexture`; loaders (OBJ/MTL, glTF) emit this. New material
+  kinds slot in beside it without touching the renderer.
+- `MeshDispatcher` (Blitter.Bits) caches one
+  `IMeshDrawAdapter` per encountered vertex type so non-generic
+  dispatch (a `Materializer`) can hand a base `Mesh` to the
+  strongly-typed renderer entry points without per-call reflection.
+- `Mesh.VertexType` exposes the concrete vertex CLR type for
+  non-generic dispatch.
+- `MaterializerNotSupportedException` thrown when a materializer has
+  no shader for a given (mesh, material) combination.
+- `Materializer.DrawMesh<TInstance>(renderer, mesh, material, instances)`
+  (and `DrawModel<TInstance>` walker): instanced equivalent of the
+  non-instanced `DrawMesh`. Subclasses dispatch on (material kind,
+  `TInstance` type) to find a matching instanced shader.
+- `Shaders.LitTextureInstanced`: instanced variant of `LitTexture`,
+  paired with `TransformAndColorInstance` for the per-instance
+  transform + tint. `StandardMaterializer` routes
+  `LitTextureMaterial` + `TransformAndColorInstance` here automatically.
+- `Renderer3D.DrawMesh<TVertex,TArgs,TInstance>` (textured, scene-aware):
+  composes camera/lights into the per-call args via `IUniformArgs` then
+  forwards to the existing `DrawMeshRaw` instanced path.
+
+### Changed
+- **Breaking.** `Submesh` renamed to `ModelPart` and `Model.Submeshes`
+  to `Model.Parts`. The type describes a *part of a model* (a
+  `Mesh` + `Material` + optional `Name`), not a kind of `Mesh` --
+  the new name reflects the composition relationship.
+- **Breaking.** `Material` is now an abstract base; the data formerly
+  on it (`DiffuseColor`, `DiffuseTexture`) lives on the new
+  `LitTextureMaterial` subclass. Callers constructing materials switch
+  from `new Material { ... }` to `new LitTextureMaterial { ... }`;
+  `Material.Default` becomes `LitTextureMaterial.Default`.
+- **Breaking.** `ModelPart.Mesh` (the renamed `Submesh.Mesh`) is
+  typed as the non-generic `Mesh` base so model parts can carry any
+  vertex format; cast to `Mesh<LitTextureVertex3D>` when you need
+  the typed view.
+- **Breaking.** `Model.Draw(Renderer3D, ...)` removed and `Model` no
+  longer implements `IDisposable`. Use the
+  `Renderer3D.DrawModel(model, transform)` extension method (in
+  `Blitter.Bits`); under the hood it uses `StandardMaterializer.Default`.
+- **Breaking.** `Model`, `ModelPart` (formerly `Submesh`),
+  `Material`, `LitTextureMaterial`, and the OBJ/glTF/MTL loaders
+  move from `Blitter` to `Blitter.Bits` (namespace `Blitter.Bits`).
+  `Blitter` sheds its `SharpGLTF.Toolkit` dependency. Add
+  `using Blitter.Bits;` where you constructed or loaded these types.
+
 ## [0.4.0] 2026-05-10
 
 ### Added

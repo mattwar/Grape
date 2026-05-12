@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Wavefront OBJ + MTL loader. Internal entry point sits behind
@@ -36,13 +36,13 @@ internal static class OBJ
         // covers face groups that never had a `usemtl` -- it points to
         // a default material so the build pass doesn't need a special
         // case.
-        var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+        var materials = new Dictionary<string, LitTextureMaterial>(StringComparer.Ordinal)
         {
-            [DefaultMaterialName] = Material.Default,
+            [DefaultMaterialName] = LitTextureMaterial.Default,
         };
 
         // One bucket per (group, material) pair. Face order within a
-        // bucket is preserved; bucket creation order drives submesh
+        // bucket is preserved; bucket creation order drives part
         // order in the resulting model.
         var bucketOrder = new List<(string Group, string Material)>();
         var buckets = new Dictionary<(string Group, string Material), List<FaceCorner[]>>();
@@ -153,8 +153,8 @@ internal static class OBJ
             : null;
 
         // Build pass: turn each bucket into a deduplicated
-        // LitTextureVertex3D mesh + Submesh.
-        var submeshes = new List<Submesh>();
+        // LitTextureVertex3D mesh + ModelPart.
+        var parts = new List<ModelPart>();
         foreach (var key in bucketOrder)
         {
             var faceList = buckets[key];
@@ -162,33 +162,33 @@ internal static class OBJ
                 continue;
 
             if (!materials.TryGetValue(key.Material, out var material))
-                material = Material.Default;
+                material = LitTextureMaterial.Default;
 
-            var (vertices, indices) = BuildSubmesh(faceList, positions, texCoords, normals, smoothNormals, material);
+            var (vertices, indices) = BuildPart(faceList, positions, texCoords, normals, smoothNormals, material);
             if (vertices.Length == 0)
                 continue;
 
             var mesh = Mesh.Create<LitTextureVertex3D>(vertices, indices);
-            // Submesh name: prefer the group label; fall back to
+            // ModelPart name: prefer the group label; fall back to
             // "<material>" so an unnamed-group OBJ still produces
-            // distinguishable submeshes.
+            // distinguishable parts.
             var name = !string.IsNullOrEmpty(key.Group) ? key.Group :
                        !string.IsNullOrEmpty(key.Material) ? key.Material :
                        null;
-            submeshes.Add(new Submesh(mesh, material, name));
+            parts.Add(new ModelPart(mesh, material, name));
         }
 
-        return new Model(submeshes, path);
+        return new Model(parts);
     }
 
     // Triangulate + deduplicate one bucket into a vertex array + index buffer.
-    private static (LitTextureVertex3D[] V, uint[] I) BuildSubmesh(
+    private static (LitTextureVertex3D[] V, uint[] I) BuildPart(
         List<FaceCorner[]> faces,
         List<Vector3> positions,
         List<Vector2> texCoords,
         List<Vector3> normals,
         Vector3[]? smoothNormals,
-        Material material)
+        LitTextureMaterial material)
     {
         // Bake the material's diffuse color into every emitted vertex.
         // The shader multiplies texture sample × vertex color, so this
@@ -314,7 +314,7 @@ internal static class OBJ
                 if (i0 < 0 || i0 >= positions.Count) continue;
                 Vector3 a = positions[i0];
 
-                // Fan triangulation matches BuildSubmesh so each
+                // Fan triangulation matches BuildPart so each
                 // emitted triangle contributes its own face normal
                 // (and area weight) to the three positions it touches.
                 for (int t = 1; t < face.Length - 1; t++)

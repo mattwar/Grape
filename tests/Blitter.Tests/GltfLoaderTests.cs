@@ -1,4 +1,5 @@
 using System.Numerics;
+using Blitter.Bits;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
@@ -44,8 +45,8 @@ public class GltfLoaderTests
         WriteSingleTriangleGlb(path, new Vector4(1, 1, 1, 1));
         try
         {
-            using var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var model = Model.Load(path);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
         }
@@ -60,11 +61,12 @@ public class GltfLoaderTests
         WriteSingleTriangleGlb(path, new Vector4(1f, 0f, 0f, 1f));
         try
         {
-            using var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
-            Assert.Equal(255, sub.Material.DiffuseColor.R);
-            Assert.Equal(0, sub.Material.DiffuseColor.G);
-            Assert.Equal(0, sub.Material.DiffuseColor.B);
+            var model = Model.Load(path);
+            var sub = Assert.Single(model.Parts);
+            var mat = Assert.IsType<LitTextureMaterial>(sub.Material);
+            Assert.Equal(255, mat.DiffuseColor.R);
+            Assert.Equal(0, mat.DiffuseColor.G);
+            Assert.Equal(0, mat.DiffuseColor.B);
         }
         finally { File.Delete(path); }
     }
@@ -91,8 +93,8 @@ public class GltfLoaderTests
 
         try
         {
-            using var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var model = Model.Load(path);
+            var sub = Assert.Single(model.Parts);
             // We don't peek inside the GPU buffer; rely on the fact
             // that the internal Mesh<T> exposes VertexCount and our
             // load went through the bake path. Stronger assertions
@@ -131,8 +133,8 @@ public class GltfLoaderTests
             scene.AddRigidMesh(mesh, Matrix4x4.Identity);
             scene.ToGltf2().SaveGLTF(path);
 
-            using var model = Model.Load(path);
-            Assert.Single(model.Submeshes);
+            var model = Model.Load(path);
+            Assert.Single(model.Parts);
         }
         finally { dir.Delete(recursive: true); }
     }

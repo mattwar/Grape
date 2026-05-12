@@ -25,7 +25,7 @@ using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
 using SharpGLTF.Scenes;
 
-// --- Build a procedural textured-cube glb -----------------------------
+// --- Build a procedural textured-cube glb using SharpGLTF---------------------
 
 var tempDir = Directory.CreateTempSubdirectory("Blitter-gltfsample");
 var texPath = Path.Combine(tempDir.FullName, "checker.png");
@@ -51,13 +51,13 @@ scene.ToGltf2().SaveGLB(glbPath);
 
 // --- Load + render ----------------------------------------------------
 
-using var model = Model.Load(glbPath);
+var model = Model.Load(glbPath);
 
 var window = new Window3D
 {
     Title = "Loaded glTF: textured cube",
     BackgroundColor = new Color(8, 8, 24),
-    //FullScreen = true,
+    FullScreen = true,
     CloseKey = Key.Escape,
 };
 
@@ -82,7 +82,7 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        model.Draw(rd, transform);
+        rd.DrawModel(model, transform);
     }
 });
 

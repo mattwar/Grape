@@ -59,4 +59,37 @@ public class ShadersBuiltInTests
         Assert.Equal(0u, v.NumStorageTextures);
         Assert.Equal(2u, v.NumUniformBuffers);
     }
+
+    [Fact]
+    public void LitTextureInstanced_VertexShader_HasNoTexturesOrStorage()
+    {
+        // Touching .GetResources() forces shadercross to compile the
+        // HLSL and reflect on the SPIR-V; a malformed shader would
+        // throw here, making this a cheap compile-smoke test for the
+        // instanced lit-textured vertex stage.
+        var v = Shaders.LitTextureInstanced.Vertex.GetResources();
+
+        Assert.Equal(0u, v.NumStorageBuffers);
+        Assert.Equal(0u, v.NumSamplers);
+        Assert.Equal(0u, v.NumStorageTextures);
+        // Same two cbuffers as the non-instanced LitTexture vertex
+        // stage (Model + ViewProjection); Model is unused but
+        // declared so we can reuse the LitArgs layout exactly.
+        Assert.Equal(2u, v.NumUniformBuffers);
+    }
+
+    [Fact]
+    public void LitTextureInstanced_FragmentShader_MatchesNonInstancedLitTexture()
+    {
+        // The instanced shader reuses the LitTexture fragment stage,
+        // so its resource counts must match the non-instanced version
+        // exactly (same texture binding, same lighting cbuffers, same
+        // point-light storage buffer slot).
+        var f = Shaders.LitTextureInstanced.Fragment.GetResources();
+
+        Assert.Equal(1u, f.NumSamplers);
+        Assert.Equal(1u, f.NumStorageBuffers);
+        Assert.Equal(0u, f.NumStorageTextures);
+        Assert.Equal(4u, f.NumUniformBuffers);
+    }
 }
