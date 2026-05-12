@@ -1,54 +1,30 @@
-﻿using System.Numerics;
+using System.Collections.Immutable;
 
 namespace Blitter.Bits;
 
 /// <summary>
-/// One drawable piece of a <see cref="Model"/>
-/// </summary>
-public sealed class Submesh
-{
-    /// <summary>
-    /// The vertex data, index and topology.
-    /// </summary>
-    public Mesh Mesh { get; }
-
-    /// <summary>The material to render this mesh with.</summary>
-    public Material Material { get; }
-
-    /// <summary>
-    /// Optional name; useful for debugging.
-    /// </summary>
-    public string? Name { get; }
-
-    public Submesh(Mesh mesh, Material material, string? name = null)
-    {
-        ArgumentNullException.ThrowIfNull(mesh);
-        ArgumentNullException.ThrowIfNull(material);
-        Mesh = mesh;
-        Material = material;
-        Name = name;
-    }
-}
-
-/// <summary>
-/// A multi-mesh Model.
+/// A collection of meshes and materials parts.
 /// </summary>
 public sealed class Model
 {
-    /// <summary>The model's submeshes, in the order they were loaded.</summary>
-    public IReadOnlyList<Submesh> Submeshes { get; }
-
     /// <summary>
-    /// Source path the model was loaded from, or <c>null</c> if it was assembled in code. 
-    /// Useful for diagnostics.
+    /// The model's parts, in the order they were declared.
     /// </summary>
-    public string? SourcePath { get; }
+    public ImmutableArray<ModelPart> Parts { get; }
 
-    public Model(IEnumerable<Submesh> submeshes, string? sourcePath = null)
+    public Model(IEnumerable<ModelPart> parts)
     {
-        ArgumentNullException.ThrowIfNull(submeshes);
-        Submeshes = submeshes.ToArray();
-        SourcePath = sourcePath;
+        ArgumentNullException.ThrowIfNull(parts);
+        Parts = parts.ToImmutableArray();
+    }
+
+    public Model(ImmutableArray<ModelPart> parts)
+    {
+        // ImmutableArray<T> is a struct, so it's never null -- but
+        // `default(ImmutableArray<T>)` is uninitialized (IsDefault),
+        // and any access on it throws NullReferenceException.
+        // Substitute an empty array so Parts is always usable.
+        Parts = parts.IsDefault ? ImmutableArray<ModelPart>.Empty : parts;
     }
 
     /// <summary>
@@ -67,4 +43,33 @@ public sealed class Model
             $"Unsupported model format '{ext}'. Supported: .obj, .glb, .gltf.");
     }
 }
+
+/// <summary>
+/// One drawable piece of a <see cref="Model"/>
+/// </summary>
+public sealed class ModelPart
+{
+    /// <summary>
+    /// The vertex data, index and topology.
+    /// </summary>
+    public Mesh Mesh { get; }
+
+    /// <summary>The material to render this mesh with.</summary>
+    public Material Material { get; }
+
+    /// <summary>
+    /// Optional name; useful for debugging.
+    /// </summary>
+    public string? Name { get; }
+
+    public ModelPart(Mesh mesh, Material material, string? name = null)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(material);
+        Mesh = mesh;
+        Material = material;
+        Name = name;
+    }
+}
+
 

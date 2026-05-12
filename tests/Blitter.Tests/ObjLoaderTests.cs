@@ -32,7 +32,7 @@ public class ObjLoaderTests
         {
             var model = Model.Load(path);
 
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
             Assert.Same(LitTextureMaterial.Default, sub.Material);
@@ -57,7 +57,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(4, sub.Mesh.VertexCount);
             Assert.Equal(6, sub.Mesh.IndexCount);
         }
@@ -81,7 +81,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
 
             var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices;
             foreach (var v in verts)
@@ -116,7 +116,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices.ToArray();
             // Original (0,0) -> (0,1), (1,0) -> (1,1), (0,1) -> (0,0)
             Assert.Contains(verts, v => v.TextureCoordinate == new Vector2(0, 1));
@@ -130,7 +130,7 @@ public class ObjLoaderTests
     public void Load_DifferentMaterials_ProduceSeparateSubmeshes()
     {
         // Two faces share positions but use different materials. The
-        // loader should split them into two submeshes, one per
+        // loader should split them into two parts, one per
         // material, even though both reference the same group.
         var mtl = """
             newmtl red
@@ -161,13 +161,13 @@ public class ObjLoaderTests
         {
             var model = Model.Load(objPath);
 
-            Assert.Equal(2, model.Submeshes.Count);
+            Assert.Equal(2, model.Parts.Length);
 
             // Order isn't strictly part of the contract, but in
             // practice the loader preserves bucket-creation order
             // (which mirrors usemtl order in the file).
-            var red = Assert.Single(model.Submeshes, s => s.Material.Name == "red");
-            var green = Assert.Single(model.Submeshes, s => s.Material.Name == "green");
+            var red = Assert.Single(model.Parts, s => s.Material.Name == "red");
+            var green = Assert.Single(model.Parts, s => s.Material.Name == "green");
 
             var redMat = Assert.IsType<LitTextureMaterial>(red.Material);
             Assert.Equal(255, redMat.DiffuseColor.R);
@@ -202,7 +202,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
         }
@@ -225,7 +225,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(3, sub.Mesh.VertexCount);
         }
         finally { File.Delete(path); }
@@ -253,7 +253,7 @@ public class ObjLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(4, sub.Mesh.VertexCount);
             Assert.Equal(6, sub.Mesh.IndexCount);
         }

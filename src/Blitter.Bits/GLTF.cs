@@ -8,7 +8,7 @@ namespace Blitter.Bits;
 /// <see cref="Model.Load(string)"/>. v1 maps glTF geometry, base-color
 /// factor, and base-color texture into Blitter's
 /// <see cref="LitTextureVertex3D"/> + <see cref="Material"/> +
-/// <see cref="Submesh"/> types. Animations, skinning, morph targets,
+/// <see cref="ModelPart"/> types. Animations, skinning, morph targets,
 /// metallic/roughness/normal/AO maps, and tangents are not yet
 /// consumed -- the loader extracts the diffuse channel only and
 /// renders Lambert.
@@ -29,27 +29,27 @@ internal static class GLTF
         // Same for materials.
         var materialCache = new Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial>();
 
-        var submeshes = new List<Submesh>();
+        var parts = new List<ModelPart>();
 
         // Walk the default scene's node hierarchy. Each node carries a
         // resolved WorldMatrix; we bake that into vertex positions and
-        // normals so the resulting flat submesh list draws correctly
+        // normals so the resulting flat part list draws correctly
         // without a runtime scene graph. Nodes outside the default
         // scene are skipped (typical glTF practice -- they're often
         // helper nodes like cameras / unused variants).
         var scene = root.DefaultScene ?? root.LogicalScenes.FirstOrDefault();
         if (scene is null)
-            return new Model(submeshes, path);
+            return new Model(parts);
 
         foreach (var node in scene.VisualChildren)
-            VisitNode(node, submeshes, imageCache, materialCache);
+            VisitNode(node, parts, imageCache, materialCache);
 
-        return new Model(submeshes, path);
+        return new Model(parts);
     }
 
     private static void VisitNode(
         Node node,
-        List<Submesh> submeshes,
+        List<ModelPart> parts,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
         Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache)
     {
@@ -67,17 +67,17 @@ internal static class GLTF
                 if (prim.DrawPrimitiveType != PrimitiveType.TRIANGLES)
                     continue;
 
-                var submesh = BuildSubmesh(prim, world, normalMatrix, imageCache, materialCache, node.Name);
-                if (submesh is not null)
-                    submeshes.Add(submesh);
+                var part = BuildPart(prim, world, normalMatrix, imageCache, materialCache, node.Name);
+                if (part is not null)
+                    parts.Add(part);
             }
         }
 
         foreach (var child in node.VisualChildren)
-            VisitNode(child, submeshes, imageCache, materialCache);
+            VisitNode(child, parts, imageCache, materialCache);
     }
 
-    private static Submesh? BuildSubmesh(
+    private static ModelPart? BuildPart(
         MeshPrimitive prim,
         Matrix4x4 world,
         Matrix4x4 normalMatrix,
@@ -144,7 +144,7 @@ internal static class GLTF
         // SDL_GPU. Unlike OBJ we do NOT flip V on import.
 
         var mesh = Mesh.Create<LitTextureVertex3D>(verts, indices);
-        return new Submesh(mesh, material, nodeName);
+        return new ModelPart(mesh, material, nodeName);
     }
 
     private static LitTextureMaterial ConvertMaterial(

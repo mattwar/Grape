@@ -59,7 +59,7 @@ internal static class MeshOccupancy
         var (origin, nx, ny, nz) = MakeGrid(bbox, voxelSize);
         var occupied = new bool[nx * ny * nz];
 
-        foreach (var sub in model.Submeshes)
+        foreach (var sub in model.Parts)
         {
             if (sub.Mesh.Topology != Topology.TriangleList) continue;
             VoxelizeMeshInto((Mesh<LitTextureVertex3D>)sub.Mesh, occupied, nx, ny, nz, origin, voxelSize, mode);

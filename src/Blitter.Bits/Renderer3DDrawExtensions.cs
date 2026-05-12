@@ -101,7 +101,7 @@ public static class Renderer3DDrawExtensions
         Materializer? materializer = null)
         => DrawModel(renderer, model, Matrix4x4.Identity, materializer);
 
-    /// <summary>Draw every submesh of <paramref name="model"/>.</summary>
+    /// <summary>Draw every part of <paramref name="model"/>.</summary>
     public static void DrawModel(
         this Renderer3D renderer,
         Model model,
@@ -110,12 +110,12 @@ public static class Renderer3DDrawExtensions
     {
         ArgumentNullException.ThrowIfNull(model);
         var m = materializer ?? StandardMaterializer.Default;
-        foreach (var submesh in model.Submeshes)
-            m.DrawMesh(renderer, submesh.Mesh, submesh.Material, transform);
+        foreach (var part in model.Parts)
+            m.DrawMesh(renderer, part.Mesh, part.Material, transform);
     }
 
     /// <summary>
-    /// Instanced model draw: every submesh of <paramref name="model"/>
+    /// Instanced model draw: every part of <paramref name="model"/>
     /// is rendered once per entry in <paramref name="instances"/>.
     /// </summary>
     public static void DrawModel<TInstance>(
@@ -127,7 +127,7 @@ public static class Renderer3DDrawExtensions
     {
         ArgumentNullException.ThrowIfNull(model);
         var m = materializer ?? StandardMaterializer.Default;
-        foreach (var submesh in model.Submeshes)
-            m.DrawMesh(renderer, submesh.Mesh, submesh.Material, instances);
+        foreach (var part in model.Parts)
+            m.DrawMesh(renderer, part.Mesh, part.Material, instances);
     }
 }

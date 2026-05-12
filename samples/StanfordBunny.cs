@@ -90,7 +90,7 @@ static (Vector3 Center, float Radius) ComputeBounds(Model model)
 {
     var min = new Vector3(float.PositiveInfinity);
     var max = new Vector3(float.NegativeInfinity);
-    foreach (var sub in model.Submeshes)
+    foreach (var sub in model.Parts)
     {
         // use the vertices to determine the bounding box
         foreach (var v in sub.Mesh.Vertices)

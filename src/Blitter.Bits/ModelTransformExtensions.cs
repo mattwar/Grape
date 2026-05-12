@@ -3,24 +3,24 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Simple transformations of model submeshes. 
+/// Simple transformations of model parts. 
 /// For per-frame alterations use a transform at draw time instead.
 /// </summary>
 public static class ModelTransformExtensions
 {
     /// <summary>
-    /// Returns a new model whose submesh vertices have been transformed by <paramref name="matrix"/>.
+    /// Returns a new model whose part vertices have been transformed by <paramref name="matrix"/>.
     /// </summary>
     public static Model Transform(this Model model, Matrix4x4 matrix)
     {
         ArgumentNullException.ThrowIfNull(model);
-        var newSubs = new Submesh[model.Submeshes.Count];
+        var newSubs = new ModelPart[model.Parts.Length];
         for (int i = 0; i < newSubs.Length; i++)
         {
-            var s = model.Submeshes[i];
-            newSubs[i] = new Submesh(((Mesh<LitTextureVertex3D>)s.Mesh).Transform(matrix), s.Material, s.Name);
+            var s = model.Parts[i];
+            newSubs[i] = new ModelPart(((Mesh<LitTextureVertex3D>)s.Mesh).Transform(matrix), s.Material, s.Name);
         }
-        return new Model(newSubs, model.SourcePath);
+        return new Model(newSubs);
     }
 
     public static Model Translate(this Model model, Vector3 offset) =>

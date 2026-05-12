@@ -60,23 +60,28 @@ All notable changes to this project will be documented in this file.
   forwards to the existing `DrawMeshRaw` instanced path.
 
 ### Changed
+- **Breaking.** `Submesh` renamed to `ModelPart` and `Model.Submeshes`
+  to `Model.Parts`. The type describes a *part of a model* (a
+  `Mesh` + `Material` + optional `Name`), not a kind of `Mesh` --
+  the new name reflects the composition relationship.
 - **Breaking.** `Material` is now an abstract base; the data formerly
   on it (`DiffuseColor`, `DiffuseTexture`) lives on the new
   `LitTextureMaterial` subclass. Callers constructing materials switch
   from `new Material { ... }` to `new LitTextureMaterial { ... }`;
   `Material.Default` becomes `LitTextureMaterial.Default`.
-- **Breaking.** `Submesh.Mesh` is typed as the non-generic `Mesh`
-  base so submeshes can carry any vertex format; cast to
-  `Mesh<LitTextureVertex3D>` when you need the typed view.
+- **Breaking.** `ModelPart.Mesh` (the renamed `Submesh.Mesh`) is
+  typed as the non-generic `Mesh` base so model parts can carry any
+  vertex format; cast to `Mesh<LitTextureVertex3D>` when you need
+  the typed view.
 - **Breaking.** `Model.Draw(Renderer3D, ...)` removed and `Model` no
   longer implements `IDisposable`. Use the
   `Renderer3D.DrawModel(model, transform)` extension method (in
   `Blitter.Bits`); under the hood it uses `StandardMaterializer.Default`.
-- **Breaking.** `Model`, `Submesh`, `Material`, `LitTextureMaterial`,
-  and the OBJ/glTF/MTL loaders move from `Blitter` to `Blitter.Bits`
-  (namespace `Blitter.Bits`). `Blitter` sheds its `SharpGLTF.Toolkit`
-  dependency. Add `using Blitter.Bits;` where you constructed or
-  loaded these types.
+- **Breaking.** `Model`, `ModelPart` (formerly `Submesh`),
+  `Material`, `LitTextureMaterial`, and the OBJ/glTF/MTL loaders
+  move from `Blitter` to `Blitter.Bits` (namespace `Blitter.Bits`).
+  `Blitter` sheds its `SharpGLTF.Toolkit` dependency. Add
+  `using Blitter.Bits;` where you constructed or loaded these types.
 
 ## [0.4.0] 2026-05-10
 

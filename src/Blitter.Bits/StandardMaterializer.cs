@@ -53,7 +53,7 @@ public class StandardMaterializer : Materializer
             case LitTextureMaterial lit:
                 // Material.DiffuseColor is not honored: per-vertex tint
                 // (baked by the OBJ loader) is what carries Kd today.
-                // Hand-built submeshes with white vertices + a colored
+                // Hand-built parts with white vertices + a colored
                 // material won't see the tint; revisit when materials
                 // grow a per-draw uniform tier.
                 var texture = lit.DiffuseTexture ?? GetWhitePlaceholder();

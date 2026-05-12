@@ -46,7 +46,7 @@ public class GltfLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
         }
@@ -62,7 +62,7 @@ public class GltfLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             var mat = Assert.IsType<LitTextureMaterial>(sub.Material);
             Assert.Equal(255, mat.DiffuseColor.R);
             Assert.Equal(0, mat.DiffuseColor.G);
@@ -94,7 +94,7 @@ public class GltfLoaderTests
         try
         {
             var model = Model.Load(path);
-            var sub = Assert.Single(model.Submeshes);
+            var sub = Assert.Single(model.Parts);
             // We don't peek inside the GPU buffer; rely on the fact
             // that the internal Mesh<T> exposes VertexCount and our
             // load went through the bake path. Stronger assertions
@@ -134,7 +134,7 @@ public class GltfLoaderTests
             scene.ToGltf2().SaveGLTF(path);
 
             var model = Model.Load(path);
-            Assert.Single(model.Submeshes);
+            Assert.Single(model.Parts);
         }
         finally { dir.Delete(recursive: true); }
     }

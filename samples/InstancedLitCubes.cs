@@ -29,7 +29,7 @@ var instances = new TransformAndColorInstance[Count];
 
 var window = new Window3D
 {
-    Title = "Instanced lit cubes (one DrawInstanced call)",
+    Title = "Instanced lit cubes (one DrawMesh call)",
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,

@@ -23,7 +23,7 @@ using Blitter.Bits;
 
 // A small two-material model: an octahedron (bipyramid) with the four
 // upper faces in one color and the four lower faces in another. Two
-// materials -> two submeshes -> two draw calls under the hood, all
+// materials -> two parts -> two draw calls under the hood, all
 // invisible to the caller.
 const string Obj = """
     # Bipyramid centered on origin, ±1 along each axis.
@@ -72,8 +72,8 @@ File.WriteAllText(objPath, Obj);
 File.WriteAllText(mtlPath, Mtl);
 
 var model = Model.Load(objPath);
-Console.WriteLine($"Loaded {model.SourcePath}: {model.Submeshes.Count} submeshes");
-foreach (var sub in model.Submeshes)
+Console.WriteLine($"Loaded {objPath}: {model.Parts.Count} parts");
+foreach (var sub in model.Parts)
 {
     var lit = (LitTextureMaterial)sub.Material;
     Console.WriteLine(
@@ -115,10 +115,10 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        // One call draws every submesh; the default materializer walks
+        // One call draws every part; the default materializer walks
         // them internally, picks Shaders.LitTexture for each
         // LitTextureMaterial, and binds the material texture (or a 1x1
-        // white fallback) per submesh.
+        // white fallback) per part.
         rd.DrawModel(model, transform);
     }
 });
