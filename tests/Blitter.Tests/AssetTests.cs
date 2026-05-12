@@ -5,9 +5,9 @@ namespace Blitter.Tests;
 public class AssetTests
 {
     [Fact]
-    public void RelativeToCaller_ResolvesNextToSourceFile()
+    public void GetPathRelativeToCaller_ResolvesNextToSourceFile()
     {
-        var p = Asset.RelativeToCaller("hello.txt");
+        var p = Asset.GetPathRelativeToCaller("hello.txt");
         var dir = Path.GetDirectoryName(p);
         Assert.NotNull(dir);
         // The test file lives next to AssetTests.cs in the test project,
@@ -17,8 +17,8 @@ public class AssetTests
     }
 
     [Fact]
-    public void RelativeToCaller_NullName_Throws()
+    public void GetPathRelativeToCaller_NullName_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => Asset.RelativeToCaller(null!));
+        Assert.Throws<ArgumentNullException>(() => Asset.GetPathRelativeToCaller(null!));
     }
 }

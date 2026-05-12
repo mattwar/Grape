@@ -35,7 +35,7 @@ var window = new Window2D(DesignW, DesignH)
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-var rocketImage = Image.Load(Asset.RelativeToCaller("rocket.png"));
+var rocketImage = Image.Load(Asset.GetPathRelativeToCaller("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 {
@@ -43,7 +43,7 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
     Heading = 45f
 };
 
-var sound = Sound.LoadWAV(Asset.RelativeToCaller("szwoopy.wav"));
+var sound = Sound.LoadWAV(Asset.GetPathRelativeToCaller("szwoopy.wav"));
 
 window.Rendering += (w, rd) =>
 {

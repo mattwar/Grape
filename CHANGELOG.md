@@ -18,7 +18,7 @@ All notable changes to this project will be documented in this file.
   on-demand windows unchanged.
 - `MathG.Orbit` / `Orbit2D` for circular position helpers
   (`time, radius, speed, phase`).
-- `Asset.RelativeToCaller(name)` (Blitter.Bits) resolves a path next
+- `Asset.GetPathRelativeToCaller(name)` (Blitter.Bits) resolves a path next
   to the caller's source file, for samples and tests that ship data
   alongside their `.cs`.
 - `FrameInput` per-loop snapshot owner for keyboard / mouse edge
