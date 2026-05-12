@@ -13,8 +13,6 @@ All notable changes to this project will be documented in this file.
   `ElapsedSecondsSinceLastUpdate`) � drop the `(float)x.TotalSeconds` cast.
 - `Camera3D.GetViewProjection(Renderer3D)` overload reads aspect from
   the renderer directly.
-- `Window.AutoAnimate` runs the window as a continuous animation loop;
-  default `false` keeps on-demand (event-driven) rendering.
 - `MathG.Orbit` / `Orbit2D` for circular position helpers
   (`time, radius, speed, phase`).
 - `Asset.GetPathRelativeToCaller(name)` (Blitter.Bits) resolves a path next
@@ -179,12 +177,10 @@ All notable changes to this project will be documented in this file.
   to the application thread, so they're safe to call from any thread
   (including `RunAsync` loop bodies and `await` continuations) on
   every platform.
-- Migrated all animating samples (32 of them) from the
-  `Rendering += ...; AutoAnimate = true; await WaitForCloseAsync()`
-  pattern to `await window.RunAsync(rd => { ... })`. The event-driven
-  `Rendering` callback is still used for the static `Logo` sample.
-  `AutoAnimate` remains for the niche "event-driven but continuously
-  redrawing" case.
+- Migrated all animating samples (32 of them) from
+  `Rendering += ...; await WaitForCloseAsync()` to
+  `await window.RunAsync(rd => { ... })`. The event-driven `Rendering`
+  callback is still used for the static `Logo` sample.
 - Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
   `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
 - Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of
@@ -225,6 +221,10 @@ All notable changes to this project will be documented in this file.
   failing image is logged once and affected draws are skipped.
 
 ### Removed
+- `Window.AutoAnimate`. `Window.RunAsync(...)` is now the documented
+  animation pattern. Users still wanting an event-driven continuous
+  loop can call `window.Invalidate()` from inside their `Rendering`
+  handler.
 - `Window.NextFrameAsync` and `Window.WaitForNextFrame`. Use
   `Window.RunAsync(...)` to drive a manual render loop; it encapsulates
   the same pacing without exposing the raw frame-tick primitives.

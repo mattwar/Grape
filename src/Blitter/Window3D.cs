@@ -133,9 +133,6 @@ public class Window3D : Window
             renderer.RenderSuppressed = prev;
         }
         renderer.Render();
-
-        if (AutoAnimate)
-            Invalidate();
     }
 
     /// <summary>

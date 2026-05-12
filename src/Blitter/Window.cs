@@ -659,13 +659,6 @@ public abstract class Window : IDisposable
         EnsureRenderLoopStarted();
     }
 
-    /// <summary>
-    /// When true, the window keeps rendering frames continuously,
-    /// driving an animation loop. When false (the default), the window
-    /// is event-driven and only repaints when something changes.
-    /// </summary>
-    public bool AutoAnimate { get; set; }
-
     private void EnsureRenderLoopStarted()
     {
         // Register the render tick on first invalidation. The tick runs
