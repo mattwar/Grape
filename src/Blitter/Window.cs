@@ -880,43 +880,6 @@ public abstract class Window : IDisposable
 
     private Action? _renderingEventBody;
 
-    /// <summary>
-    /// Awaits the start of the next frame tick, paced by
-    /// <see cref="MinRenderInterval"/>. Use this in manual render loops
-    /// to avoid spinning the CPU and to match the cadence the
-    /// event-driven path would use.
-    /// </summary>
-    /// <remarks>
-    /// Allocation-free per iteration: the returned <see cref="ValueTask"/>
-    /// is backed by a reusable <see cref="PeriodicAwaiter"/> driven by the
-    /// application's tick scheduler. <paramref name="cancellationToken"/>
-    /// is observed only at call time — callers should re-check it (or
-    /// <see cref="IsClosed"/>) at the top of their loop body.
-    /// </remarks>
-    public ValueTask NextFrameAsync(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (IsClosed)
-            return ValueTask.CompletedTask;
-        return EnsureFrameAwaiter().WaitForNextAsync();
-    }
-
-    /// <summary>
-    /// Synchronously blocks the calling thread until the start of the
-    /// next frame tick, paced by <see cref="MinRenderInterval"/>. Use
-    /// this in a manual render loop owned by a thread other than the
-    /// application thread (e.g. the user's main thread) so the loop
-    /// stays on its own thread instead of being shifted by an
-    /// <c>await</c> continuation.
-    /// </summary>
-    public void WaitForNextFrame(CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (IsClosed)
-            return;
-        EnsureFrameAwaiter().Wait(cancellationToken);
-    }
-
     private PeriodicAwaiter EnsureFrameAwaiter()
     {
         // (Re)create the awaiter when MinRenderInterval changes so the
@@ -952,7 +915,7 @@ public abstract class Window : IDisposable
                     RenderFrame(renderFrame);
                     if (IsClosed || cancellationToken.IsCancellationRequested)
                         break;
-                    WaitForNextFrame(cancellationToken);
+                    EnsureFrameAwaiter().Wait(cancellationToken);
                 }
                 tcs.TrySetResult();
             }

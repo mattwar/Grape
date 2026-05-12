@@ -183,11 +183,6 @@ All notable changes to this project will be documented in this file.
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
 - Window render-tick and heartbeat loops are now allocation-free per
   tick (no per-iteration `Task.Delay` / `PeriodicTimer` waits).
-- `Window.NextFrameAsync` now returns `ValueTask`; manual loops are
-  allocation-free per iteration when awaited with `ConfigureAwait(false)`.
-- `Window.WaitForNextFrame()` synchronously paces a render loop on
-  the calling thread (no thread shift). Prefer this for main-thread
-  manual loops; `NextFrameAsync` resumes on the application thread.
 - `Window.RunAsync(loopBody)` runs a manual render loop on a dedicated
   background thread and returns a `Task` that completes when the loop
   exits; compose multiple windows via `Task.WhenAll`.
@@ -196,8 +191,8 @@ All notable changes to this project will be documented in this file.
 - `Window.RunAsync` auto-flushes the renderer at the end of each frame
   body; manual `Render()` calls are no longer required (and are
   suppressed if you make them).
-- `Scene2D.RunAsync` replaced by synchronous `Scene2D.Run`, paced via
-  `WaitForNextFrame` so the loop stays on its calling thread.
+- `Scene2D.RunAsync` replaced by synchronous `Scene2D.Run`, which paces
+  itself on the calling thread.
 - Renamed `Image.RenderCanvas` to `Image.DrawCanvas` for naming
   consistency with the rest of the `Draw*` family.
 - Default window size (parameterless `Window2D` / `Window3D` ctor) is
@@ -215,6 +210,9 @@ All notable changes to this project will be documented in this file.
   failing image is logged once and affected draws are skipped.
 
 ### Removed
+- `Window.NextFrameAsync` and `Window.WaitForNextFrame`. Use
+  `Window.RunAsync(...)` to drive a manual render loop; it encapsulates
+  the same pacing without exposing the raw frame-tick primitives.
 - `Mesh<T>` constructors and `Reset` overload that took
   `ImmutableArray<T>`. Build the mesh once with `Mesh.Create(...)` and,
   if dynamic, call `mesh.Update(vertices)` to push new contents.
