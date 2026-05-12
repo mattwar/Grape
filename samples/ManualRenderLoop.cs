@@ -33,13 +33,11 @@ await window.RunAsync(
     shouldContinue: () => !Keyboard.IsDown(Key.Escape),
     renderFrame: r =>
     {
-        var seconds = (float)r.ElapsedSinceStart.TotalSeconds;
-        var (width, height) = window.Size;
-        var aspect = (float)height / width;
+        var seconds = r.ElapsedSecondsSinceStart;
         var transform =
             Matrix4x4.CreateRotationZ(seconds) *
             Matrix4x4.CreateScale(0.8f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+            Matrix4x4.CreateScale(1f / r.AspectRatio, 1f, 1f);
 
         r.DrawMesh(triangle, transform);
     });

@@ -58,6 +58,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 12, 20),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
@@ -74,7 +75,7 @@ window.Rendering += (w, rd) =>
     const float MinDist = 1.5f;
     const float MaxDist = 50f;
     const float Period = 6f; // seconds for a full near->far->near cycle
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     var phase = (1f - MathF.Cos(t * 2f * MathF.PI / Period)) * 0.5f; // 0..1
     var distance = MinDist + (MaxDist - MinDist) * phase;
     var transform = Matrix4x4.CreateTranslation(0f, 0f, -distance);
@@ -92,8 +93,6 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(quad, withMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "Mipmaps", paneAspect);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

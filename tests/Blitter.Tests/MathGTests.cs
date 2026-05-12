@@ -250,6 +250,41 @@ public class MathGTests
         var m2 = MathG.TRS(Vector3.Zero, Quaternion.Identity, 3f);
         Assert.Equal(m1, m2);
     }
+
+    [Fact]
+    public void Orbit_DefaultUnitCircleAtTimeZero()
+    {
+        var p = MathG.Orbit(0f);
+        Assert.Equal(1f, p.X, Eps);
+        Assert.Equal(0f, p.Y, Eps);
+        Assert.Equal(0f, p.Z, Eps);
+    }
+
+    [Fact]
+    public void Orbit_QuarterTurnLandsOnPlusZ()
+    {
+        // speed=1 rad/s; quarter turn at t=pi/2 -> (cos, 0, sin) = (0, 0, 1).
+        var p = MathG.Orbit(MathF.PI * 0.5f, radius: 2f);
+        Assert.Equal(0f, p.X, Eps);
+        Assert.Equal(2f, p.Z, Eps);
+    }
+
+    [Fact]
+    public void Orbit_PhaseShifts_StartingAngle()
+    {
+        var p = MathG.Orbit(0f, radius: 1f, speed: 1f, phase: MathF.PI * 0.5f);
+        Assert.Equal(0f, p.X, Eps);
+        Assert.Equal(1f, p.Z, Eps);
+    }
+
+    [Fact]
+    public void Orbit2D_MatchesXZComponents()
+    {
+        var p3 = MathG.Orbit(0.7f, radius: 3f, speed: 2f, phase: 0.1f);
+        var p2 = MathG.Orbit2D(0.7f, radius: 3f, speed: 2f, phase: 0.1f);
+        Assert.Equal(p3.X, p2.X, Eps);
+        Assert.Equal(p3.Z, p2.Y, Eps);
+    }
 }
 
 public class EasingTests

@@ -71,6 +71,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -85,7 +86,7 @@ window.Rendering += (w, rd) =>
     // user-side draw call only carries the model matrix.
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     var model =
         Matrix4x4.CreateRotationY(t * 0.7f) *
@@ -103,8 +104,7 @@ window.Rendering += (w, rd) =>
     // Caption sits in front of everything regardless of depth.
     // DrawDebugText still takes a raw clip-space transform, so build
     // the view-projection once for it.
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var viewProjection = camera.GetViewProjection(rd);
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;
@@ -113,8 +113,6 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)",
             yOffset: -1.6f, viewProjection);
     }
-
-    w.Invalidate();
 };
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)

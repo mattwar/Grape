@@ -57,6 +57,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -67,9 +68,8 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Refresh the sine plot in-place. The mesh's Version bumps so the
     // GPU buffer re-uploads automatically.
@@ -98,8 +98,6 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateScale(0.6f) *
         Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

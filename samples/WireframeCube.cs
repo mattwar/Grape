@@ -56,6 +56,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -65,9 +66,8 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     var spin =
         Matrix4x4.CreateRotationY(t * 0.7f) *
@@ -104,8 +104,6 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "Solid",     offsetX: -1.8f, viewProjection);
         DrawLabel(rd, "Wireframe", offsetX:  1.8f, viewProjection);
     }
-
-    w.Invalidate();
 };
 
 static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4 viewProjection)

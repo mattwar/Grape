@@ -265,4 +265,32 @@ public static class MathG
         Matrix4x4.CreateScale(uniformScale)
         * Matrix4x4.CreateFromQuaternion(rotation)
         * Matrix4x4.CreateTranslation(translation);
+
+    /// <summary>
+    /// Position on a horizontal (XZ-plane) circle of <paramref name="radius"/>
+    /// at <paramref name="time"/> seconds, centred at the origin. Use
+    /// <paramref name="speed"/> in radians/sec and <paramref name="phase"/>
+    /// to offset the start angle. Y is always 0; add a separate term if
+    /// you want vertical bob.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// var lightPos = MathG.Orbit(t, radius: 4f, speed: 0.7f);
+    /// </code>
+    /// </example>
+    public static Vector3 Orbit(float time, float radius = 1f, float speed = 1f, float phase = 0f)
+    {
+        var angle = time * speed + phase;
+        return new Vector3(MathF.Cos(angle) * radius, 0f, MathF.Sin(angle) * radius);
+    }
+
+    /// <summary>
+    /// 2D version of <see cref="Orbit(float, float, float, float)"/>: a
+    /// point on a circle of <paramref name="radius"/> at the given time.
+    /// </summary>
+    public static Vector2 Orbit2D(float time, float radius = 1f, float speed = 1f, float phase = 0f)
+    {
+        var angle = time * speed + phase;
+        return new Vector2(MathF.Cos(angle) * radius, MathF.Sin(angle) * radius);
+    }
 }

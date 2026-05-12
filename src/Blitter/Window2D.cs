@@ -89,6 +89,9 @@ public class Window2D : Window
             renderer.RenderSuppressed = prev;
         }
         renderer.Render();
+
+        if (AutoInvalidate)
+            Invalidate();
     }
 
     /// <summary>

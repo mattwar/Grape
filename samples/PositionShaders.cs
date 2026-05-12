@@ -43,13 +43,13 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
 {
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var seconds = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
     var fit  = Matrix4x4.CreateScale(0.35f) * Matrix4x4.CreateScale(aspect, 1f, 1f);
     var spin = Matrix4x4.CreateRotationZ(seconds);
@@ -80,8 +80,6 @@ window.Rendering += (w, rd) =>
         Transform = bottomRight,
         FColor = HueToRgb(seconds * 0.25f),
     });
-
-    w.Invalidate(); // schedule the next frame
 };
 
 await window.WaitForCloseAsync();

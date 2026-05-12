@@ -88,15 +88,14 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera();
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)width / height;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Orbit the camera around the origin so every face of the
     // skybox passes through view over time. Radius 3 keeps us
@@ -116,14 +115,14 @@ window.Rendering += (w, rd) =>
     {
         rd.CullMode = CullMode.None;
         rd.DrawMeshRaw(skyboxMesh, cubemap, Shaders.Skybox,
-            camera.GetSkyboxViewProjection(aspect));
+            camera.GetSkyboxViewProjection(rd.AspectRatio));
     }
 
     // Inner cube: regular view-projection (translation kept), with
     // backface culling. Depth writes are on by default so the
     // skybox correctly hides behind the cube where the cube covers
     // it.
-    var viewProjection = camera.GetViewProjection(aspect);
+    var viewProjection = camera.GetViewProjection(rd);
     var model =
         Matrix4x4.CreateRotationY(t * 0.7f) *
         Matrix4x4.CreateRotationX(t * 0.4f);
@@ -133,8 +132,6 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(innerCube, Shaders.PositionColorWithTransform,
             model * viewProjection);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

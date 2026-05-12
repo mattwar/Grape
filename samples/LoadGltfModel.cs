@@ -58,6 +58,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     //FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -70,7 +71,7 @@ window.Rendering += (w, rd) =>
 {
     rd.Camera = camera;
     rd.AmbientLight = new Color(40, 40, 60);
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
         Color.White);
@@ -84,8 +85,6 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         model.Draw(rd, transform);
     }
-
-    w.Invalidate();
 };
 
 try

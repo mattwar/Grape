@@ -35,12 +35,13 @@ var window = new Window3D
     Title = "Animated Sine Ribbon",
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
-    CloseKey = Key.Escape
+    CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     for (int i = 0; i < Segments; i++)
     {
@@ -72,13 +73,11 @@ window.Rendering += (w, rd) =>
 
     mesh.Update(vertices);
 
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
-    var transform = Matrix4x4.CreateScale(aspect, 1f, 1f);
+    // Squash to height/width so the ribbon keeps its aspect when the
+    // window is wider than tall.
+    var transform = Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(mesh, transform);
-
-    w.Invalidate(); // schedule the next render
 };
 
 await window.WaitForCloseAsync();

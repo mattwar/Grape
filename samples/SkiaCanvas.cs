@@ -25,12 +25,13 @@ var window = new Window2D(960, 540)
     Title = "Skia Canvas",
     BackgroundColor = new Color(18, 22, 30),
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
 {
     var (width, height) = w.Size;
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var seconds = rd.ElapsedSecondsSinceStart;
 
     // 1) Native Renderer2D draw underneath: a checkerboard of squares
     //    so the Skia overlays clearly composite on top of existing
@@ -94,8 +95,6 @@ window.Rendering += (w, rd) =>
         float phase = seconds + i * 0.35f;
         rd.DrawCanvas(rect, canvas => DrawGauge(canvas, rect.Width, rect.Height, phase, i));
     }
-
-    w.Invalidate(); // animate
 };
 
 await window.WaitForCloseAsync();

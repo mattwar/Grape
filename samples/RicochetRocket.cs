@@ -14,12 +14,9 @@
 // Asset paths below resolve relative to this source file, so the
 // sample works regardless of the shell's current directory.
 
-using System.Runtime.CompilerServices;
 using Blitter;
+using Blitter.Bits;
 using Blitter.Blocks;
-
-static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
-    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
 
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
@@ -33,11 +30,12 @@ var window = new Window2D(DesignW, DesignH)
     BackgroundColor = new Color(0, 20, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-var rocketImage = Image.Load(SampleAsset("rocket.png"));
+var rocketImage = Image.Load(Asset.RelativeToCaller("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 {
@@ -45,7 +43,7 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
     Heading = 45f
 };
 
-var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
+var sound = Sound.LoadWAV(Asset.RelativeToCaller("szwoopy.wav"));
 
 window.Rendering += (w, rd) =>
 {
@@ -107,8 +105,6 @@ window.Rendering += (w, rd) =>
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 2f);
-
-    w.Invalidate(); // request the next rendering
 };
 
 await window.WaitForCloseAsync();

@@ -86,6 +86,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -101,7 +102,7 @@ window.Rendering += (w, rd) =>
     // Soft ambient; an orbiting directional light so every face gets
     // its turn in shadow as the gem spins.
     rd.AmbientLight = new Color(40, 40, 60);
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
         Color.White);
@@ -119,8 +120,6 @@ window.Rendering += (w, rd) =>
         // material texture (or a 1x1 white fallback) per submesh.
         model.Draw(rd, transform);
     }
-
-    w.Invalidate();
 };
 
 try

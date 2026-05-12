@@ -40,14 +40,13 @@ var window = new Window3D
     BackgroundColor = new Color(8, 0, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
-    var aspectScale = Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var t = rd.ElapsedSecondsSinceStart;
+    var aspectScale = Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
 
     // The orbit ring breathes in and out over time.
     float ring = 0.55f + 0.15f * MathF.Sin(t * 0.7f);
@@ -75,8 +74,6 @@ window.Rendering += (w, rd) =>
     // transforms above already place each triangle directly in clip
     // space.
     rd.DrawMeshRaw(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
-
-    w.Invalidate(); // schedule the next frame
 };
 
 await window.WaitForCloseAsync();

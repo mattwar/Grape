@@ -125,6 +125,7 @@ var window = new Window2D(960, 540)
     Title = "Skia Bitmap (atlas blitting)",
     BackgroundColor = new Color(14, 16, 24),
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 // Tell the renderer to treat the surface as a fixed DesignW x DesignH
@@ -162,8 +163,6 @@ window.Rendering += (w, rd) =>
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
         atlasGrid.Draw(rd, c.AtlasIndex, dst);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

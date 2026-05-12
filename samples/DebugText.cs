@@ -25,6 +25,7 @@ var window = new Window3D
     BackgroundColor = new Color(16, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 long frameCount = 0;
@@ -32,9 +33,8 @@ long frameCount = 0;
 window.Rendering += (w, rd) =>
 {
     frameCount++;
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var t = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
     // Top line: a fixed banner that swings left-to-right with a gentle
     // rotational wobble and slight vertical bob.
@@ -64,8 +64,6 @@ window.Rendering += (w, rd) =>
             Matrix4x4.CreateScale(aspect, 1f, 1f);
         rd.DrawDebugText(live, transform);
     }
-
-    w.Invalidate(); // schedule the next frame
 };
 
 await window.WaitForCloseAsync();

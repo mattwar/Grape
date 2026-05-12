@@ -59,6 +59,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -68,9 +69,8 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Both quads spin around Y at the same rate, just at different
     // positions. Spinning around Y means the front face faces the
@@ -114,8 +114,6 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "CullMode.None", offsetX: -1.5f, viewProjection);
         DrawLabel(rd, "CullMode.Back", offsetX:  1.5f, viewProjection);
     }
-
-    w.Invalidate();
 };
 
 static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4 viewProjection)

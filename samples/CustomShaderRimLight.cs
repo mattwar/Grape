@@ -119,6 +119,7 @@ var window = new Window3D
     BackgroundColor = new Color(2, 3, 8),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -131,7 +132,7 @@ window.Rendering += (w, rd) =>
 {
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Sphere on the left with a cool cyan rim that pulses thinner/wider.
     var sphereModel =
@@ -158,8 +159,6 @@ window.Rendering += (w, rd) =>
         CameraPos  = new Vector4(camera.Position, 1f),
         RimParams  = new Vector4(1.0f, 0.55f, 0.15f, 3.5f),
     });
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

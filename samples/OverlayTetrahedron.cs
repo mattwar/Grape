@@ -17,6 +17,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -58,6 +59,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 const float OrbitRadius = 1.2f;
@@ -73,12 +75,11 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Two solid orbiting tetras -- same as the OrbitingTetrahedra sample.
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
     var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
@@ -97,10 +98,8 @@ window.Rendering += (w, rd) =>
     // position is well behind both solid tetras. Without DepthMode.Overlay
     // it would be occluded; with it, it always draws on top.
     var indicatorAngle = t * 1.8f;
-    var indicatorOrbit = new Vector3(
-        MathF.Cos(indicatorAngle) * 1.5f,
-        MathF.Sin(indicatorAngle * 0.7f) * 0.6f,
-        MathF.Sin(indicatorAngle) * 1.5f);
+    var indicatorOrbit = MathG.Orbit(indicatorAngle, radius: 1.5f)
+        + Vector3.UnitY * MathF.Sin(indicatorAngle * 0.7f) * 0.6f;
     var indicatorSpin = Matrix4x4.CreateRotationY(t * 3f) *
                         Matrix4x4.CreateRotationX(t * 2f);
     var indicatorModel = Matrix4x4.CreateScale(IndicatorScale) *
@@ -112,8 +111,6 @@ window.Rendering += (w, rd) =>
         rd.DepthMode = DepthMode.Overlay;
         rd.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
     } // DepthMode automatically restored to Default here.
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

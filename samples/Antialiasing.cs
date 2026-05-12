@@ -61,6 +61,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var levels = new[] { Antialiasing.None, Antialiasing.X2, Antialiasing.X4, Antialiasing.X8 };
@@ -75,21 +76,17 @@ window.Rendering += (w, rd) =>
 
     rd.Antialiasing = levels[levelIndex];
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    float aspect = (float)width / height;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Slow rotation -- aliasing is most visible when edges crawl
     // through pixel boundaries gradually.
     var model = Matrix4x4.CreateRotationZ(t * 0.1f);
-    var viewProjection = camera.GetViewProjection(aspect);
+    var viewProjection = camera.GetViewProjection(rd);
 
     rd.DrawMesh(wheel, Shaders.PositionColorWithTransform, model * viewProjection);
 
     DrawLabel(rd, $"Antialiasing: {levels[levelIndex]}", yOffset: -0.85f, viewProjection);
     DrawLabel(rd, "Press SPACE to cycle (None / X2 / X4 / X8)", yOffset: -0.95f, viewProjection);
-
-    w.Invalidate();
 };
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)

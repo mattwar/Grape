@@ -15,11 +15,8 @@
 // exception -- it's rebuilt per frame because the lens position
 // changes -- and shows the cost model honestly with `using`.
 
-using System.Runtime.CompilerServices;
 using Blitter;
-
-static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
-    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
+using Blitter.Bits;
 
 const int DesignW = 960;
 const int DesignH = 540;
@@ -30,10 +27,11 @@ var window = new Window2D
     BackgroundColor = new Color(18, 20, 28),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-using var source = Image.Load(SampleAsset("blitter.png"));
+using var source = Image.Load(Asset.RelativeToCaller("blitter.png"));
 
 // Bake the static effects once. Each is a new image owning its own
 
@@ -65,7 +63,7 @@ int cardH = (DesignH - Margin * (Rows + 1) - 60) / Rows; // leave room for the m
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Draw the static-effect grid.
     for (int i = 0; i < cards.Length; i++)
@@ -121,8 +119,6 @@ window.Rendering += (w, rd) =>
 
     rd.DrawColor = new Color(160, 180, 220);
     rd.DrawDebugText(8, stripY - 16, "Magnify(lens, 4x, Nearest) -- rebuilt per frame", scale: 1.2f);
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

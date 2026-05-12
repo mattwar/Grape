@@ -17,6 +17,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -51,6 +52,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 const float OrbitRadius = 1.2f;
@@ -71,7 +73,7 @@ var cameraRight = new PerspectiveCamera
 
 void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
 {
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
     var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
@@ -88,7 +90,7 @@ void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     var (width, height) = w.Size;
 
     // Each pane is half the window's width. The aspect ratio passed to
@@ -110,8 +112,6 @@ window.Rendering += (w, rd) =>
         rd.Viewport = new Rect(paneWidth, 0, paneWidth, height);
         DrawScene(rd, cameraRight.GetViewProjection(paneAspect), t);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 ## [0.4.0] 2026-05-10
 
 ### Added
+- `Renderer2D.AspectRatio` (Renderer3D already exposed it) for one-line
+  aspect math without reaching for `Window.Size`.
+- `Renderer.ElapsedSecondsSinceStart` / `ElapsedSecondsSinceLastRender`
+  on `Renderer2D` / `Renderer3D`, plus matching defaults on
+  `IUpdateContext` (`ElapsedSecondsSinceStart` /
+  `ElapsedSecondsSinceLastUpdate`) — drop the `(float)x.TotalSeconds` cast.
+- `Camera3D.GetViewProjection(Renderer3D)` overload reads aspect from
+  the renderer directly.
+- `Window.AutoInvalidate` opts a window in to continuous rendering
+  (auto-`Invalidate()` after each frame); default `false` keeps
+  on-demand windows unchanged.
+- `MathG.Orbit` / `Orbit2D` for circular position helpers
+  (`time, radius, speed, phase`).
+- `Asset.RelativeToCaller(name)` (Blitter.Bits) resolves a path next
+  to the caller's source file, for samples and tests that ship data
+  alongside their `.cs`.
 - `FrameInput` per-loop snapshot owner for keyboard / mouse edge
   detection: `WasJustPressed`, `WasJustReleased`, `IsDown`,
   `Direction(neg, pos)`, `Direction2D(left, right, down, up)`,

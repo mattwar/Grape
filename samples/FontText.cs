@@ -39,6 +39,7 @@ var window = new Window3D
     BackgroundColor = new Color(10, 12, 22),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 long frameCount = 0;
@@ -46,9 +47,8 @@ long frameCount = 0;
 window.Rendering += (w, rd) =>
 {
     frameCount++;
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var t = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
     // Title banner: fixed string, gentle bob.
     {
@@ -106,8 +106,6 @@ window.Rendering += (w, rd) =>
             Matrix4x4.CreateScale(aspect, 1f, 1f);
         ghostFont.DrawText(rd, s, transform);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

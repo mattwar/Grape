@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Regular tetrahedron with vertices on the unit cube's diagonals.
 // Each vertex carries a color so the faces show as colored gradients
@@ -62,6 +63,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 const float OrbitRadius = 1.2f;
@@ -78,13 +80,12 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Tetra A and B sit on opposite sides of the orbit; as `t` advances
     // they swap places in Z, and pass through each other near the centre.
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
     var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
@@ -97,8 +98,6 @@ window.Rendering += (w, rd) =>
 
     rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

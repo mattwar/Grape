@@ -113,6 +113,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -122,9 +123,8 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Backdrop drawn opaque (default DepthMode.Solid + BlendMode.Alpha
     // is fine here -- the quad's vertices have alpha=255 so it acts
@@ -179,8 +179,6 @@ window.Rendering += (w, rd) =>
         foreach (var sample in samples)
             DrawLabel(rd, sample.Label, sample.Y, viewProjection);
     }
-
-    w.Invalidate();
 };
 
 static void DrawLabel(Renderer3D renderer, string text, float centerY, Matrix4x4 viewProjection)

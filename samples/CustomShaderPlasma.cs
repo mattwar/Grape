@@ -91,13 +91,12 @@ var window = new Window3D
     BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = width / (float)height;
+    var t = rd.ElapsedSecondsSinceStart;
 
     using (rd.PushState())
     {
@@ -108,11 +107,9 @@ window.Rendering += (w, rd) =>
 
         rd.DrawMesh(quad, plasmaShader, new PlasmaArgs
         {
-            Frame = new Vector4(t, aspect, 0f, 0f),
+            Frame = new Vector4(t, rd.AspectRatio, 0f, 0f),
         });
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

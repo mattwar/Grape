@@ -103,6 +103,7 @@ var window = new Window3D
     BackgroundColor = new Color(6, 6, 16),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -134,11 +135,14 @@ window.Rendering += (w, rd) =>
     // bobs. Mutate the renderer's PointLights list freely between
     // frames; the renderer snapshots and uploads it each frame.
     rd.PointLights.Clear();
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
-    var redPos = new Vector3(MathF.Cos(t * 0.7f) * 4.5f, 1.6f + MathF.Sin(t * 1.1f) * 0.4f, MathF.Sin(t * 0.7f) * 4.5f);
-    var greenPos = new Vector3(MathF.Cos(t * 0.9f + 2.0f) * 3.2f, 1.4f + MathF.Sin(t * 1.3f) * 0.5f, MathF.Sin(t * 0.9f + 2.0f) * 3.2f);
-    var bluePos = new Vector3(MathF.Cos(-t * 0.5f + 4.0f) * 5.5f, 1.8f + MathF.Sin(t * 0.8f) * 0.3f, MathF.Sin(-t * 0.5f + 4.0f) * 5.5f);
+    var redPos   = MathG.Orbit(t, radius: 4.5f, speed: 0.7f)
+        + Vector3.UnitY * (1.6f + MathF.Sin(t * 1.1f) * 0.4f);
+    var greenPos = MathG.Orbit(t, radius: 3.2f, speed: 0.9f, phase: 2.0f)
+        + Vector3.UnitY * (1.4f + MathF.Sin(t * 1.3f) * 0.5f);
+    var bluePos  = MathG.Orbit(t, radius: 5.5f, speed: -0.5f, phase: 4.0f)
+        + Vector3.UnitY * (1.8f + MathF.Sin(t * 0.8f) * 0.3f);
 
     rd.PointLights.Add(new PointLight(redPos,   redColor,   lightRange, lightIntensity));
     rd.PointLights.Add(new PointLight(greenPos, greenColor, lightRange, lightIntensity));
@@ -164,8 +168,6 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(greenMarkerMesh, Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(greenPos));
         rd.DrawMesh(blueMarkerMesh,  Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(bluePos));
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

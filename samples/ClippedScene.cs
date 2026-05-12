@@ -46,6 +46,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -55,9 +56,9 @@ var camera = new PerspectiveCamera
 
 window.Rendering += (w, rd) =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var viewProjection = camera.GetViewProjection(rd);
 
     var spin = Matrix4x4.CreateRotationY(t) * Matrix4x4.CreateRotationX(t * 0.7f);
     var transform = spin * viewProjection;
@@ -85,8 +86,6 @@ window.Rendering += (w, rd) =>
         rd.ClipRect = porthole;
         rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

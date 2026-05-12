@@ -55,6 +55,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -67,17 +68,13 @@ window.Rendering += (w, rd) =>
     rd.Camera = camera;
     rd.AmbientLight = new Color(30, 30, 50);
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // The light "lives" at this orbit position. Direction to feed the
     // shader is from the cube (origin) toward this point, so the lit
     // face is the one pointing at the marker.
-    const float orbitRadius = 2.5f;
-    const float orbitSpeed  = 0.6f;
-    var lightPos = new Vector3(
-        MathF.Cos(t * orbitSpeed) * orbitRadius,
-        MathF.Sin(t * 0.4f) * 0.8f + 1.2f,
-        MathF.Sin(t * orbitSpeed) * orbitRadius);
+    var lightPos = MathG.Orbit(t, radius: 2.5f, speed: 0.6f)
+        + Vector3.UnitY * (MathF.Sin(t * 0.4f) * 0.8f + 1.2f);
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(lightPos),
         Color.White);
@@ -106,8 +103,6 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         rd.DrawMesh(marker, Shaders.PositionColorWithTransform, markerModel);
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();

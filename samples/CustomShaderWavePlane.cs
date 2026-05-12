@@ -124,6 +124,7 @@ var window = new Window3D
     BackgroundColor = new Color(4, 6, 18),
     FullScreen = true,
     CloseKey = Key.Escape,
+    AutoInvalidate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -136,7 +137,7 @@ window.Rendering += (w, rd) =>
 {
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     using (rd.PushState())
     {
@@ -155,8 +156,6 @@ window.Rendering += (w, rd) =>
                 0f),
         });
     }
-
-    w.Invalidate();
 };
 
 await window.WaitForCloseAsync();
