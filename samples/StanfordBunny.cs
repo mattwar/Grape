@@ -80,9 +80,11 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        model.Draw(rd, fitTransform);
+        rd.DrawModel(model, fitTransform);
     }
-});// --- helpers ------------------------------------------------------
+});
+
+// --- helpers ------------------------------------------------------
 
 static (Vector3 Center, float Radius) ComputeBounds(Model model)
 {

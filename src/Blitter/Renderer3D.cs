@@ -318,11 +318,39 @@ public abstract class Renderer3D
         Shader<TVertex> shader)
         where TVertex : unmanaged;
 
+    /// <summary>
+    /// Multi-texture variant: binds <paramref name="textures"/> to fragment
+    /// sampler slots <c>0..textures.Length-1</c>. Length must equal
+    /// <c>shader.TextureLayout.Count</c> and every slot must declare
+    /// <see cref="ShaderTextureDimension.Texture2D"/>; for cubemap slots use
+    /// the dedicated cubemap overloads. The span is consumed during the call;
+    /// callers may reuse or discard the underlying buffer immediately after
+    /// the call returns.
+    /// </summary>
+    public abstract void DrawMesh<TVertex>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex> shader)
+        where TVertex : unmanaged;
+
     /// <summary>Raw textured draw with no scene composition. See
     /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.</summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
         Image texture,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged;
+
+    /// <summary>
+    /// Raw multi-texture draw with no scene composition. See
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// for binding semantics.
+    /// </summary>
+    public abstract void DrawMeshRaw<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -410,6 +438,25 @@ public abstract class Renderer3D
     }
 
     /// <summary>
+    /// Scene-aware multi-texture draw. See
+    /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
+    /// for trait-application behavior, and
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// for texture-binding semantics.
+    /// </summary>
+    public void DrawMesh<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IUniformArgs<TArgs>
+    {
+        var resolved = ApplyRenderArgs(args);
+        DrawMeshRaw(mesh, textures, shader, in resolved);
+    }
+
+    /// <summary>
     /// Scene-aware cubemap draw. See
     /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// for trait-application behavior.
@@ -492,12 +539,12 @@ public abstract class Renderer3D
     /// discard the underlying buffer immediately after the call returns.
     /// </summary>
     /// <remarks>
-    /// Instanced draws skip scene composition: callers must supply the full
-    /// view-projection in <paramref name="args"/> themselves. The
-    /// <c>Raw</c> suffix flags this -- there is no scene-aware instanced
-    /// overload yet because the per-call args for instanced shaders is
-    /// almost always exactly the camera's view-projection (no model matrix
-    /// to compose with), so the convenience would be small.
+    /// Instanced draws skip scene composition by default: callers must
+    /// supply the full view-projection in <paramref name="args"/>
+    /// themselves. The <c>Raw</c> suffix flags this. For args structs
+    /// implementing <see cref="IUniformArgs{TSelf}"/>, use the
+    /// scene-aware <c>DrawMesh</c> instanced overloads, which compose
+    /// camera/lights into the args before forwarding here.
     /// </remarks>
     public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
@@ -522,6 +569,45 @@ public abstract class Renderer3D
         where TVertex : unmanaged
         where TArgs : unmanaged
         where TInstance : unmanaged;
+
+    /// <summary>
+    /// Multi-texture variant of the instanced draw overload. See
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// for texture-binding semantics; the bound textures are shared by
+    /// every instance in the call.
+    /// </summary>
+    public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged
+        where TInstance : unmanaged;
+
+    /// <summary>
+    /// Scene-aware textured instanced draw. Composes the renderer's
+    /// camera view-projection, ambient, directional, and point-light
+    /// state into <paramref name="args"/> via
+    /// <see cref="IUniformArgs{TSelf}"/> before forwarding to the
+    /// underlying instanced draw path. <see cref="IUniformArgs{TSelf}.SetTransform"/>
+    /// is intentionally not applied -- the per-instance transform replaces
+    /// the model matrix.
+    /// </summary>
+    public void DrawMesh<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        Image texture,
+        Shader<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged, IUniformArgs<TArgs>
+        where TInstance : unmanaged
+    {
+        var resolved = ApplyRenderArgs(args);
+        DrawMeshRaw(mesh, texture, shader, in resolved, instances);
+    }
 
     /// <summary>Queues ASCII debug text for drawing at the given world-space transform.</summary>
     public abstract void DrawDebugText(string text, in Matrix4x4 transform);

@@ -601,6 +601,51 @@ public static class Shaders
         }
         """;
 
+    // Instanced variant of LitTextureVertHlsl. Per-vertex inputs occupy
+    // TEXCOORD0..3 (matching the non-instanced shader); per-instance
+    // attributes follow on TEXCOORD4..8: a float4x4 transform consumes
+    // four consecutive semantic indices (one per row) and is followed by
+    // a float4 tint that multiplies the per-vertex color.
+    //
+    // The Model cbuffer is declared (so the shader matches LitArgs's
+    // LightingArgsLayout exactly and we can reuse LitArgs as TArgs) but
+    // unused -- the per-instance transform replaces it.
+    private const string LitTextureInstancedVertHlsl = """
+        cbuffer Model : register(b0, space1) { float4x4 model;          };
+        cbuffer VP    : register(b1, space1) { float4x4 viewProjection; };
+
+        struct Input
+        {
+            float3 Position            : TEXCOORD0;
+            float3 Normal              : TEXCOORD1;
+            float2 TexCoord            : TEXCOORD2;
+            float4 Color               : TEXCOORD3;
+            float4x4 InstanceTransform : TEXCOORD4;
+            float4 InstanceTint        : TEXCOORD8;
+        };
+
+        struct Output
+        {
+            float3 WorldPos  : TEXCOORD0;
+            float3 WorldNorm : TEXCOORD1;
+            float2 TexCoord  : TEXCOORD2;
+            float4 Color     : TEXCOORD3;
+            float4 Position  : SV_Position;
+        };
+
+        Output main(Input input)
+        {
+            Output output;
+            float4 worldPos    = mul(input.InstanceTransform, float4(input.Position, 1.0f));
+            output.WorldPos    = worldPos.xyz;
+            output.WorldNorm   = mul((float3x3)input.InstanceTransform, input.Normal);
+            output.TexCoord    = input.TexCoord;
+            output.Color       = input.Color * input.InstanceTint;
+            output.Position    = mul(viewProjection, worldPos);
+            return output;
+        }
+        """;
+
     // ---- Per-stage StageShader instances. Several sets share a fragment stage
     // (e.g. SolidColor is used by both PositionColor variants), so we cache
     // each stage shader as a singleton to keep GPU upload bookkeeping
@@ -663,6 +708,9 @@ public static class Shaders
     private static readonly VertexShader PositionTextureInstancedVert =
         new(PositionTextureInstancedVertHlsl);
 
+    private static readonly VertexShader LitTextureInstancedVert =
+        new(LitTextureInstancedVertHlsl);
+
     private static readonly FragmentShader PositionTextureTintedFrag =
         new(PositionTextureTintedFragHlsl);
 
@@ -704,14 +752,14 @@ public static class Shaders
     /// must already be in normalized device coordinates.
     /// </summary>
     public static Shader<Vertex3D> Position { get; } =
-        new(PositionVert, WhiteFrag, Vertex3D.ShaderVertexLayout);
+        new(PositionVert, WhiteFrag, Vertex3D.ShaderVertexLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix; emits
     /// opaque white.
     /// </summary>
     public static Shader<Vertex3D, TransformArgs> PositionWithTransform { get; } =
-        new(PositionWithTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
+        new(PositionWithTransformVert, WhiteFrag, Vertex3D.ShaderVertexLayout, TransformLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Position-only vertices, transformed by a per-draw 4x4 matrix, with a
@@ -719,7 +767,7 @@ public static class Shaders
     /// <see cref="TransformAndFColorArgs"/>.
     /// </summary>
     public static Shader<Vertex3D, TransformAndFColorArgs> PositionWithTransformAndColor { get; } =
-        new(PositionWithTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout);
+        new(PositionWithTransformVert, SolidColorUniformFrag, Vertex3D.ShaderVertexLayout, TransformAndColorLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Draws each vertex at its position with its baked color, with no
@@ -728,7 +776,7 @@ public static class Shaders
     /// screen-space drawing or testing.
     /// </summary>
     public static Shader<ColorVertex3D> PositionColor { get; } =
-        new(PositionColorVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout);
+        new(PositionColorVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Draws each vertex at its position with its color, transforming the
@@ -746,7 +794,7 @@ public static class Shaders
     /// cref="TransformArgs"/> conversion.
     /// </remarks>
     public static Shader<ColorVertex3D, TransformArgs> PositionColorWithTransform { get; } =
-        new(PositionColorWithTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout);
+        new(PositionColorWithTransformVert, SolidColorFrag, ColorVertex3D.ShaderVertexLayout, TransformLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Draws each vertex at its position, sampling the bound texture using
@@ -780,7 +828,7 @@ public static class Shaders
     /// a custom shader using a true inverse-transpose normal matrix.
     /// </remarks>
     public static Shader<LitVertex3D, LitArgs> LitColor { get; } =
-        new(LitColorVert, LitColorFrag, LitVertex3D.ShaderVertexLayout, LightingArgsLayout);
+        new(LitColorVert, LitColorFrag, LitVertex3D.ShaderVertexLayout, LightingArgsLayout, ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Lit + textured shader: per-pixel Lambertian shading using the
@@ -816,7 +864,7 @@ public static class Shaders
     /// special depth state.
     /// </summary>
     public static Shader<Vertex3D, Matrix4x4> Skybox { get; } =
-        new(SkyboxVert, SkyboxFrag, Vertex3D.ShaderVertexLayout, TransformLayout);
+        new(SkyboxVert, SkyboxFrag, Vertex3D.ShaderVertexLayout, TransformLayout, ShaderTextureLayout.SingleTextureCube);
 
     /// <summary>
     /// The per-instance vertex layout used by every built-in
@@ -837,7 +885,8 @@ public static class Shaders
         new(PositionInstancedVert, SolidColorFrag,
             Vertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
-            TransformLayout);
+            TransformLayout,
+            ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Instanced variant of <see cref="PositionColorWithTransform"/>: the
@@ -848,7 +897,8 @@ public static class Shaders
         new(PositionColorInstancedVert, SolidColorFrag,
             ColorVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
-            TransformLayout);
+            TransformLayout,
+            ShaderTextureLayout.Empty);
 
     /// <summary>
     /// Instanced variant of <see cref="PositionTextureWithTransform"/>:
@@ -859,4 +909,27 @@ public static class Shaders
             TextureVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
             TransformLayout);
+
+    /// <summary>
+    /// Instanced variant of <see cref="LitTexture"/>: the mesh is drawn
+    /// once per <see cref="TransformAndColorInstance"/> in the supplied
+    /// span. Each instance contributes its own world transform and a
+    /// tint that is multiplied with the per-vertex color before
+    /// per-pixel Lambertian shading. Camera view-projection, ambient,
+    /// directional, and point lights are composed from the renderer
+    /// just like the non-instanced shader.
+    /// </summary>
+    /// <remarks>
+    /// Reuses the <see cref="LitArgs"/> args layout exactly: the
+    /// <see cref="LitArgs.Model"/> field is unused (per-instance
+    /// transform replaces it) and can be left at default. The
+    /// per-instance transform's upper 3x3 is used to transform normals,
+    /// matching <see cref="LitTexture"/>'s rotation + uniform scale +
+    /// translation assumption.
+    /// </remarks>
+    public static Shader<LitTextureVertex3D, LitArgs, TransformAndColorInstance> LitTextureInstanced { get; } =
+        new(LitTextureInstancedVert, LitTextureFrag,
+            LitTextureVertex3D.ShaderVertexLayout,
+            TransformAndColorVertexLayout,
+            LightingArgsLayout);
 }

@@ -15,7 +15,7 @@ public static class ModelBounds
         ArgumentNullException.ThrowIfNull(model);
         var box = BoundingBox.Empty;
         foreach (var sub in model.Submeshes)
-            box = box.Encapsulate(sub.Mesh.ComputeBoundingBox());
+            box = box.Encapsulate(((Mesh<LitTextureVertex3D>)sub.Mesh).ComputeBoundingBox());
         return box;
     }
 
@@ -27,7 +27,7 @@ public static class ModelBounds
         ArgumentNullException.ThrowIfNull(model);
         var box = BoundingBox.Empty;
         foreach (var sub in model.Submeshes)
-            box = box.Encapsulate(sub.Mesh.ComputeBoundingBox().Transform(transform));
+            box = box.Encapsulate(((Mesh<LitTextureVertex3D>)sub.Mesh).ComputeBoundingBox().Transform(transform));
         return box;
     }
 
@@ -44,7 +44,7 @@ public static class ModelBounds
         var sum = Vector3.Zero;
         foreach (var sub in model.Submeshes)
         {
-            var verts = sub.Mesh.Vertices;
+            var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices;
             for (int i = 0; i < verts.Length; i++)
                 sum += verts[i].Position;
             total += verts.Length;
@@ -55,7 +55,7 @@ public static class ModelBounds
         float maxSq = 0f;
         foreach (var sub in model.Submeshes)
         {
-            var verts = sub.Mesh.Vertices;
+            var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices;
             for (int i = 0; i < verts.Length; i++)
             {
                 float d = Vector3.DistanceSquared(center, verts[i].Position);
@@ -79,7 +79,7 @@ public static class ModelBounds
         ArgumentNullException.ThrowIfNull(model);
         var boxes = new BoundingBox[model.Submeshes.Count];
         for (int i = 0; i < boxes.Length; i++)
-            boxes[i] = model.Submeshes[i].Mesh.ComputeBoundingBox().Transform(transform);
+            boxes[i] = ((Mesh<LitTextureVertex3D>)model.Submeshes[i].Mesh).ComputeBoundingBox().Transform(transform);
         return boxes;
     }
 
@@ -91,7 +91,7 @@ public static class ModelBounds
         ArgumentNullException.ThrowIfNull(model);
         var boxes = new BoundingBox[model.Submeshes.Count];
         for (int i = 0; i < boxes.Length; i++)
-            boxes[i] = model.Submeshes[i].Mesh.ComputeBoundingBox();
+            boxes[i] = ((Mesh<LitTextureVertex3D>)model.Submeshes[i].Mesh).ComputeBoundingBox();
         return boxes;
     }
 

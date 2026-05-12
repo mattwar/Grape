@@ -13,7 +13,7 @@ public static class ModelNormalsExtensions
         for (int i = 0; i < newSubs.Length; i++)
         {
             var s = model.Submeshes[i];
-            newSubs[i] = new Submesh(s.Mesh.RecalculateNormals(smooth), s.Material, s.Name);
+            newSubs[i] = new Submesh(((Mesh<LitTextureVertex3D>)s.Mesh).RecalculateNormals(smooth), s.Material, s.Name);
         }
         return new Model(newSubs, model.SourcePath);
     }

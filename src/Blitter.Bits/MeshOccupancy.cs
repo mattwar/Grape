@@ -62,7 +62,7 @@ internal static class MeshOccupancy
         foreach (var sub in model.Submeshes)
         {
             if (sub.Mesh.Topology != Topology.TriangleList) continue;
-            VoxelizeMeshInto(sub.Mesh, occupied, nx, ny, nz, origin, voxelSize, mode);
+            VoxelizeMeshInto((Mesh<LitTextureVertex3D>)sub.Mesh, occupied, nx, ny, nz, origin, voxelSize, mode);
         }
         return GreedyMerge(occupied, nx, ny, nz, origin, voxelSize);
     }

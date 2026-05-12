@@ -1,5 +1,6 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Blitter.Bits;
 
 namespace Blitter.Tests;
 
@@ -29,12 +30,12 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
 
             var sub = Assert.Single(model.Submeshes);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
-            Assert.Same(Material.Default, sub.Material);
+            Assert.Same(LitTextureMaterial.Default, sub.Material);
         }
         finally { File.Delete(path); }
     }
@@ -55,7 +56,7 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
             Assert.Equal(4, sub.Mesh.VertexCount);
             Assert.Equal(6, sub.Mesh.IndexCount);
@@ -79,10 +80,10 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
 
-            var verts = sub.Mesh.Vertices;
+            var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices;
             foreach (var v in verts)
             {
                 // Cross of (1,0,0) and (0,0,1) is (0,-1,0); the
@@ -114,9 +115,9 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
-            var verts = sub.Mesh.Vertices.ToArray();
+            var verts = ((Mesh<LitTextureVertex3D>)sub.Mesh).Vertices.ToArray();
             // Original (0,0) -> (0,1), (1,0) -> (1,1), (0,1) -> (0,0)
             Assert.Contains(verts, v => v.TextureCoordinate == new Vector2(0, 1));
             Assert.Contains(verts, v => v.TextureCoordinate == new Vector2(1, 1));
@@ -158,7 +159,7 @@ public class ObjLoaderTests
 
         try
         {
-            using var model = Model.Load(objPath);
+            var model = Model.Load(objPath);
 
             Assert.Equal(2, model.Submeshes.Count);
 
@@ -168,13 +169,15 @@ public class ObjLoaderTests
             var red = Assert.Single(model.Submeshes, s => s.Material.Name == "red");
             var green = Assert.Single(model.Submeshes, s => s.Material.Name == "green");
 
-            Assert.Equal(255, red.Material.DiffuseColor.R);
-            Assert.Equal(0, red.Material.DiffuseColor.G);
-            Assert.Equal(0, red.Material.DiffuseColor.B);
+            var redMat = Assert.IsType<LitTextureMaterial>(red.Material);
+            Assert.Equal(255, redMat.DiffuseColor.R);
+            Assert.Equal(0, redMat.DiffuseColor.G);
+            Assert.Equal(0, redMat.DiffuseColor.B);
 
-            Assert.Equal(0, green.Material.DiffuseColor.R);
-            Assert.Equal(255, green.Material.DiffuseColor.G);
-            Assert.Equal(0, green.Material.DiffuseColor.B);
+            var greenMat = Assert.IsType<LitTextureMaterial>(green.Material);
+            Assert.Equal(0, greenMat.DiffuseColor.R);
+            Assert.Equal(255, greenMat.DiffuseColor.G);
+            Assert.Equal(0, greenMat.DiffuseColor.B);
         }
         finally
         {
@@ -198,7 +201,7 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
             Assert.Equal(3, sub.Mesh.VertexCount);
             Assert.Equal(3, sub.Mesh.IndexCount);
@@ -221,7 +224,7 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
             Assert.Equal(3, sub.Mesh.VertexCount);
         }
@@ -249,7 +252,7 @@ public class ObjLoaderTests
         var path = CreateTempFile(".obj", obj);
         try
         {
-            using var model = Model.Load(path);
+            var model = Model.Load(path);
             var sub = Assert.Single(model.Submeshes);
             Assert.Equal(4, sub.Mesh.VertexCount);
             Assert.Equal(6, sub.Mesh.IndexCount);

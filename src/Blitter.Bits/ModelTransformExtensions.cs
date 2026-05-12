@@ -18,7 +18,7 @@ public static class ModelTransformExtensions
         for (int i = 0; i < newSubs.Length; i++)
         {
             var s = model.Submeshes[i];
-            newSubs[i] = new Submesh(s.Mesh.Transform(matrix), s.Material, s.Name);
+            newSubs[i] = new Submesh(((Mesh<LitTextureVertex3D>)s.Mesh).Transform(matrix), s.Material, s.Name);
         }
         return new Model(newSubs, model.SourcePath);
     }

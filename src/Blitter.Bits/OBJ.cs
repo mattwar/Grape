@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Numerics;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Wavefront OBJ + MTL loader. Internal entry point sits behind
@@ -36,9 +36,9 @@ internal static class OBJ
         // covers face groups that never had a `usemtl` -- it points to
         // a default material so the build pass doesn't need a special
         // case.
-        var materials = new Dictionary<string, Material>(StringComparer.Ordinal)
+        var materials = new Dictionary<string, LitTextureMaterial>(StringComparer.Ordinal)
         {
-            [DefaultMaterialName] = Material.Default,
+            [DefaultMaterialName] = LitTextureMaterial.Default,
         };
 
         // One bucket per (group, material) pair. Face order within a
@@ -162,7 +162,7 @@ internal static class OBJ
                 continue;
 
             if (!materials.TryGetValue(key.Material, out var material))
-                material = Material.Default;
+                material = LitTextureMaterial.Default;
 
             var (vertices, indices) = BuildSubmesh(faceList, positions, texCoords, normals, smoothNormals, material);
             if (vertices.Length == 0)
@@ -188,7 +188,7 @@ internal static class OBJ
         List<Vector2> texCoords,
         List<Vector3> normals,
         Vector3[]? smoothNormals,
-        Material material)
+        LitTextureMaterial material)
     {
         // Bake the material's diffuse color into every emitted vertex.
         // The shader multiplies texture sample × vertex color, so this

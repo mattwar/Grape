@@ -12,7 +12,8 @@ public abstract class Shader
     private protected Shader(
         VertexShader vertex,
         FragmentShader fragment,
-        ShaderVertexLayout vertexLayout)
+        ShaderVertexLayout vertexLayout,
+        ShaderTextureLayout? textureLayout = null)
     {
         ArgumentNullException.ThrowIfNull(vertex);
         ArgumentNullException.ThrowIfNull(fragment);
@@ -21,6 +22,7 @@ public abstract class Shader
         Vertex = vertex;
         Fragment = fragment;
         VertexLayout = vertexLayout;
+        TextureLayout = textureLayout ?? ShaderTextureLayout.SingleTexture2D;
     }
 
     /// <summary>The vertex stage.</summary>
@@ -33,6 +35,14 @@ public abstract class Shader
     /// The layout of the vertex data the vertex shader receives.
     /// </summary>
     public ShaderVertexLayout VertexLayout { get; }
+
+    /// <summary>
+    /// The texture/sampler bindings the shader's fragment stage expects.
+    /// Defaults to <see cref="ShaderTextureLayout.SingleTexture2D"/>; pass
+    /// <see cref="ShaderTextureLayout.Empty"/> for shaders that bind no
+    /// textures.
+    /// </summary>
+    public ShaderTextureLayout TextureLayout { get; }
 }
 
 /// <summary>
@@ -46,19 +56,22 @@ public class Shader<TVertex> : Shader where TVertex : unmanaged
     public Shader(
         VertexShader vertex,
         FragmentShader fragment,
-        ShaderVertexLayout vertexLayout)
-        : base(vertex, fragment, vertexLayout)
+        ShaderVertexLayout vertexLayout,
+        ShaderTextureLayout? textureLayout = null)
+        : base(vertex, fragment, vertexLayout, textureLayout)
     {
     }
 
     public Shader(
         string vertex,
         string fragment,
-        ShaderVertexLayout vertexLayout)
+        ShaderVertexLayout vertexLayout,
+        ShaderTextureLayout? textureLayout = null)
         : this(
             new VertexShader(vertex),
             new FragmentShader(fragment),
-            vertexLayout)
+            vertexLayout,
+            textureLayout)
     {
     }
 }
@@ -86,16 +99,19 @@ public sealed class Shader<TVertex, TArgs> : Shader<TVertex>
         VertexShader vertex,
         FragmentShader fragment,
         ShaderVertexLayout vertexLayout,
-        ShaderArgsLayout argsLayout)
-        : base(vertex, fragment, vertexLayout)
+        ShaderArgsLayout argsLayout,
+        ShaderTextureLayout? textureLayout = null)
+        : base(vertex, fragment, vertexLayout, textureLayout)
     {
         ArgumentNullException.ThrowIfNull(argsLayout);
 
         var actual = Unsafe.SizeOf<TArgs>();
         if (actual != argsLayout.TotalSize)
+        {
             throw new ArgumentException(
                 $"sizeof({typeof(TArgs).Name}) = {actual} but ShaderArgsLayout describes {argsLayout.TotalSize} bytes.",
                 nameof(argsLayout));
+        }
 
         ArgsLayout = argsLayout;
     }
@@ -104,12 +120,14 @@ public sealed class Shader<TVertex, TArgs> : Shader<TVertex>
         string vertex,
         string fragment,
         ShaderVertexLayout vertexLayout,
-        ShaderArgsLayout argsLayout)
+        ShaderArgsLayout argsLayout,
+        ShaderTextureLayout? textureLayout = null)
         : this(
             new VertexShader(vertex),
             new FragmentShader(fragment),
             vertexLayout,
-            argsLayout)
+            argsLayout,
+            textureLayout)
     {       
     }
 
@@ -150,24 +168,29 @@ public sealed class Shader<TVertex, TArgs, TInstance> : Shader<TVertex>
         FragmentShader fragment,
         ShaderVertexLayout vertexLayout,
         ShaderVertexLayout instanceLayout,
-        ShaderArgsLayout argsLayout)
-        : base(vertex, fragment, vertexLayout)
+        ShaderArgsLayout argsLayout,
+        ShaderTextureLayout? textureLayout = null)
+        : base(vertex, fragment, vertexLayout, textureLayout)
     {
         ArgumentNullException.ThrowIfNull(instanceLayout);
         ArgumentNullException.ThrowIfNull(argsLayout);
 
         var argsActual = Unsafe.SizeOf<TArgs>();
         if (argsActual != argsLayout.TotalSize)
+        {
             throw new ArgumentException(
                 $"sizeof({typeof(TArgs).Name}) = {argsActual} but ShaderArgsLayout describes {argsLayout.TotalSize} bytes.",
                 nameof(argsLayout));
+        }
 
         var instanceActual = Unsafe.SizeOf<TInstance>();
         var instanceExpected = SizeOfVertexLayout(instanceLayout);
         if (instanceActual != instanceExpected)
+        {
             throw new ArgumentException(
                 $"sizeof({typeof(TInstance).Name}) = {instanceActual} but instance ShaderVertexLayout describes {instanceExpected} bytes.",
                 nameof(instanceLayout));
+        }
 
         InstanceLayout = instanceLayout;
         ArgsLayout = argsLayout;

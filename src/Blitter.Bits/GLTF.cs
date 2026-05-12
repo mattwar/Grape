@@ -1,7 +1,7 @@
 using System.Numerics;
 using SharpGLTF.Schema2;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// glTF 2.0 / glb model loader. Internal entry point sits behind
@@ -27,7 +27,7 @@ internal static class GLTF
         // texture share the GPU upload too.
         var imageCache = new Dictionary<SharpGLTF.Schema2.Image, Image>();
         // Same for materials.
-        var materialCache = new Dictionary<SharpGLTF.Schema2.Material, Material>();
+        var materialCache = new Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial>();
 
         var submeshes = new List<Submesh>();
 
@@ -51,7 +51,7 @@ internal static class GLTF
         Node node,
         List<Submesh> submeshes,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
-        Dictionary<SharpGLTF.Schema2.Material, Material> materialCache)
+        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache)
     {
         if (node.Mesh is { } mesh)
         {
@@ -82,7 +82,7 @@ internal static class GLTF
         Matrix4x4 world,
         Matrix4x4 normalMatrix,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
-        Dictionary<SharpGLTF.Schema2.Material, Material> materialCache,
+        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache,
         string? nodeName)
     {
         var positions = prim.GetVertexAccessor("POSITION")?.AsVector3Array();
@@ -147,13 +147,13 @@ internal static class GLTF
         return new Submesh(mesh, material, nodeName);
     }
 
-    private static Material ConvertMaterial(
+    private static LitTextureMaterial ConvertMaterial(
         SharpGLTF.Schema2.Material? src,
-        Dictionary<SharpGLTF.Schema2.Material, Material> materialCache,
+        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache)
     {
         if (src is null)
-            return Material.Default;
+            return LitTextureMaterial.Default;
 
         if (materialCache.TryGetValue(src, out var cached))
             return cached;
@@ -174,7 +174,7 @@ internal static class GLTF
                 texture = GetOrDecodeImage(srcImage, imageCache);
         }
 
-        var mat = new Material
+        var mat = new LitTextureMaterial
         {
             DiffuseColor = color,
             DiffuseTexture = texture,

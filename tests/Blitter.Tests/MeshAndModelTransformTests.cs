@@ -126,7 +126,7 @@ public class ModelTransformTests
         var mesh = Meshes.TexturedCube(new Vector3(scale));
         if (offset is { } o)
             mesh = mesh.Translate(o);
-        var sub = new Submesh(mesh, Material.Default, "cube");
+        var sub = new Submesh(mesh, LitTextureMaterial.Default, "cube");
         return new Model(new[] { sub });
     }
 
@@ -158,7 +158,7 @@ public class ModelTransformTests
     {
         // Stretched cube: 4 x 1 x 1.
         var stretched = Meshes.TexturedCube(new Vector3(4, 1, 1));
-        var model = new Model(new[] { new Submesh(stretched, Material.Default) });
+        var model = new Model(new[] { new Submesh(stretched, LitTextureMaterial.Default) });
 
         var normalized = model.NormalizeSize(2f);
         var size = normalized.ComputeBoundingBox().Size;

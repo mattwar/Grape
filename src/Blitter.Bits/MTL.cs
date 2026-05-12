@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Blitter;
+namespace Blitter.Bits;
 
 /// <summary>
 /// Wavefront MTL (material library) loader. Supports the subset Blitter
@@ -19,9 +19,9 @@ internal static class MTL
     /// "later wins"; callers merging multiple libraries get the same
     /// behavior by overlaying the returned dictionaries in order.
     /// </summary>
-    public static Dictionary<string, Material> Load(string path)
+    public static Dictionary<string, LitTextureMaterial> Load(string path)
     {
-        var materials = new Dictionary<string, Material>(StringComparer.Ordinal);
+        var materials = new Dictionary<string, LitTextureMaterial>(StringComparer.Ordinal);
         var directory = Path.GetDirectoryName(Path.GetFullPath(path)) ?? string.Empty;
 
         string? currentName = null;
@@ -95,11 +95,11 @@ internal static class MTL
         string? name,
         Color diffuse,
         Image? texture,
-        Dictionary<string, Material> materials)
+        Dictionary<string, LitTextureMaterial> materials)
     {
         if (string.IsNullOrEmpty(name))
             return;
-        materials[name] = new Material
+        materials[name] = new LitTextureMaterial
         {
             Name = name,
             DiffuseColor = diffuse,

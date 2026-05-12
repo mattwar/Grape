@@ -71,14 +71,15 @@ var mtlPath = Path.Combine(tempDir.FullName, "gem.mtl");
 File.WriteAllText(objPath, Obj);
 File.WriteAllText(mtlPath, Mtl);
 
-using var model = Model.Load(objPath);
+var model = Model.Load(objPath);
 Console.WriteLine($"Loaded {model.SourcePath}: {model.Submeshes.Count} submeshes");
 foreach (var sub in model.Submeshes)
 {
+    var lit = (LitTextureMaterial)sub.Material;
     Console.WriteLine(
         $"  '{sub.Name}': {sub.Mesh.VertexCount} verts, " +
-        $"material '{sub.Material.Name}' " +
-        $"Kd=({sub.Material.DiffuseColor.R},{sub.Material.DiffuseColor.G},{sub.Material.DiffuseColor.B})");
+        $"material '{lit.Name}' " +
+        $"Kd=({lit.DiffuseColor.R},{lit.DiffuseColor.G},{lit.DiffuseColor.B})");
 }
 
 var window = new Window3D
@@ -114,10 +115,11 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        // One call draws every submesh; the model walks them
-        // internally, picks Shaders.LitTexture, and binds the
-        // material texture (or a 1x1 white fallback) per submesh.
-        model.Draw(rd, transform);
+        // One call draws every submesh; the default materializer walks
+        // them internally, picks Shaders.LitTexture for each
+        // LitTextureMaterial, and binds the material texture (or a 1x1
+        // white fallback) per submesh.
+        rd.DrawModel(model, transform);
     }
 });
 

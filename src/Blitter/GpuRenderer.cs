@@ -457,6 +457,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
+        ValidateNoTextures(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateNoArgsDrawCommand();
@@ -477,6 +478,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     {
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
+        ValidateNoTextures(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateDrawCommand<TArgs>();
@@ -502,6 +504,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
+        ValidateSingleTexture2D(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateNoArgsDrawCommand();
@@ -521,6 +524,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
+        ValidateSingleTexture2D(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateDrawCommand<TArgs>();
@@ -541,6 +545,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(cubemap);
+        ValidateSingleCubemap(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateNoArgsDrawCommand();
@@ -560,6 +565,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(cubemap);
+        ValidateSingleCubemap(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateDrawCommand<TArgs>();
@@ -580,6 +586,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
+        ValidateSingleTexture2D(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateNoArgsDrawCommand();
@@ -599,11 +606,111 @@ internal class GpuRenderer : Renderer3D, IDisposable
         ArgumentNullException.ThrowIfNull(mesh);
         ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
+        ValidateSingleTexture2D(shader);
 
         var (topology, wireframe) = ResolveDrawState(mesh.Topology);
         var command = AllocateDrawCommand<TArgs>();
         command.Init(mesh, shader, texture, cubemap: null, sampler, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
         _commands.Add(command);
+    }
+
+    /// <inheritdoc/>
+    public override void DrawMesh<TVertex>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex> shader)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ValidateTextureSpan(shader, textures);
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        var command = AllocateNoArgsDrawCommand();
+        command.Init(mesh, shader, textures, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect);
+        _commands.Add(command);
+    }
+
+    /// <inheritdoc/>
+    public override void DrawMeshRaw<TVertex, TArgs>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex, TArgs> shader,
+        in TArgs args)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ValidateTextureSpan(shader, textures);
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        var command = AllocateDrawCommand<TArgs>();
+        command.Init(mesh, shader, textures, sampler: null, DepthMode, BlendMode, CullMode, topology, wireframe, Viewport, ClipRect, shader.ArgsLayout, args);
+        _commands.Add(command);
+    }
+
+    // Validates a multi-texture span against the shader's TextureLayout:
+    // matching count, every supplied image is non-null, every declared
+    // slot is Texture2D (mixed dimensions need a future per-slot API).
+    private static void ValidateTextureSpan(Shader shader, ReadOnlySpan<Image> textures)
+    {
+        var layout = shader.TextureLayout;
+        if (textures.Length != layout.Count)
+            throw new ArgumentException(
+                $"Shader expects {layout.Count} texture(s); {textures.Length} supplied.",
+                nameof(textures));
+
+        for (int i = 0; i < layout.Count; i++)
+        {
+            if (layout.Slots[i].Dimension != ShaderTextureDimension.Texture2D)
+                throw new ArgumentException(
+                    $"Shader texture slot {i} ({layout.Slots[i].Name}) expects {layout.Slots[i].Dimension}; " +
+                    $"the ReadOnlySpan<Image> overloads support only Texture2D slots.",
+                    nameof(textures));
+
+            if (textures[i] is null)
+                throw new ArgumentException($"Texture at index {i} is null.", nameof(textures));
+        }
+    }
+
+    // Validates that the shader expects no texture bindings.
+    private static void ValidateNoTextures(Shader shader)
+    {
+        var layout = shader.TextureLayout;
+        if (layout.Count != 0)
+            throw new ArgumentException(
+                $"Shader expects {layout.Count} texture(s); none supplied. " +
+                $"Use a textured DrawMesh overload.",
+                nameof(shader));
+    }
+
+    // Validates that the shader declares exactly one Texture2D slot.
+    private static void ValidateSingleTexture2D(Shader shader)
+    {
+        var layout = shader.TextureLayout;
+        if (layout.Count != 1)
+            throw new ArgumentException(
+                $"Shader expects {layout.Count} texture(s); 1 Image supplied. " +
+                $"Use the ReadOnlySpan<Image> overload to supply multiple textures.",
+                nameof(shader));
+        if (layout.Slots[0].Dimension != ShaderTextureDimension.Texture2D)
+            throw new ArgumentException(
+                $"Shader texture slot 0 ({layout.Slots[0].Name}) expects {layout.Slots[0].Dimension}; " +
+                $"single-Image DrawMesh overloads supply Texture2D.",
+                nameof(shader));
+    }
+
+    // Validates that the shader declares exactly one TextureCube slot.
+    private static void ValidateSingleCubemap(Shader shader)
+    {
+        var layout = shader.TextureLayout;
+        if (layout.Count != 1)
+            throw new ArgumentException(
+                $"Shader expects {layout.Count} texture(s); 1 Cubemap supplied.",
+                nameof(shader));
+        if (layout.Slots[0].Dimension != ShaderTextureDimension.TextureCube)
+            throw new ArgumentException(
+                $"Shader texture slot 0 ({layout.Slots[0].Name}) expects {layout.Slots[0].Dimension}; " +
+                $"single-Cubemap DrawMesh overloads supply TextureCube.",
+                nameof(shader));
     }
 
     /// <inheritdoc/>
@@ -613,6 +720,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
     {
+        ArgumentNullException.ThrowIfNull(shader);
+        ValidateNoTextures(shader);
         QueueInstanced(mesh, texture: null, shader, args, instances);
     }
 
@@ -624,8 +733,24 @@ internal class GpuRenderer : Renderer3D, IDisposable
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
     {
+        ArgumentNullException.ThrowIfNull(shader);
         ArgumentNullException.ThrowIfNull(texture);
+        ValidateSingleTexture2D(shader);
         QueueInstanced(mesh, texture, shader, args, instances);
+    }
+
+    /// <inheritdoc/>
+    public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+    {
+        ArgumentNullException.ThrowIfNull(mesh);
+        ArgumentNullException.ThrowIfNull(shader);
+        ValidateTextureSpan(shader, textures);
+        QueueInstancedMulti(mesh, textures, shader, args, instances);
     }
 
     private void QueueInstanced<TVertex, TArgs, TInstance>(
@@ -664,6 +789,40 @@ internal class GpuRenderer : Renderer3D, IDisposable
             shader.InstanceLayout,  
             instances
             );
+        _commands.Add(command);
+    }
+
+    private void QueueInstancedMulti<TVertex, TArgs, TInstance>(
+        Mesh<TVertex> mesh,
+        ReadOnlySpan<Image> textures,
+        Shader<TVertex, TArgs, TInstance> shader,
+        in TArgs args,
+        ReadOnlySpan<TInstance> instances)
+        where TVertex : unmanaged
+        where TArgs : unmanaged
+        where TInstance : unmanaged
+    {
+        if (instances.IsEmpty)
+            return;
+
+        var (topology, wireframe) = ResolveDrawState(mesh.Topology);
+        var command = AllocateInstancedDrawCommand<TArgs, TInstance>();
+        command.Init(
+            mesh,
+            shader,
+            textures,
+            sampler: null,
+            DepthMode,
+            BlendMode,
+            CullMode,
+            topology,
+            wireframe,
+            Viewport,
+            ClipRect,
+            shader.ArgsLayout,
+            args,
+            shader.InstanceLayout,
+            instances);
         _commands.Add(command);
     }
 
@@ -1023,6 +1182,29 @@ internal class GpuRenderer : Renderer3D, IDisposable
                         }
                     }
 
+                    if (command.Textures is { } multiTextures)
+                    {
+                        for (int i = 0; i < command.TextureCount; i++)
+                        {
+                            var multiImage = multiTextures[i];
+                            if (_failedTextureUploads.Contains(multiImage))
+                                continue;
+                            try
+                            {
+                                EnsureTextureUploaded(copyPass!, multiImage);
+                            }
+                            catch (Exception ex)
+                            {
+                                _failedTextureUploads.Add(multiImage);
+                                Console.Error.WriteLine(
+                                    $"Blitter.GpuRenderer: failed to upload image " +
+                                    $"({multiImage.Size.Width}x{multiImage.Size.Height}, format {multiImage.PixelFormat}) " +
+                                    $"to GPU: {ex.GetType().Name}: {ex.Message}. " +
+                                    $"Affected draws will be skipped for the rest of this session.");
+                            }
+                        }
+                    }
+
                     if (command.Cubemap is { } cubemap && !_failedCubemapUploads.Contains(cubemap))
                     {
                         try
@@ -1196,7 +1378,29 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     }
 
                     command.PushArgs(renderPass);
-                    if (command.Texture is { } image)
+                    if (command.Textures is { } textures && command.TextureCount > 0)
+                    {
+                        // Multi-texture path: bind each Image to slots
+                        // 0..N-1 with the current default sampler. A
+                        // future per-slot sampler API would replace
+                        // DefaultSampler here. GpuTextureSamplerBinding
+                        // is a managed struct (holds GpuTexture/GpuSampler
+                        // references) so we can't stackalloc; rent from
+                        // the pool and return immediately after the bind.
+                        var sampler = command.Sampler ?? DefaultSampler;
+                        var count = command.TextureCount;
+                        var binds = ArrayPool<GpuTextureSamplerBinding>.Shared.Rent(count);
+                        for (int i = 0; i < count; i++)
+                        {
+                            var gpuTexture = LookupTexture(textures[i])
+                                ?? throw new InvalidOperationException(
+                                    "Texture upload was not recorded for this image.");
+                            binds[i] = new GpuTextureSamplerBinding(gpuTexture, sampler);
+                        }
+                        renderPass.BindFragmentSamplers(0, binds.AsSpan(0, count));
+                        ArrayPool<GpuTextureSamplerBinding>.Shared.Return(binds, clearArray: true);
+                    }
+                    else if (command.Texture is { } image)
                     {
                         var gpuTexture = LookupTexture(image)
                             ?? throw new InvalidOperationException(
@@ -2226,6 +2430,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public Shader Pipeline { get; private protected set; } = null!;
         public Image? Texture { get; private protected set; }
         public Cubemap? Cubemap { get; private protected set; }
+        // Multi-texture path. When non-null, the bind site reads the
+        // first TextureCount entries and ignores Texture/Cubemap. The
+        // backing array is rented from ArrayPool<Image>.Shared and is
+        // returned in Release.
+        public Image[]? Textures { get; private protected set; }
+        public int TextureCount { get; private protected set; }
         public GpuSampler? Sampler { get; private protected set; }
         public DepthMode DepthMode { get; private protected set; }
         public BlendMode BlendMode { get; private protected set; }
@@ -2270,6 +2480,37 @@ internal class GpuRenderer : Renderer3D, IDisposable
         /// </summary>
         public virtual void Release()
         {
+        }
+
+        /// <summary>
+        /// Rents an <see cref="Image"/> array from the shared pool, copies
+        /// the supplied textures into it, and stores it on the command.
+        /// Balanced by <see cref="ReturnRentedTextures"/> in
+        /// <see cref="Release"/>.
+        /// </summary>
+        private protected void RentTextures(ReadOnlySpan<Image> textures)
+        {
+            var array = ArrayPool<Image>.Shared.Rent(textures.Length);
+            textures.CopyTo(array);
+            Textures = array;
+            TextureCount = textures.Length;
+        }
+
+        /// <summary>
+        /// Returns the rented multi-texture array (if any) to the shared
+        /// pool. Subclasses call this from their <see cref="Release"/> override
+        /// before returning themselves to their command pool.
+        /// </summary>
+        private protected void ReturnRentedTextures()
+        {
+            if (Textures is { } array)
+            {
+                // clearArray: true so we don't keep dead Image references
+                // alive in the pool slot after the command is recycled.
+                ArrayPool<Image>.Shared.Return(array, clearArray: true);
+                Textures = null;
+                TextureCount = 0;
+            }
         }
 
         // Transient per-frame state attached during PrepareCommandsInPlace
@@ -2318,8 +2559,39 @@ internal class GpuRenderer : Renderer3D, IDisposable
             this.ClipRect = clipRect;
         }
 
+        // Multi-texture overload: copies the span into a pooled
+        // Image[] that Release returns to the pool.
+        public void Init(
+            Mesh mesh,
+            Shader shader,
+            ReadOnlySpan<Image> textures,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect)
+        {
+            this.Mesh = mesh;
+            this.Pipeline = shader;
+            this.Texture = null;
+            this.Cubemap = null;
+            RentTextures(textures);
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+        }
+
         public override void Release()
         {
+            ReturnRentedTextures();
             _pool.Return(this);
         }
     }
@@ -2373,8 +2645,43 @@ internal class GpuRenderer : Renderer3D, IDisposable
             this.Args = args;
         }
 
+        // Multi-texture overload: copies the span into a pooled Image[]
+        // that Release returns to the pool.
+        public void Init(
+            Mesh mesh,
+            Shader shader,
+            ReadOnlySpan<Image> textures,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args)
+        {
+            this.Mesh = mesh;
+            this.Pipeline = shader;
+            this.Texture = null;
+            this.Cubemap = null;
+            RentTextures(textures);
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+        }
+
         public override void Release()
         {
+            ReturnRentedTextures();
             _pool.Return(this);
         }
 
@@ -2471,6 +2778,49 @@ internal class GpuRenderer : Renderer3D, IDisposable
             this.ArgsLayout = argsLayout;
             this.Args = args;
 
+            InitInstances(instanceLayout, instances);
+        }
+
+        // Multi-texture overload: copies the span into a pooled Image[]
+        // that Release returns to the pool.
+        public void Init(
+            Mesh mesh,
+            Shader shader,
+            ReadOnlySpan<Image> textures,
+            GpuSampler? sampler,
+            DepthMode depthMode,
+            BlendMode blendMode,
+            CullMode cullMode,
+            Topology topology,
+            bool wireframe,
+            Rect? viewport,
+            Rect? clipRect,
+            ShaderArgsLayout argsLayout,
+            TArgs args,
+            ShaderVertexLayout instanceLayout,
+            ReadOnlySpan<TInstance> instances)
+        {
+            this.Mesh = mesh;
+            this.Pipeline = shader;
+            this.Texture = null;
+            this.Cubemap = null;
+            RentTextures(textures);
+            this.Sampler = sampler;
+            this.DepthMode = depthMode;
+            this.BlendMode = blendMode;
+            this.CullMode = cullMode;
+            this.Topology = topology;
+            this.Wireframe = wireframe;
+            this.Viewport = viewport;
+            this.ClipRect = clipRect;
+            this.ArgsLayout = argsLayout;
+            this.Args = args;
+
+            InitInstances(instanceLayout, instances);
+        }
+
+        private void InitInstances(ShaderVertexLayout instanceLayout, ReadOnlySpan<TInstance> instances)
+        {
             _instanceLayout = instanceLayout;
             _rentedInstancesArray = ArrayPool<TInstance>.Shared.Rent(instances.Length);
             instances.CopyTo(_rentedInstancesArray);
@@ -2491,6 +2841,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         public override void Release()
         {
+            ReturnRentedTextures();
             ArrayPool<TInstance>.Shared.Return(_rentedInstancesArray);
             _rentedInstancesArray = null!;
             _pool.Return(this);
