@@ -93,8 +93,7 @@ await window.RunAsync(rd =>
     rd.DrawMesh(plot, Shaders.PositionColorWithTransform, plotModel * viewProjection);
 
     // Filled triangle, parked above and to the right.
-    var triModel =
-        Matrix4x4.CreateScale(0.6f) *
-        Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
+    var triModel = Matrix4x4.CreateScale(0.6f)
+        .Translate(1.4f, 1.0f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
 });

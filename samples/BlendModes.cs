@@ -149,9 +149,8 @@ await window.RunAsync(rd =>
 
     foreach (var sample in samples)
     {
-        var transform = Matrix4x4.CreateScale(BandWidth, BandHeight, 1f) *
-                        Matrix4x4.CreateTranslation(slide, sample.Y, 0f) *
-                        viewProjection;
+        var transform = Matrix4x4.CreateScale(BandWidth, BandHeight, 1f)
+            .Translate(slide, sample.Y, 0f);
 
         // PushState() so each sample's blend setting is scoped: the
         // Opaque draw doesn't leak into the Alpha draw, etc.
@@ -163,7 +162,7 @@ await window.RunAsync(rd =>
             // get discarded on the equal-depth comparison and you only
             // see the gradient backdrop.
             rd.DepthMode = DepthMode.Overlay;
-            rd.DrawMesh(sample.Mesh, Shaders.PositionColorWithTransform, transform);
+            rd.DrawMesh(sample.Mesh, Shaders.PositionColorWithTransform, transform * viewProjection);
         }
     }
 
@@ -186,10 +185,8 @@ static void DrawLabel(Renderer3D renderer, string text, float centerY, Matrix4x4
     // shift x by -text.Length/2 in pre-scale units, then scale, then
     // translate to the band's center y.
     const float scale = 0.12f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, -0.5f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(0f, centerY, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, -0.5f, 0f)
+        .Scale(scale)
+        .Translate(0f, centerY, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }

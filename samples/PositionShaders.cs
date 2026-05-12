@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Exercises every position-only built-in shader in `Shaders`:
 //   - Shaders.Position                       (white, no transform)
@@ -50,18 +51,18 @@ await window.RunAsync(rd =>
     var seconds = rd.ElapsedSecondsSinceStart;
     var aspect = 1f / rd.AspectRatio; // height / width
 
-    var fit  = Matrix4x4.CreateScale(0.35f) * Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var fit  = Matrix4x4.CreateScale(0.35f).Scale(aspect, 1f, 1f);
     var spin = Matrix4x4.CreateRotationZ(seconds);
 
     // Top-left: Shaders.Position (no transform).
     rd.DrawMesh(staticTopLeft, Shaders.Position);
 
     // Top-right: Shaders.PositionWithTransform (white, spinning, translated).
-    var topRight = spin * fit * Matrix4x4.CreateTranslation(0.5f, 0.5f, 0f);
+    var topRight = (spin * fit).Translate(0.5f, 0.5f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionWithTransform, topRight);
 
     // Bottom-left: Shaders.PositionWithTransformAndColor with red.
-    var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
+    var bottomLeft = (spin * fit).Translate(-0.5f, -0.5f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColorArgs
     {
         Transform = bottomLeft,
@@ -70,9 +71,8 @@ await window.RunAsync(rd =>
 
     // Bottom-right: Shaders.PositionWithTransformAndColor with hue-cycling color
     // and counter-rotation.
-    var bottomRight =
-        Matrix4x4.CreateRotationZ(-seconds) * fit *
-        Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
+    var bottomRight = (Matrix4x4.CreateRotationZ(-seconds) * fit)
+        .Translate(0.5f, -0.5f, 0f);
 
     rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColorArgs
     {

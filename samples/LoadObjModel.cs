@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A small two-material model: an octahedron (bipyramid) with the four
 // upper faces in one color and the four lower faces in another. Two
@@ -107,9 +108,8 @@ await window.RunAsync(rd =>
         Color.White);
 
     // Spin the gem around its vertical axis.
-    var transform =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(MathF.Sin(t * 0.5f) * 0.2f);
+    var transform = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(MathF.Sin(t * 0.5f) * 0.2f);
 
     using (rd.PushState())
     {

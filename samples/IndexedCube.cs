@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // 8 unique corners of a unit cube centred on the origin. Each gets its
 // own color so face interpolation makes the cube's structure obvious.
@@ -87,9 +88,8 @@ await window.RunAsync(rd =>
 
     var t = rd.ElapsedSecondsSinceStart;
 
-    var model =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(t * 0.4f);
+    var model = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(t * 0.4f);
 
     // Closed solid -> back faces are always hidden by front faces, so
     // culling them costs nothing visually and saves the rasteriser
@@ -117,10 +117,8 @@ await window.RunAsync(rd =>
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
     const float scale = 0.08f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(0f, yOffset, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(0f, yOffset, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }

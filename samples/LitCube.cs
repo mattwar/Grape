@@ -53,9 +53,8 @@ await window.RunAsync(rd =>
     var lightDir = Vector3.Normalize(MathG.Orbit(t, speed: 0.5f) + Vector3.UnitY * 0.6f);
     rd.DirectionalLight = new DirectionalLight(lightDir, Color.White);
 
-    var model =
-        Matrix4x4.CreateRotationY(t * 0.6f) *
-        Matrix4x4.CreateRotationX(t * 0.3f);
+    var model = Matrix4x4.CreateRotationY(t * 0.6f)
+        .RotateX(t * 0.3f);
 
     using (rd.PushState())
     {

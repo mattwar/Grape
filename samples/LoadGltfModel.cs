@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
@@ -75,9 +76,8 @@ await window.RunAsync(rd =>
         Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
         Color.White);
 
-    var transform =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(MathF.Sin(t * 0.5f) * 0.2f);
+    var transform = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(MathF.Sin(t * 0.5f) * 0.2f);
 
     using (rd.PushState())
     {

@@ -100,9 +100,8 @@ await window.RunAsync(rd =>
     // viewport rather than being stretched horizontally.
     const float Scale = 0.08f;
     var widthInNdc = text.Length * Scale / paneAspect;
-    var transform =
-        Matrix4x4.CreateScale(Scale / paneAspect, Scale, 1f) *
-        Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.85f, 0f);
+    var transform = Matrix4x4.CreateScale(Scale / paneAspect, Scale, 1f)
+        .Translate(-widthInNdc / 2f, -0.85f, 0f);
     rd.DrawDebugText(text, transform);
 }
 

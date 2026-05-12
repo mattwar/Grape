@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A textured triangle. Position is in NDC; UVs are in [0,1] with
 // (0,0) at the top-left of the texture and (1,1) at the bottom-right.
@@ -37,10 +38,9 @@ var window = new Window3D
 await window.RunAsync(rd =>
 {
     var seconds = rd.ElapsedSecondsSinceStart;
-    var transform =
-        Matrix4x4.CreateRotationZ(seconds) *
-        Matrix4x4.CreateScale(0.8f) *
-        Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
+    var transform = Matrix4x4.CreateRotationZ(seconds)
+        .Scale(0.8f)
+        .Scale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(
         triangle,

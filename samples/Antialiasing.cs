@@ -23,6 +23,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 const int Spokes = 64;
 const float HalfThickness = 0.003f; // ~1-2 pixels wide at 4K
@@ -91,10 +92,8 @@ await window.RunAsync(rd =>
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
     const float scale = 0.04f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(0f, yOffset, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(0f, yOffset, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }

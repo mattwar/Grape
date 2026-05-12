@@ -23,6 +23,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // 8 unique cube corners + 36 triangle indices (12 triangles, CCW from
 // outside). Identical to the IndexedCube sample.
@@ -68,9 +69,8 @@ await window.RunAsync(rd =>
     var t = rd.ElapsedSecondsSinceStart;
     var viewProjection = camera.GetViewProjection(rd);
 
-    var spin =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(t * 0.4f);
+    var spin = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(t * 0.4f);
 
     var modelLeft  = spin * Matrix4x4.CreateTranslation(-1.8f, 0f, 0f);
     var modelRight = spin * Matrix4x4.CreateTranslation( 1.8f, 0f, 0f);
@@ -108,10 +108,8 @@ await window.RunAsync(rd =>
 static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4 viewProjection)
 {
     const float scale = 0.08f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(offsetX, -1.7f, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(offsetX, -1.7f, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }

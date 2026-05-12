@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Demonstrates 3D debug text. The string is updated every frame to show
 // elapsed time and frame number; the text mesh re-uploads via the renderer's
@@ -43,12 +44,11 @@ await window.RunAsync(rd =>
         float bob   = 0.04f * MathF.Sin(t * 2.3f);
         float roll  = 0.15f * MathF.Sin(t * 1.7f);
         float scale = 0.08f;
-        var transform =
-            Matrix4x4.CreateTranslation(-banner.Length / 2f, -0.5f, 0f) *
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateRotationZ(roll) *
-            Matrix4x4.CreateTranslation(swing, 0.4f + bob, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateTranslation(-banner.Length / 2f, -0.5f, 0f)
+            .Scale(scale)
+            .RotateZ(roll)
+            .Translate(swing, 0.4f + bob, 0f)
+            .Scale(aspect, 1f, 1f);
         rd.DrawDebugText(banner, transform);
     }
 
@@ -57,10 +57,9 @@ await window.RunAsync(rd =>
         var live = $"t={t:F2}s frame={frameCount}";
         float scale = 0.06f;
         float widthInNdc = live.Length * scale;
-        var transform =
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.5f, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateScale(scale)
+            .Translate(-widthInNdc / 2f, -0.5f, 0f)
+            .Scale(aspect, 1f, 1f);
         rd.DrawDebugText(live, transform);
     }
 });

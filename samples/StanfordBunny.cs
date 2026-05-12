@@ -38,9 +38,8 @@ using var model = Model.Load(Asset.GetPathRelativeToCaller(ModelFile));
 // frames the same way regardless of which classic asset is loaded
 // (bunny is millimeter-scale and offset; teapot is ~6 units wide).
 var (center, radius) = ComputeBounds(model);
-var fitTransform =
-    Matrix4x4.CreateTranslation(-center) *
-    Matrix4x4.CreateScale(1f / radius);
+var fitTransform = Matrix4x4.CreateTranslation(-center)
+    .Scale(1f / radius);
 
 var window = new Window3D
 {

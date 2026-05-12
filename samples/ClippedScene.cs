@@ -18,6 +18,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -59,7 +60,7 @@ await window.RunAsync(rd =>
     var (width, height) = window.Size;
     var viewProjection = camera.GetViewProjection(rd);
 
-    var spin = Matrix4x4.CreateRotationY(t) * Matrix4x4.CreateRotationX(t * 0.7f);
+    var spin = Matrix4x4.CreateRotationY(t).RotateX(t * 0.7f);
     var transform = spin * viewProjection;
 
     // A "ghost" pass with no clip draws the whole tetra at low intensity

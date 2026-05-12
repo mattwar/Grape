@@ -79,10 +79,9 @@ await window.RunAsync(rd =>
         Color.White);
 
     // Big cube: small (~0.6 unit half-extent) and gently spinning.
-    var bigModel =
-        Matrix4x4.CreateScale(0.6f) *
-        Matrix4x4.CreateRotationY(t * 0.5f) *
-        Matrix4x4.CreateRotationX(t * 0.25f);
+    var bigModel = Matrix4x4.CreateScale(0.6f)
+        .RotateY(t * 0.5f)
+        .RotateX(t * 0.25f);
 
     using (rd.PushState())
     {
@@ -93,9 +92,8 @@ await window.RunAsync(rd =>
     // Marker: small unlit white cube parked at the light's orbit
     // position. Uses the unlit transform shader -- it ignores ambient
     // and directional state entirely.
-    var markerModel =
-        Matrix4x4.CreateScale(0.08f) *
-        Matrix4x4.CreateTranslation(lightPos);
+    var markerModel = Matrix4x4.CreateScale(0.08f)
+        .Translate(lightPos);
 
     using (rd.PushState())
     {

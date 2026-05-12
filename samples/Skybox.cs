@@ -27,6 +27,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 const int FaceSize = 128;
 
@@ -122,9 +123,8 @@ await window.RunAsync(rd =>
     // skybox correctly hides behind the cube where the cube covers
     // it.
     var viewProjection = camera.GetViewProjection(rd);
-    var model =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(t * 0.4f);
+    var model = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(t * 0.4f);
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;

@@ -75,13 +75,14 @@ void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
     var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
-    var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
-                Matrix4x4.CreateRotationX(t * SpinSpeed * 0.7f);
-    var spinB = Matrix4x4.CreateRotationY(-t * SpinSpeed) *
-                Matrix4x4.CreateRotationZ(t * SpinSpeed * 0.5f);
-
-    var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
-    var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
+    var modelA = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(t * SpinSpeed)
+        .RotateX(t * SpinSpeed * 0.7f)
+        .Translate(orbitA);
+    var modelB = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(-t * SpinSpeed)
+        .RotateZ(t * SpinSpeed * 0.5f)
+        .Translate(orbitB);
 
     r.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);

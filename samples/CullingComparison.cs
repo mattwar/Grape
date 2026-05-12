@@ -74,12 +74,8 @@ await window.RunAsync(rd =>
     // Both quads spin around Y at the same rate, just at different
     // positions. Spinning around Y means the front face faces the
     // camera for half the rotation and away from it for the other half.
-    var spin = Matrix4x4.CreateRotationY(t * 1.0f);
-
-    var modelLeft  = Matrix4x4.CreateScale(0.6f) * spin *
-                     Matrix4x4.CreateTranslation(-1.5f, 0f, 0f);
-    var modelRight = Matrix4x4.CreateScale(0.6f) * spin *
-                     Matrix4x4.CreateTranslation( 1.5f, 0f, 0f);
+    var modelLeft  = Matrix4x4.CreateScale(0.6f).RotateY(t).Translate(-1.5f, 0f, 0f);
+    var modelRight = Matrix4x4.CreateScale(0.6f).RotateY(t).Translate( 1.5f, 0f, 0f);
 
     // Backdrop sits behind both quads (negative Z relative to the camera
     // looking down -Z) so the depth buffer correctly orders it under
@@ -119,9 +115,9 @@ static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4
 {
     const float scale = 0.08f;
     var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(offsetX, -1.2f, 0f) *
+        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(offsetX, -1.2f, 0f) *
         viewProjection;
     renderer.DrawDebugText(text, transform);
 }

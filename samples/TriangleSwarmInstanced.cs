@@ -20,6 +20,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 const int Count = 24;
 
@@ -60,9 +61,8 @@ await window.RunAsync(rd =>
         float cx = MathF.Cos(orbitAngle) * ring;
         float cy = MathF.Sin(orbitAngle) * ring + bob;
 
-        var transform =
-            Matrix4x4.CreateRotationZ(spinAngle) *
-            Matrix4x4.CreateTranslation(cx, cy, 0f) *
+        var transform = Matrix4x4.CreateRotationZ(spinAngle)
+            .Translate(cx, cy, 0f) *
             aspectScale;
 
         // White tint -- pass the mesh's baked vertex colors through unchanged.
