@@ -72,7 +72,7 @@ File.WriteAllText(objPath, Obj);
 File.WriteAllText(mtlPath, Mtl);
 
 var model = Model.Load(objPath);
-Console.WriteLine($"Loaded {objPath}: {model.Parts.Count} parts");
+Console.WriteLine($"Loaded {objPath}: {model.Parts.Length} parts");
 foreach (var sub in model.Parts)
 {
     var lit = (LitTextureMaterial)sub.Material;
@@ -123,10 +123,4 @@ await window.RunAsync(rd =>
     }
 });
 
-try
-{
-    }
-finally
-{
-    try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }
-}
+try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }
