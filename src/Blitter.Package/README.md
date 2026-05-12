@@ -52,9 +52,9 @@ using Blitter;
 
 var triangle = Mesh.Create<ColorVertex3D>(
 [
-    new(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
-    new(new Vertex3D( 0.5f, -0.5f, 0f), new Color(0,   255, 0)),
-    new(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255)),
+    new(new Vertex3D( 0.0f,  0.5f, 0f), Color.Red),
+    new(new Vertex3D( 0.5f, -0.5f, 0f), Color.Green),
+    new(new Vertex3D(-0.5f, -0.5f, 0f), Color.Blue),
 ]);
 
 var window = new Window3D

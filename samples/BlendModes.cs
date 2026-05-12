@@ -110,7 +110,7 @@ var backdrop     = MakeBackdrop();
 var window = new Window3D
 {
     Title = "Blend Modes",
-    BackgroundColor = new Color(0, 0, 0),
+    BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
 };

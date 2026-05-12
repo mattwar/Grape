@@ -25,9 +25,9 @@ const int Count = 24;
 
 // One small triangle in model space, shared by every instance.
 var triangle = ImmutableArray.Create(
-    new ColorVertex3D(new Vertex3D( 0.0f,   0.12f, 0f), new Color(255,   0,   0)),
-    new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), new Color(  0, 255,   0)),
-    new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), new Color(  0,   0, 255)));
+    new ColorVertex3D(new Vertex3D( 0.0f,   0.12f, 0f), Color.Red),
+    new ColorVertex3D(new Vertex3D( 0.10f, -0.08f, 0f), Color.Green),
+    new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), Color.Blue));
 var mesh = Mesh.Create(triangle.AsSpan());
 
 // Reusable instance buffer -- updated in place each frame to avoid

@@ -99,7 +99,7 @@ await window.RunAsync(rd =>
 
     rocket.Draw(rd);
 
-    rd.DrawColor = new Color(255, 255, 255);
+    rd.DrawColor = Color.White;
     rd.DrawDebugText(
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",

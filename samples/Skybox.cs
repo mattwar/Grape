@@ -85,7 +85,7 @@ var innerCube = Mesh.Create(innerCubeVertices, skyboxIndices);
 var window = new Window3D
 {
     Title = "Skybox: cubemap-sampled environment",
-    BackgroundColor = new Color(0, 0, 0),
+    BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
 };
@@ -134,7 +134,7 @@ await window.RunAsync(rd =>
 });static Image MakeFace(Color fill)
 {
     var image = Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
-    var border = new Color(0, 0, 0);
+    var border = Color.Black;
     for (int y = 0; y < FaceSize; y++)
     {
         for (int x = 0; x < FaceSize; x++)
