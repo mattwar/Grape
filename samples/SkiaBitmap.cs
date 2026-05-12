@@ -125,7 +125,6 @@ var window = new Window2D(960, 540)
     Title = "Skia Bitmap (atlas blitting)",
     BackgroundColor = new Color(14, 16, 24),
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 // Tell the renderer to treat the surface as a fixed DesignW x DesignH
@@ -135,7 +134,7 @@ var window = new Window2D(960, 540)
 // window's BackgroundColor).
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     float dt = (float)rd.ElapsedSinceLastRender.TotalSeconds;
 
@@ -163,11 +162,7 @@ window.Rendering += (w, rd) =>
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
         atlasGrid.Draw(rd, c.AtlasIndex, dst);
     }
-};
-
-await window.WaitForCloseAsync();
-
-static Confetti SpawnConfetti(Random rng, bool initial)
+});static Confetti SpawnConfetti(Random rng, bool initial)
 {
     float size = 18f + (float)rng.NextDouble() * 30f;
     return new Confetti

@@ -179,6 +179,12 @@ All notable changes to this project will be documented in this file.
   to the application thread, so they're safe to call from any thread
   (including `RunAsync` loop bodies and `await` continuations) on
   every platform.
+- Migrated all animating samples (32 of them) from the
+  `Rendering += ...; AutoAnimate = true; await WaitForCloseAsync()`
+  pattern to `await window.RunAsync(rd => { ... })`. The event-driven
+  `Rendering` callback is still used for the static `Logo` sample.
+  `AutoAnimate` remains for the niche "event-driven but continuously
+  redrawing" case.
 - Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
   `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
 - Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of

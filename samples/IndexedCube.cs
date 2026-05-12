@@ -71,7 +71,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -79,7 +78,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.5f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     // Camera lives on the renderer; DrawMesh composes
     // model * camera.GetViewProjection(rd.AspectRatio) for us, so the
@@ -113,7 +112,7 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)",
             yOffset: -1.6f, viewProjection);
     }
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
@@ -125,5 +124,3 @@ static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4
         viewProjection;
     renderer.DrawDebugText(text, transform);
 }
-
-await window.WaitForCloseAsync();

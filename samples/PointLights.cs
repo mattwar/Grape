@@ -103,7 +103,6 @@ var window = new Window3D
     BackgroundColor = new Color(6, 6, 16),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -119,7 +118,7 @@ var camera = new PerspectiveCamera
 const float lightIntensity = 4f;
 const float lightRange = 6f;
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
@@ -168,6 +167,4 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(greenMarkerMesh, Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(greenPos));
         rd.DrawMesh(blueMarkerMesh,  Shaders.PositionColorWithTransform, Matrix4x4.CreateTranslation(bluePos));
     }
-};
-
-await window.WaitForCloseAsync();
+});

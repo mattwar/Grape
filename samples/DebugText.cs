@@ -25,12 +25,11 @@ var window = new Window3D
     BackgroundColor = new Color(16, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 long frameCount = 0;
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     frameCount++;
     var t = rd.ElapsedSecondsSinceStart;
@@ -64,6 +63,4 @@ window.Rendering += (w, rd) =>
             Matrix4x4.CreateScale(aspect, 1f, 1f);
         rd.DrawDebugText(live, transform);
     }
-};
-
-await window.WaitForCloseAsync();
+});

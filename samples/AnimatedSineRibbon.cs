@@ -36,10 +36,9 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
@@ -78,6 +77,4 @@ window.Rendering += (w, rd) =>
     var transform = Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(mesh, transform);
-};
-
-await window.WaitForCloseAsync();
+});

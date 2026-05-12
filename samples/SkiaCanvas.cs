@@ -25,12 +25,11 @@ var window = new Window2D(960, 540)
     Title = "Skia Canvas",
     BackgroundColor = new Color(18, 22, 30),
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var (width, height) = w.Size;
+    var (width, height) = window.Size;
     var seconds = rd.ElapsedSecondsSinceStart;
 
     // 1) Native Renderer2D draw underneath: a checkerboard of squares
@@ -95,11 +94,7 @@ window.Rendering += (w, rd) =>
         float phase = seconds + i * 0.35f;
         rd.DrawCanvas(rect, canvas => DrawGauge(canvas, rect.Width, rect.Height, phase, i));
     }
-};
-
-await window.WaitForCloseAsync();
-
-// --- Renderer2D draws (no Skia) -------------------------------------
+});// --- Renderer2D draws (no Skia) -------------------------------------
 
 static void DrawCheckerboard(Renderer2D rd, int width, int height, int cell)
 {

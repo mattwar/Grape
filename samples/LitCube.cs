@@ -34,7 +34,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -42,7 +41,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.5f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
@@ -63,6 +62,4 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(model));
     }
-};
-
-await window.WaitForCloseAsync();
+});

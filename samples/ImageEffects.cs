@@ -27,7 +27,6 @@ var window = new Window2D
     BackgroundColor = new Color(18, 20, 28),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
@@ -61,7 +60,7 @@ int cardH = (DesignH - Margin * (Rows + 1) - 60) / Rows; // leave room for the m
     ("Dilate(3)",   dilated),
 ];
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
@@ -119,6 +118,4 @@ window.Rendering += (w, rd) =>
 
     rd.DrawColor = new Color(160, 180, 220);
     rd.DrawDebugText(8, stripY - 16, "Magnify(lens, 4x, Nearest) -- rebuilt per frame", scale: 1.2f);
-};
-
-await window.WaitForCloseAsync();
+});

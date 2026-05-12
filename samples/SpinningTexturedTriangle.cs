@@ -32,10 +32,9 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var seconds = rd.ElapsedSecondsSinceStart;
     var transform =
@@ -48,11 +47,7 @@ window.Rendering += (w, rd) =>
         checker,
         Shaders.PositionTextureWithTransform,
         transform);
-};
-
-await window.WaitForCloseAsync();
-
-static Image CreateCheckerboardImage(int width, int height, int cellSize)
+});static Image CreateCheckerboardImage(int width, int height, int cellSize)
 {
     var image = Image.Create(width, height, PixelFormat.ABGR8888);
     var dark = new Color(32, 32, 32);

@@ -43,10 +43,9 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var seconds = rd.ElapsedSecondsSinceStart;
     var aspect = 1f / rd.AspectRatio; // height / width
@@ -80,11 +79,7 @@ window.Rendering += (w, rd) =>
         Transform = bottomRight,
         FColor = HueToRgb(seconds * 0.25f),
     });
-};
-
-await window.WaitForCloseAsync();
-
-static Vector4 HueToRgb(float hue)
+});static Vector4 HueToRgb(float hue)
 {
     hue -= MathF.Floor(hue);
     var h6 = hue * 6f;

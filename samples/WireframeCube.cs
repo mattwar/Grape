@@ -56,7 +56,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -64,7 +63,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.0f, 6.5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var viewProjection = camera.GetViewProjection(rd);
@@ -104,7 +103,7 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "Solid",     offsetX: -1.8f, viewProjection);
         DrawLabel(rd, "Wireframe", offsetX:  1.8f, viewProjection);
     }
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4 viewProjection)
 {
@@ -116,5 +115,3 @@ static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4
         viewProjection;
     renderer.DrawDebugText(text, transform);
 }
-
-await window.WaitForCloseAsync();

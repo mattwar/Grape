@@ -86,7 +86,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -95,7 +94,7 @@ var camera = new PerspectiveCamera
     Target = Vector3.Zero,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
@@ -120,12 +119,11 @@ window.Rendering += (w, rd) =>
         // material texture (or a 1x1 white fallback) per submesh.
         model.Draw(rd, transform);
     }
-};
+});
 
 try
 {
-    await window.WaitForCloseAsync();
-}
+    }
 finally
 {
     try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }

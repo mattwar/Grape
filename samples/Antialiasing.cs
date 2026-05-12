@@ -61,17 +61,16 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var levels = new[] { Antialiasing.None, Antialiasing.X2, Antialiasing.X4, Antialiasing.X8 };
 int levelIndex = 0;
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     // Cycle AA mode on Space tap. WasJustPressed fires once per
     // press, so holding Space won't blur through the modes.
-    if (w.Input.WasJustPressed(Key.Space))
+    if (window.Input.WasJustPressed(Key.Space))
         levelIndex = (levelIndex + 1) % levels.Length;
 
     rd.Antialiasing = levels[levelIndex];
@@ -87,7 +86,7 @@ window.Rendering += (w, rd) =>
 
     DrawLabel(rd, $"Antialiasing: {levels[levelIndex]}", yOffset: -0.85f, viewProjection);
     DrawLabel(rd, "Press SPACE to cycle (None / X2 / X4 / X8)", yOffset: -0.95f, viewProjection);
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
@@ -99,5 +98,3 @@ static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4
         viewProjection;
     renderer.DrawDebugText(text, transform);
 }
-
-await window.WaitForCloseAsync();

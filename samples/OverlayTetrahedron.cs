@@ -59,7 +59,6 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 const float OrbitRadius = 1.2f;
@@ -73,7 +72,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var viewProjection = camera.GetViewProjection(rd);
@@ -111,6 +110,4 @@ window.Rendering += (w, rd) =>
         rd.DepthMode = DepthMode.Overlay;
         rd.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
     } // DepthMode automatically restored to Default here.
-};
-
-await window.WaitForCloseAsync();
+});

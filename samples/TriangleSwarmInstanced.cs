@@ -40,10 +40,9 @@ var window = new Window3D
     BackgroundColor = new Color(8, 0, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var aspectScale = Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
@@ -74,8 +73,4 @@ window.Rendering += (w, rd) =>
     // transforms above already place each triangle directly in clip
     // space.
     rd.DrawMeshRaw(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
-};
-
-await window.WaitForCloseAsync();
-
-
+});

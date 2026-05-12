@@ -30,7 +30,6 @@ var window = new Window2D(DesignW, DesignH)
     BackgroundColor = new Color(0, 20, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
@@ -45,12 +44,12 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 
 var sound = Sound.LoadWAV(Asset.GetPathRelativeToCaller("szwoopy.wav"));
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     // Per-frame input: edges for arrow-key tap response. Holding an
     // arrow key only fires once per press, matching the original
     // KeyDown event behavior.
-    var input = w.Input;
+    var input = window.Input;
     if (input.WasJustPressed(Key.Left))
         rocket.Heading = (rocket.Heading + 350f) % 360f;
     if (input.WasJustPressed(Key.Right))
@@ -105,6 +104,4 @@ window.Rendering += (w, rd) =>
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 2f);
-};
-
-await window.WaitForCloseAsync();
+});

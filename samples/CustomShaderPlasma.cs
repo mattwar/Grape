@@ -91,10 +91,9 @@ var window = new Window3D
     BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
@@ -110,11 +109,7 @@ window.Rendering += (w, rd) =>
             Frame = new Vector4(t, rd.AspectRatio, 0f, 0f),
         });
     }
-};
-
-await window.WaitForCloseAsync();
-
-// ----- Per-draw args struct ------------------------------------------------
+});// ----- Per-draw args struct ------------------------------------------------
 //
 // Single fragment-stage slot carrying time + aspect ratio. No
 // IUniformArgs accessors -- this shader doesn't need any

@@ -88,12 +88,11 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera();
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
@@ -132,11 +131,7 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(innerCube, Shaders.PositionColorWithTransform,
             model * viewProjection);
     }
-};
-
-await window.WaitForCloseAsync();
-
-static Image MakeFace(Color fill)
+});static Image MakeFace(Color fill)
 {
     var image = Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
     var border = new Color(0, 0, 0);

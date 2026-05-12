@@ -52,7 +52,6 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 const float OrbitRadius = 1.2f;
@@ -88,10 +87,10 @@ void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
     r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 }
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
-    var (width, height) = w.Size;
+    var (width, height) = window.Size;
 
     // Each pane is half the window's width. The aspect ratio passed to
     // the camera also halves so the scene isn't horizontally squished.
@@ -112,6 +111,4 @@ window.Rendering += (w, rd) =>
         rd.Viewport = new Rect(paneWidth, 0, paneWidth, height);
         DrawScene(rd, cameraRight.GetViewProjection(paneAspect), t);
     }
-};
-
-await window.WaitForCloseAsync();
+});

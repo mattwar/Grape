@@ -113,7 +113,6 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -121,7 +120,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0f, 4f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var viewProjection = camera.GetViewProjection(rd);
@@ -179,7 +178,7 @@ window.Rendering += (w, rd) =>
         foreach (var sample in samples)
             DrawLabel(rd, sample.Label, sample.Y, viewProjection);
     }
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float centerY, Matrix4x4 viewProjection)
 {
@@ -194,5 +193,3 @@ static void DrawLabel(Renderer3D renderer, string text, float centerY, Matrix4x4
         viewProjection;
     renderer.DrawDebugText(text, transform);
 }
-
-await window.WaitForCloseAsync();

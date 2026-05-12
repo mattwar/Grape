@@ -58,12 +58,11 @@ var window = new Window3D
     BackgroundColor = new Color(8, 12, 20),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var (width, height) = w.Size;
+    var (width, height) = window.Size;
     var paneWidth = width / 2f;
     var paneAspect = paneWidth / height;
     var viewProjection = camera.GetViewProjection(paneAspect);
@@ -93,11 +92,7 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(quad, withMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "Mipmaps", paneAspect);
     }
-};
-
-await window.WaitForCloseAsync();
-
-static void DrawLabel(Renderer3D rd, string text, float paneAspect)
+});static void DrawLabel(Renderer3D rd, string text, float paneAspect)
 {
     // Debug text is drawn in NDC: each character is 1x1 unit. Center
     // horizontally near the bottom of the pane. The X scale is divided

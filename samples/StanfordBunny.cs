@@ -48,7 +48,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -65,7 +64,7 @@ var orbiter = new CameraOrbiter(window)
     Pitch = 0.15f,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     orbiter.Update(rd.GetUpdateContext());
     orbiter.Draw(rd);
@@ -84,11 +83,7 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         model.Draw(rd, fitTransform);
     }
-};
-
-await window.WaitForCloseAsync();
-
-// --- helpers ------------------------------------------------------
+});// --- helpers ------------------------------------------------------
 
 static (Vector3 Center, float Radius) ComputeBounds(Model model)
 {

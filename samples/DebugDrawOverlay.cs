@@ -34,7 +34,6 @@ var window = new Window3D
     BackgroundColor = new Color(12, 14, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -60,7 +59,7 @@ window.KeyDown += (_, e) =>
         window.Renderer.DebugDrawEnabled = !window.Renderer.DebugDrawEnabled;
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
@@ -96,6 +95,4 @@ window.Rendering += (w, rd) =>
     DebugDraw.DrawText($"fps {fps,5:F1}", 12, 12);
     DebugDraw.DrawText($"orbit ({orbit.X,6:F2}, {orbit.Y,6:F2}, {orbit.Z,6:F2})", 12, 32);
     DebugDraw.DrawText("F3 toggles DebugDraw", 12, 52);
-};
-
-await window.WaitForCloseAsync();
+});

@@ -119,7 +119,6 @@ var window = new Window3D
     BackgroundColor = new Color(2, 3, 8),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -128,7 +127,7 @@ var camera = new PerspectiveCamera
     Target   = new Vector3(0f, 0f, 0f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
@@ -159,11 +158,7 @@ window.Rendering += (w, rd) =>
         CameraPos  = new Vector4(camera.Position, 1f),
         RimParams  = new Vector4(1.0f, 0.55f, 0.15f, 3.5f),
     });
-};
-
-await window.WaitForCloseAsync();
-
-// ----- Per-draw args struct ------------------------------------------------
+});// ----- Per-draw args struct ------------------------------------------------
 //
 // Slot layout matches the ShaderArgsLayout above:
 //   Vertex   slot 0 = Model           (Matrix4x4)

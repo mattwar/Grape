@@ -58,7 +58,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     //FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -67,7 +66,7 @@ var camera = new PerspectiveCamera
     Target = Vector3.Zero,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
     rd.AmbientLight = new Color(40, 40, 60);
@@ -85,12 +84,11 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         model.Draw(rd, transform);
     }
-};
+});
 
 try
 {
-    await window.WaitForCloseAsync();
-}
+    }
 finally
 {
     try { tempDir.Delete(recursive: true); } catch { /* leave temp files if cleanup fails */ }

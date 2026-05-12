@@ -57,7 +57,6 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera
@@ -66,7 +65,7 @@ var camera = new PerspectiveCamera
     Target = new Vector3(0f, 0.2f, 0f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var viewProjection = camera.GetViewProjection(rd);
@@ -98,6 +97,4 @@ window.Rendering += (w, rd) =>
         Matrix4x4.CreateScale(0.6f) *
         Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
-};
-
-await window.WaitForCloseAsync();
+});
