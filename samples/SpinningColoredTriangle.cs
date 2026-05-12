@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -27,7 +27,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 window.Rendering += (w, rd) =>

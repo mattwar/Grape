@@ -30,7 +30,7 @@ var window = new Window2D(DesignW, DesignH)
     BackgroundColor = new Color(0, 20, 0, 0),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);

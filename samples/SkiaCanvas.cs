@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -25,7 +25,7 @@ var window = new Window2D(960, 540)
     Title = "Skia Canvas",
     BackgroundColor = new Color(18, 22, 30),
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 window.Rendering += (w, rd) =>

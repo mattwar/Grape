@@ -58,7 +58,7 @@ var window = new Window3D
     BackgroundColor = new Color(8, 8, 24),
     //FullScreen = true,
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 var camera = new PerspectiveCamera

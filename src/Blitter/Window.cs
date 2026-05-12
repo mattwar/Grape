@@ -837,12 +837,11 @@ public abstract class Window : IDisposable
     }
 
     /// <summary>
-    /// When true, the window auto-calls <see cref="Invalidate"/> after
-    /// each rendered frame, producing a continuous animation loop without
-    /// requiring user code to invalidate explicitly. Defaults to false
-    /// (event-driven rendering: only repaint when something changed).
+    /// When true, the window keeps rendering frames continuously,
+    /// driving an animation loop. When false (the default), the window
+    /// is event-driven and only repaints when something changes.
     /// </summary>
-    public bool AutoInvalidate { get; set; }
+    public bool AutoAnimate { get; set; }
 
     private void EnsureRenderLoopStarted()
     {

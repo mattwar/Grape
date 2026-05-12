@@ -134,7 +134,7 @@ public class Window3D : Window
         }
         renderer.Render();
 
-        if (AutoInvalidate)
+        if (AutoAnimate)
             Invalidate();
     }
 

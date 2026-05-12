@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -125,7 +125,7 @@ var window = new Window2D(960, 540)
     Title = "Skia Bitmap (atlas blitting)",
     BackgroundColor = new Color(14, 16, 24),
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 // Tell the renderer to treat the surface as a fixed DesignW x DesignH

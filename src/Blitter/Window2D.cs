@@ -90,7 +90,7 @@ public class Window2D : Window
         }
         renderer.Render();
 
-        if (AutoInvalidate)
+        if (AutoAnimate)
             Invalidate();
     }
 

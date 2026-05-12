@@ -36,7 +36,7 @@ var window = new Window3D
     BackgroundColor = new Color(0, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 window.Rendering += (w, rd) =>

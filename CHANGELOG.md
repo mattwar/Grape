@@ -1,4 +1,4 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
@@ -10,12 +10,11 @@ All notable changes to this project will be documented in this file.
 - `Renderer.ElapsedSecondsSinceStart` / `ElapsedSecondsSinceLastRender`
   on `Renderer2D` / `Renderer3D`, plus matching defaults on
   `IUpdateContext` (`ElapsedSecondsSinceStart` /
-  `ElapsedSecondsSinceLastUpdate`) — drop the `(float)x.TotalSeconds` cast.
+  `ElapsedSecondsSinceLastUpdate`) � drop the `(float)x.TotalSeconds` cast.
 - `Camera3D.GetViewProjection(Renderer3D)` overload reads aspect from
   the renderer directly.
-- `Window.AutoInvalidate` opts a window in to continuous rendering
-  (auto-`Invalidate()` after each frame); default `false` keeps
-  on-demand windows unchanged.
+- `Window.AutoAnimate` runs the window as a continuous animation loop;
+  default `false` keeps on-demand (event-driven) rendering.
 - `MathG.Orbit` / `Orbit2D` for circular position helpers
   (`time, radius, speed, phase`).
 - `Asset.GetPathRelativeToCaller(name)` (Blitter.Bits) resolves a path next
@@ -27,10 +26,10 @@ All notable changes to this project will be documented in this file.
   `MouseDelta`, `MousePosition`. Each instance maintains its own
   previous/current snapshots, so independent loops (render, fixed
   tick, replay) report edges against their own timelines.
-- `Window.Input` — auto-advanced `FrameInput` per window, updated
+- `Window.Input` � auto-advanced `FrameInput` per window, updated
   at the start of each rendered frame. Covers the 90% case with
   zero glue.
-- `InputActions` (Blitter.Bits) — named-action map over `FrameInput`
+- `InputActions` (Blitter.Bits) � named-action map over `FrameInput`
   with multiple bindings per action (`Key`, `PhysicalKey`,
   `MouseButton`, `KeyDirection`, `KeyDirection2D`).
   `Bind` appends, `Rebind` replaces, `Clear` removes; action-level
@@ -100,7 +99,7 @@ All notable changes to this project will be documented in this file.
 - `Color.Parse` / `Color.TryParse` accept `#rgb`, `#rgba`, `#rrggbb`,
   `#rrggbbaa` (with or without `#`) and `rgb(r,g,b)` / `rgba(r,g,b,a)`
   with either 0..255 or 0..1 alpha.
-- `Gradient` (in `Blitter.Bits`) — piecewise-linear color stops with
+- `Gradient` (in `Blitter.Bits`) � piecewise-linear color stops with
   `Sample(t)` and a `FromColors` evenly-spaced constructor.
 - `BoundingBox` and `BoundingSphere` value types with intersection,
   containment, encapsulation, and matrix-transform helpers.
@@ -142,18 +141,18 @@ All notable changes to this project will be documented in this file.
 - `CameraController` abstract base for camera-driving controllers;
   implements `IUpdatable<UpdateContext3D>` + `IDrawable3D` and owns a
   `Camera` property.
-- `CameraOrbiter` — mouse-drag yaw/pitch + scroll zoom around a target.
-- `CameraFlyer` — WASD + Q/E + mouse-look free 6-DOF camera.
-- `CameraWalker` — first-person ground-walker (WASD + mouse-look,
+- `CameraOrbiter` � mouse-drag yaw/pitch + scroll zoom around a target.
+- `CameraFlyer` � WASD + Q/E + mouse-look free 6-DOF camera.
+- `CameraWalker` � first-person ground-walker (WASD + mouse-look,
   movement on the horizontal plane).
-- `CameraFollower` — exponentially-smoothed follow camera tracking a
+- `CameraFollower` � exponentially-smoothed follow camera tracking a
   moving target.
 - `Renderer2D.DrawCanvas(rect, [background,] action)` draws via a
   SkiaSharp `SKCanvas`; scratch bitmap/canvas/image pooled per renderer.
 - `SKBitmap.ToImage()` extension snapshots a Skia bitmap into a Blitter
   `Image` for use with `DrawImage` (one GPU upload, reused per call).
 - `Blitter.Bits.Atlas` pairs an `Image` with a list of pixel-space
-  rectangles (and an optional name → index map) for sprite-sheet draws.
+  rectangles (and an optional name ? index map) for sprite-sheet draws.
 - `Atlas.Grid(image, columns, rows)` slices an image into a uniform
   grid of cells indexed in row-major order.
 - `Blitter.Bits.Font` bakes a SkiaSharp typeface into a monospace glyph
@@ -173,7 +172,7 @@ All notable changes to this project will be documented in this file.
 - Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
   `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
 - Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of
-  `Shader<,>`, not a subclass — instanced shaders can't be passed to
+  `Shader<,>`, not a subclass � instanced shaders can't be passed to
   non-instanced draw overloads).
 - The per-stage shader type is now `StageShader` (abstract) with
   concrete `VertexShader` and `FragmentShader` subclasses; pass these

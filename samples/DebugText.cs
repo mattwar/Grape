@@ -25,7 +25,7 @@ var window = new Window3D
     BackgroundColor = new Color(16, 0, 32),
     FullScreen = true,
     CloseKey = Key.Escape,
-    AutoInvalidate = true,
+    AutoAnimate = true,
 };
 
 long frameCount = 0;
