@@ -35,8 +35,6 @@ SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe
 - **`Blitter.Bits`** - beyond the basics: useful tidbits for graphical apps
 - **`Blitter.Blocks`** - building blocks: sprites, scenes, panels and more
 
-The SDL3 and other native binaries are pulled in automatically; there is nothing to install separately.
-
 ## Installation
 
 Blitter is published as a NuGet package:
@@ -51,7 +49,7 @@ Targets **.NET 9**.
 
 ## A 2D example
 
-A bouncing red square. The `Rendering` event fires when the window needs to repaint; calling `Invalidate()` schedules the next frame.
+A bouncing red square.
 
 ```csharp
 using Blitter;
@@ -65,24 +63,19 @@ var window = new Window2D(800, 600)
 
 float x = 0, vx = 200; // pixels per second
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var dt = (float)rd.ElapsedSinceLastRender.TotalSeconds;
-    x += vx * dt;
-    if (x < 0 || x > w.Size.Width - 100) vx = -vx;
+    x += vx * rd.ElapsedSecondsSinceLastRender;
+    if (x < 0 || x > window.Size.Width - 100) vx = -vx;
 
     rd.DrawColor = new Color(220, 60, 60);
     rd.DrawFillRect(new Rect(x, 250, 100, 100));
-
-    w.Invalidate(); // queue next render to cause animation
-};
-
-await window.WaitForCloseAsync();
+});
 ```
 
-## A 3D example (manual render loop)
+## A 3D example
 
-A spinning, colored triangle rendered with a built-in shader. Instead of using the `Rendering` event, this version drives frames itself: queue draws on the renderer inside `window.RunAsync(...)`, which paces the loop on a dedicated thread and presents each frame for you. Multiple windows can be composed via `Task.WhenAll`.
+A spinning, colored triangle rendered with a built-in shader.
 
 ```csharp
 using System.Numerics;
@@ -105,15 +98,11 @@ var window = new Window3D
 
 await window.RunAsync(r =>
 {
-    var t = (float)r.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = window.Size;
-    var aspect = (float)height / width;
     var transform =
-        Matrix4x4.CreateRotationZ(t) *
-        Matrix4x4.CreateScale(0.8f) *
-        Matrix4x4.CreateScale(aspect, 1f, 1f);
+        Matrix4x4.CreateRotationZ(r.ElapsedSecondsSinceStart) *
+        Matrix4x4.CreateScale(0.8f);
 
-    r.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+    r.DrawMesh(triangle, transform);
 });
 ```
 
