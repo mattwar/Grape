@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // 8 unique corners of a unit cube centred on the origin. Each gets its
 // own color so face interpolation makes the cube's structure obvious.
@@ -78,18 +79,17 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.5f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     // Camera lives on the renderer; DrawMesh composes
     // model * camera.GetViewProjection(rd.AspectRatio) for us, so the
     // user-side draw call only carries the model matrix.
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
-    var model =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(t * 0.4f);
+    var model = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(t * 0.4f);
 
     // Closed solid -> back faces are always hidden by front faces, so
     // culling them costs nothing visually and saves the rasteriser
@@ -103,8 +103,7 @@ window.Rendering += (w, rd) =>
     // Caption sits in front of everything regardless of depth.
     // DrawDebugText still takes a raw clip-space transform, so build
     // the view-projection once for it.
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var viewProjection = camera.GetViewProjection(rd);
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;
@@ -113,19 +112,13 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)",
             yOffset: -1.6f, viewProjection);
     }
-
-    w.Invalidate();
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
     const float scale = 0.08f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(0f, yOffset, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(0f, yOffset, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }
-
-await window.WaitForCloseAsync();

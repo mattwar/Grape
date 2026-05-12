@@ -1,10 +1,44 @@
-﻿# Changelog
+# Changelog
 
 All notable changes to this project will be documented in this file.
 
 ## [0.4.0] 2026-05-10
 
 ### Added
+- `Renderer2D.AspectRatio` (Renderer3D already exposed it) for one-line
+  aspect math without reaching for `Window.Size`.
+- `Renderer.ElapsedSecondsSinceStart` / `ElapsedSecondsSinceLastRender`
+  on `Renderer2D` / `Renderer3D`, plus matching defaults on
+  `IUpdateContext` (`ElapsedSecondsSinceStart` /
+  `ElapsedSecondsSinceLastUpdate`) � drop the `(float)x.TotalSeconds` cast.
+- `Camera3D.GetViewProjection(Renderer3D)` overload reads aspect from
+  the renderer directly.
+- `MathG.Orbit` / `Orbit2D` for circular position helpers
+  (`time, radius, speed, phase`).
+- `Asset.GetPathRelativeToCaller(name)` (Blitter.Bits) resolves a path next
+  to the caller's source file, for samples and tests that ship data
+  alongside their `.cs`.
+- `FrameInput` per-loop snapshot owner for keyboard / mouse edge
+  detection: `WasJustPressed`, `WasJustReleased`, `IsDown`,
+  `Direction(neg, pos)`, `Direction2D(left, right, down, up)`,
+  `MouseDelta`, `MousePosition`. Each instance maintains its own
+  previous/current snapshots, so independent loops (render, fixed
+  tick, replay) report edges against their own timelines.
+- `Window.Input` � auto-advanced `FrameInput` per window, updated
+  at the start of each rendered frame. Covers the 90% case with
+  zero glue.
+- `InputActions` (Blitter.Bits) � named-action map over `FrameInput`
+  with multiple bindings per action (`Key`, `PhysicalKey`,
+  `MouseButton`, `KeyDirection`, `KeyDirection2D`).
+  `Bind` appends, `Rebind` replaces, `Clear` removes; action-level
+  edges (`WasJustPressed`/`WasJustReleased`) fire once even when
+  several bindings rise together.
+- `InputActions.ToJson` / `FromJson` for saved configs / rebindable
+  controls.
+- `Mouse.Delta` (via `FrameInput.MouseDelta`) reports SDL
+  relative-motion delta when any window has `Window.RelativeMouseMode`
+  enabled, so FPS-style mouselook keeps producing motion while the
+  cursor is pinned.
 - `DebugDraw` static overlay for ad-hoc world-space wireframe gizmos
   (lines, rays, axes, boxes, spheres); opt in per renderer via
   `Renderer3D.DebugDrawEnabled`.
@@ -28,6 +62,43 @@ All notable changes to this project will be documented in this file.
   (and properly transforms normals via the inverse-transpose).
 - `Mesh<T>.Concat(other)` and `Concat(other, transform)` combine two
   meshes into one for static-batching / mesh composition.
+- `Mesh<T>.Translate`, `Scale`, `Rotate`, `RotateX`/`Y`/`Z` shortcut
+  transforms over `Mesh<T>.Transform`.
+- `Mesh<T>.FlipWinding()` reverses triangle winding for indexed and
+  unindexed `TriangleList` meshes.
+- `Mesh<T>.FlipNormals()` negates per-vertex normals on lit vertex
+  meshes (`LitVertex3D` / `LitTextureVertex3D`).
+- `Mesh<T>.RecalculateNormals(smooth)` rebuilds per-vertex normals
+  from triangle geometry for lit vertex meshes; flat mode expands
+  indexed meshes to unindexed so each face carries its own normal.
+- `Model.RecalculateNormals(smooth)` applies the same to every
+  submesh.
+- `Model.Transform`, `Translate`, `Scale`, `Rotate`, `RotateX`/`Y`/`Z`
+  bake a transform into a model's submesh vertices, returning a new
+  `Model` (source unchanged).
+- `Model.CenterOnOrigin()` translates a model so its bounding box
+  center sits at the origin.
+- `Model.NormalizeSize(targetMaxSize)` uniformly scales a model so
+  its longest bounding-box axis matches the target size.
+- `MathG` static class in `Blitter.Bits` with BCL-complementary
+  helpers: `Saturate`, `InverseLerp`, `Remap`, `SmoothStep`,
+  `SmootherStep`, `Damp` (half-life exponential smoothing for
+  `float`/`Vector2`/`Vector3`), `MoveToward`, `WrapDegrees`/`Radians`,
+  `ShortestArcDegrees`/`Radians`, `DegreesToRadians`/`RadiansToDegrees`.
+- `MathG.ProjectOnPlane`, `ClampMagnitude`, `SignedAngle` for
+  `Vector3`; `LookRotation(forward, up)` quaternion builder; `TRS`
+  matrix composer.
+- `Easing` static class with the standard 30 easing curves
+  (In/Out/InOut variants of Sine, Quad, Cubic, Quart, Quint, Expo,
+  Circ, Back, Elastic, Bounce).
+- `Color.Lerp`, `ToHsv`, `WithRed/Green/Blue`, `Darken(amount)`,
+  `Lighten(amount)`, `FromVector4` (inverse of the existing implicit
+  `Color`-to-`Vector4` conversion).
+- `Color.Parse` / `Color.TryParse` accept `#rgb`, `#rgba`, `#rrggbb`,
+  `#rrggbbaa` (with or without `#`) and `rgb(r,g,b)` / `rgba(r,g,b,a)`
+  with either 0..255 or 0..1 alpha.
+- `Gradient` (in `Blitter.Bits`) � piecewise-linear color stops with
+  `Sample(t)` and a `FromColors` evenly-spaced constructor.
 - `BoundingBox` and `BoundingSphere` value types with intersection,
   containment, encapsulation, and matrix-transform helpers.
 - `BoundingRect` and `BoundingCircle` 2D counterparts (in
@@ -68,18 +139,18 @@ All notable changes to this project will be documented in this file.
 - `CameraController` abstract base for camera-driving controllers;
   implements `IUpdatable<UpdateContext3D>` + `IDrawable3D` and owns a
   `Camera` property.
-- `CameraOrbiter` — mouse-drag yaw/pitch + scroll zoom around a target.
-- `CameraFlyer` — WASD + Q/E + mouse-look free 6-DOF camera.
-- `CameraWalker` — first-person ground-walker (WASD + mouse-look,
+- `CameraOrbiter` � mouse-drag yaw/pitch + scroll zoom around a target.
+- `CameraFlyer` � WASD + Q/E + mouse-look free 6-DOF camera.
+- `CameraWalker` � first-person ground-walker (WASD + mouse-look,
   movement on the horizontal plane).
-- `CameraFollower` — exponentially-smoothed follow camera tracking a
+- `CameraFollower` � exponentially-smoothed follow camera tracking a
   moving target.
 - `Renderer2D.DrawCanvas(rect, [background,] action)` draws via a
   SkiaSharp `SKCanvas`; scratch bitmap/canvas/image pooled per renderer.
 - `SKBitmap.ToImage()` extension snapshots a Skia bitmap into a Blitter
   `Image` for use with `DrawImage` (one GPU upload, reused per call).
 - `Blitter.Bits.Atlas` pairs an `Image` with a list of pixel-space
-  rectangles (and an optional name → index map) for sprite-sheet draws.
+  rectangles (and an optional name ? index map) for sprite-sheet draws.
 - `Atlas.Grid(image, columns, rows)` slices an image into a uniform
   grid of cells indexed in row-major order.
 - `Blitter.Bits.Font` bakes a SkiaSharp typeface into a monospace glyph
@@ -94,12 +165,26 @@ All notable changes to this project will be documented in this file.
   `Digits`, `UppercaseLatin`, `LowercaseLatin`).
 - New samples: `SkiaCanvas`, `SkiaBitmap`, `FontText` showcasing the
   SkiaSharp rendering integration and `Blitter.Bits.Font`.
+- `Application.Invoke(Action)` / `Invoke<T>(Func<T>)` marshal work to
+  the application thread without the `SendOrPostCallback` ceremony;
+  short-circuits when called from the app thread.
 
 ### Changed
+- `Clipboard`, `Window` SDL-backed properties (`Title`, `Size`,
+  `Position`, `FullScreen`, `Bordered`, `Resizable`, `Modal`, etc.)
+  and state methods (`Show`/`Hide`/`Minimize`/`Maximize`/`Restore`/
+  `Raise`), and `Gamepad.HasGamepad`/`Devices`/`Reset` now self-marshal
+  to the application thread, so they're safe to call from any thread
+  (including `RunAsync` loop bodies and `await` continuations) on
+  every platform.
+- Migrated all animating samples (32 of them) from
+  `Rendering += ...; await WaitForCloseAsync()` to
+  `await window.RunAsync(rd => { ... })`. The event-driven `Rendering`
+  callback is still used for the static `Logo` sample.
 - Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
   `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
 - Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of
-  `Shader<,>`, not a subclass — instanced shaders can't be passed to
+  `Shader<,>`, not a subclass � instanced shaders can't be passed to
   non-instanced draw overloads).
 - The per-stage shader type is now `StageShader` (abstract) with
   concrete `VertexShader` and `FragmentShader` subclasses; pass these
@@ -109,11 +194,6 @@ All notable changes to this project will be documented in this file.
 - Renamed `Mesh<T>.Reset` to `Mesh<T>.Update`.
 - Window render-tick and heartbeat loops are now allocation-free per
   tick (no per-iteration `Task.Delay` / `PeriodicTimer` waits).
-- `Window.NextFrameAsync` now returns `ValueTask`; manual loops are
-  allocation-free per iteration when awaited with `ConfigureAwait(false)`.
-- `Window.WaitForNextFrame()` synchronously paces a render loop on
-  the calling thread (no thread shift). Prefer this for main-thread
-  manual loops; `NextFrameAsync` resumes on the application thread.
 - `Window.RunAsync(loopBody)` runs a manual render loop on a dedicated
   background thread and returns a `Task` that completes when the loop
   exits; compose multiple windows via `Task.WhenAll`.
@@ -122,8 +202,8 @@ All notable changes to this project will be documented in this file.
 - `Window.RunAsync` auto-flushes the renderer at the end of each frame
   body; manual `Render()` calls are no longer required (and are
   suppressed if you make them).
-- `Scene2D.RunAsync` replaced by synchronous `Scene2D.Run`, paced via
-  `WaitForNextFrame` so the loop stays on its calling thread.
+- `Scene2D.RunAsync` replaced by synchronous `Scene2D.Run`, which paces
+  itself on the calling thread.
 - Renamed `Image.RenderCanvas` to `Image.DrawCanvas` for naming
   consistency with the rest of the `Draw*` family.
 - Default window size (parameterless `Window2D` / `Window3D` ctor) is
@@ -141,6 +221,13 @@ All notable changes to this project will be documented in this file.
   failing image is logged once and affected draws are skipped.
 
 ### Removed
+- `Window.AutoAnimate`. `Window.RunAsync(...)` is now the documented
+  animation pattern. Users still wanting an event-driven continuous
+  loop can call `window.Invalidate()` from inside their `Rendering`
+  handler.
+- `Window.NextFrameAsync` and `Window.WaitForNextFrame`. Use
+  `Window.RunAsync(...)` to drive a manual render loop; it encapsulates
+  the same pacing without exposing the raw frame-tick primitives.
 - `Mesh<T>` constructors and `Reset` overload that took
   `ImmutableArray<T>`. Build the mesh once with `Mesh.Create(...)` and,
   if dynamic, call `mesh.Update(vertices)` to push new contents.

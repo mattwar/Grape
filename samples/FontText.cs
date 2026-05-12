@@ -43,12 +43,11 @@ var window = new Window3D
 
 long frameCount = 0;
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     frameCount++;
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var t = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
     // Title banner: fixed string, gentle bob.
     {
@@ -58,11 +57,10 @@ window.Rendering += (w, rd) =>
         float widthInNdc = title.Length * scale;
         // Font glyphs are 1 unit wide in local space; translate by half-length
         // to center, then scale, then position in NDC.
-        var transform =
-            Matrix4x4.CreateTranslation(-title.Length / 2f, 0f, 0f) *
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateTranslation(0f, 0.45f + bob, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateTranslation(-title.Length / 2f, 0f, 0f)
+            .Scale(scale)
+            .Translate(0f, 0.45f + bob, 0f)
+            .Scale(aspect, 1f, 1f);
         titleFont.DrawText(rd, title, transform);
     }
 
@@ -70,11 +68,10 @@ window.Rendering += (w, rd) =>
     {
         var live = $"t={t:F2}s   frame={frameCount}";
         float scale = 0.05f;
-        var transform =
-            Matrix4x4.CreateTranslation(-live.Length / 2f, 0f, 0f) *
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateTranslation(0f, 0.25f, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateTranslation(-live.Length / 2f, 0f, 0f)
+            .Scale(scale)
+            .Translate(0f, 0.25f, 0f)
+            .Scale(aspect, 1f, 1f);
         readoutFont.DrawText(rd, live, transform);
     }
 
@@ -95,19 +92,12 @@ window.Rendering += (w, rd) =>
         float y = -0.25f + 0.1f * MathF.Sin(phase * 1.7f);
         float scale = 0.04f;
         float spin = t * 1.4f + i * MathF.Tau / 3f;
-        var transform =
-            // Center the text on its midpoint so the spin pivots through
-            // the middle instead of swinging around an end.
-            Matrix4x4.CreateTranslation(-s.Length / 2f, -0.5f, 0f) *
-            Matrix4x4.CreateRotationY(spin) *
-            Matrix4x4.CreateRotationX(0.25f * MathF.Sin(phase * 1.3f)) *
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateTranslation(x, y, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateTranslation(-s.Length / 2f, -0.5f, 0f)
+            .RotateY(spin)
+            .RotateX(0.25f * MathF.Sin(phase * 1.3f))
+            .Scale(scale)
+            .Translate(x, y, 0f)
+            .Scale(aspect, 1f, 1f);
         ghostFont.DrawText(rd, s, transform);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

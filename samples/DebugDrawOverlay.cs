@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -59,9 +59,9 @@ window.KeyDown += (_, e) =>
         window.Renderer.DebugDrawEnabled = !window.Renderer.DebugDrawEnabled;
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // The "real" scene: one lit cube.
     rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(Matrix4x4.CreateRotationY(t * 0.5f)));
@@ -76,10 +76,7 @@ window.Rendering += (w, rd) =>
     DebugDraw.DrawBoxCentered(Vector3.Zero, new Vector3(1.2f), Color.Yellow);
 
     // Wireframe sphere orbiting the cube.
-    var orbit = new Vector3(
-        MathF.Cos(t) * 2.0f,
-        0.6f + 0.3f * MathF.Sin(t * 2f),
-        MathF.Sin(t) * 2.0f);
+    var orbit = MathG.Orbit(t, radius: 2f) + Vector3.UnitY * (0.6f + 0.3f * MathF.Sin(t * 2f));
     DebugDraw.DrawSphere(orbit, radius: 0.25f, Color.Cyan);
 
     // Line from origin to the orbiting sphere -- shows DebugDraw can
@@ -98,8 +95,4 @@ window.Rendering += (w, rd) =>
     DebugDraw.DrawText($"fps {fps,5:F1}", 12, 12);
     DebugDraw.DrawText($"orbit ({orbit.X,6:F2}, {orbit.Y,6:F2}, {orbit.Z,6:F2})", 12, 32);
     DebugDraw.DrawText("F3 toggles DebugDraw", 12, 52);
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

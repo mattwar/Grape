@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Regular tetrahedron with vertices on the unit cube's diagonals.
 // Each vertex carries a color so the faces show as colored gradients
@@ -76,29 +77,25 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Tetra A and B sit on opposite sides of the orbit; as `t` advances
     // they swap places in Z, and pass through each other near the centre.
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
-    var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
-                Matrix4x4.CreateRotationX(t * SpinSpeed * 0.7f);
-    var spinB = Matrix4x4.CreateRotationY(-t * SpinSpeed) *
-                Matrix4x4.CreateRotationZ(t * SpinSpeed * 0.5f);
-
-    var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
-    var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
+    var modelA = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(t * SpinSpeed)
+        .RotateX(t * SpinSpeed * 0.7f)
+        .Translate(orbitA);
+    var modelB = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(-t * SpinSpeed)
+        .RotateZ(t * SpinSpeed * 0.5f)
+        .Translate(orbitB);
 
     rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

@@ -46,6 +46,20 @@ public abstract class Renderer3D
     }
 
     /// <summary>
+    /// <see cref="ElapsedSinceStart"/> as <c>float</c> seconds. Convenient
+    /// for shader uniforms and animation phase math.
+    /// </summary>
+    public float ElapsedSecondsSinceStart =>
+        (float)ElapsedSinceStart.TotalSeconds;
+
+    /// <summary>
+    /// <see cref="ElapsedSinceLastRender"/> as <c>float</c> seconds.
+    /// Convenient as a per-frame <c>dt</c> for time-integrated state.
+    /// </summary>
+    public float ElapsedSecondsSinceLastRender =>
+        (float)ElapsedSinceLastRender.TotalSeconds;
+
+    /// <summary>
     /// Upper bound on <see cref="ElapsedSinceLastRender"/>. Long pauses
     /// (window minimised, debugger break, system sleep) would otherwise
     /// produce a single huge delta that teleports time-integrated state.

@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -18,6 +18,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -53,13 +54,13 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var (width, height) = window.Size;
+    var viewProjection = camera.GetViewProjection(rd);
 
-    var spin = Matrix4x4.CreateRotationY(t) * Matrix4x4.CreateRotationX(t * 0.7f);
+    var spin = Matrix4x4.CreateRotationY(t).RotateX(t * 0.7f);
     var transform = spin * viewProjection;
 
     // A "ghost" pass with no clip draws the whole tetra at low intensity
@@ -85,8 +86,4 @@ window.Rendering += (w, rd) =>
         rd.ClipRect = porthole;
         rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

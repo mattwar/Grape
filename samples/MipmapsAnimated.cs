@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -60,9 +60,9 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var (width, height) = w.Size;
+    var (width, height) = window.Size;
     var paneWidth = width / 2f;
     var paneAspect = paneWidth / height;
     var viewProjection = camera.GetViewProjection(paneAspect);
@@ -74,7 +74,7 @@ window.Rendering += (w, rd) =>
     const float MinDist = 1.5f;
     const float MaxDist = 50f;
     const float Period = 6f; // seconds for a full near->far->near cycle
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     var phase = (1f - MathF.Cos(t * 2f * MathF.PI / Period)) * 0.5f; // 0..1
     var distance = MinDist + (MaxDist - MinDist) * phase;
     var transform = Matrix4x4.CreateTranslation(0f, 0f, -distance);
@@ -92,13 +92,7 @@ window.Rendering += (w, rd) =>
         rd.DrawMesh(quad, withMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "Mipmaps", paneAspect);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-
-static void DrawLabel(Renderer3D rd, string text, float paneAspect)
+});static void DrawLabel(Renderer3D rd, string text, float paneAspect)
 {
     // Debug text is drawn in NDC: each character is 1x1 unit. Center
     // horizontally near the bottom of the pane. The X scale is divided
@@ -106,9 +100,8 @@ static void DrawLabel(Renderer3D rd, string text, float paneAspect)
     // viewport rather than being stretched horizontally.
     const float Scale = 0.08f;
     var widthInNdc = text.Length * Scale / paneAspect;
-    var transform =
-        Matrix4x4.CreateScale(Scale / paneAspect, Scale, 1f) *
-        Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.85f, 0f);
+    var transform = Matrix4x4.CreateScale(Scale / paneAspect, Scale, 1f)
+        .Translate(-widthInNdc / 2f, -0.85f, 0f);
     rd.DrawDebugText(text, transform);
 }
 

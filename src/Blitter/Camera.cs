@@ -66,8 +66,19 @@ public abstract class Camera
         GetView() * GetProjection(aspectRatio);
 
     /// <summary>
+    /// Convenience overload that reads the aspect ratio from the
+    /// renderer's current target. Equivalent to
+    /// <c>GetViewProjection(renderer.AspectRatio)</c>.
+    /// </summary>
+    public Matrix4x4 GetViewProjection(Renderer3D renderer)
+    {
+        ArgumentNullException.ThrowIfNull(renderer);
+        return GetViewProjection(renderer.AspectRatio);
+    }
+
+    /// <summary>
     /// View-projection for drawing a skybox: the same as
-    /// <see cref="GetViewProjection"/> but with the camera's
+    /// <see cref="GetViewProjection(float)"/> but with the camera's
     /// translation stripped out so the skybox stays centred on the
     /// camera regardless of where the camera moves. Pair with
     /// <see cref="Shaders.Skybox"/> and a unit cube mesh.

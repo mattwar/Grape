@@ -19,6 +19,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A small two-material model: an octahedron (bipyramid) with the four
 // upper faces in one color and the four lower faces in another. Two
@@ -94,22 +95,21 @@ var camera = new PerspectiveCamera
     Target = Vector3.Zero,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
     // Soft ambient; an orbiting directional light so every face gets
     // its turn in shadow as the gem spins.
     rd.AmbientLight = new Color(40, 40, 60);
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
         Color.White);
 
     // Spin the gem around its vertical axis.
-    var transform =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(MathF.Sin(t * 0.5f) * 0.2f);
+    var transform = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(MathF.Sin(t * 0.5f) * 0.2f);
 
     using (rd.PushState())
     {
@@ -119,14 +119,11 @@ window.Rendering += (w, rd) =>
         // material texture (or a 1x1 white fallback) per submesh.
         model.Draw(rd, transform);
     }
-
-    w.Invalidate();
-};
+});
 
 try
 {
-    await window.WaitForCloseAsync();
-}
+    }
 finally
 {
     try { tempDir.Delete(recursive: true); } catch { /* leave the temp files if cleanup fails */ }

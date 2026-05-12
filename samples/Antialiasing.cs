@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -23,6 +23,7 @@
 using System.Collections.Immutable;
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 const int Spokes = 64;
 const float HalfThickness = 0.003f; // ~1-2 pixels wide at 4K
@@ -66,42 +67,33 @@ var window = new Window3D
 var levels = new[] { Antialiasing.None, Antialiasing.X2, Antialiasing.X4, Antialiasing.X8 };
 int levelIndex = 0;
 
-window.KeyDown += (_, e) =>
+await window.RunAsync(rd =>
 {
-    if (e.Key == Key.Space)
+    // Cycle AA mode on Space tap. WasJustPressed fires once per
+    // press, so holding Space won't blur through the modes.
+    if (window.Input.WasJustPressed(Key.Space))
         levelIndex = (levelIndex + 1) % levels.Length;
-};
 
-window.Rendering += (w, rd) =>
-{
     rd.Antialiasing = levels[levelIndex];
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    float aspect = (float)width / height;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Slow rotation -- aliasing is most visible when edges crawl
     // through pixel boundaries gradually.
     var model = Matrix4x4.CreateRotationZ(t * 0.1f);
-    var viewProjection = camera.GetViewProjection(aspect);
+    var viewProjection = camera.GetViewProjection(rd);
 
     rd.DrawMesh(wheel, Shaders.PositionColorWithTransform, model * viewProjection);
 
     DrawLabel(rd, $"Antialiasing: {levels[levelIndex]}", yOffset: -0.85f, viewProjection);
     DrawLabel(rd, "Press SPACE to cycle (None / X2 / X4 / X8)", yOffset: -0.95f, viewProjection);
-
-    w.Invalidate();
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float yOffset, Matrix4x4 viewProjection)
 {
     const float scale = 0.04f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(0f, yOffset, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(0f, yOffset, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }
-
-await window.WaitForCloseAsync();

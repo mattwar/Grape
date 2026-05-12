@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -17,6 +17,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -71,23 +72,23 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 0.6f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Two solid orbiting tetras -- same as the OrbitingTetrahedra sample.
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
-    var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
-                Matrix4x4.CreateRotationX(t * SpinSpeed * 0.7f);
-    var spinB = Matrix4x4.CreateRotationY(-t * SpinSpeed) *
-                Matrix4x4.CreateRotationZ(t * SpinSpeed * 0.5f);
-
-    var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
-    var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
+    var modelA = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(t * SpinSpeed)
+        .RotateX(t * SpinSpeed * 0.7f)
+        .Translate(orbitA);
+    var modelB = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(-t * SpinSpeed)
+        .RotateZ(t * SpinSpeed * 0.5f)
+        .Translate(orbitB);
 
     rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
@@ -97,23 +98,16 @@ window.Rendering += (w, rd) =>
     // position is well behind both solid tetras. Without DepthMode.Overlay
     // it would be occluded; with it, it always draws on top.
     var indicatorAngle = t * 1.8f;
-    var indicatorOrbit = new Vector3(
-        MathF.Cos(indicatorAngle) * 1.5f,
-        MathF.Sin(indicatorAngle * 0.7f) * 0.6f,
-        MathF.Sin(indicatorAngle) * 1.5f);
-    var indicatorSpin = Matrix4x4.CreateRotationY(t * 3f) *
-                        Matrix4x4.CreateRotationX(t * 2f);
-    var indicatorModel = Matrix4x4.CreateScale(IndicatorScale) *
-                         indicatorSpin *
-                         Matrix4x4.CreateTranslation(indicatorOrbit);
+    var indicatorOrbit = MathG.Orbit(indicatorAngle, radius: 1.5f)
+        + Vector3.UnitY * MathF.Sin(indicatorAngle * 0.7f) * 0.6f;
+    var indicatorModel = Matrix4x4.CreateScale(IndicatorScale)
+        .RotateY(t * 3f)
+        .RotateX(t * 2f)
+        .Translate(indicatorOrbit);
 
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;
         rd.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
     } // DepthMode automatically restored to Default here.
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

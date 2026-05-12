@@ -116,6 +116,9 @@ public class Window3D : Window
         if (!TryGetRenderer(out var renderer))
             return;
 
+        // Snap input edges before user code observes them this frame.
+        AdvanceInput();
+
         // The window owns the single per-frame Render() flush. Stray
         // Render() calls from inside the body are suppressed so they
         // don't double-present.

@@ -31,6 +31,20 @@ public abstract class Renderer2D
     }
 
     /// <summary>
+    /// <see cref="ElapsedSinceStart"/> as <c>float</c> seconds. Convenient
+    /// for shader uniforms and animation phase math.
+    /// </summary>
+    public float ElapsedSecondsSinceStart =>
+        (float)ElapsedSinceStart.TotalSeconds;
+
+    /// <summary>
+    /// <see cref="ElapsedSinceLastRender"/> as <c>float</c> seconds.
+    /// Convenient as a per-frame <c>dt</c> for time-integrated state.
+    /// </summary>
+    public float ElapsedSecondsSinceLastRender =>
+        (float)ElapsedSinceLastRender.TotalSeconds;
+
+    /// <summary>
     /// Upper bound on <see cref="ElapsedSinceLastRender"/>. Set to
     /// <see cref="TimeSpan.MaxValue"/> to disable clamping.
     /// </summary>
@@ -101,6 +115,20 @@ public abstract class Renderer2D
 
     /// <summary>The output size in pixels.</summary>
     public abstract (int Width, int Height) OutputSize { get; }
+
+    /// <summary>
+    /// Output width / height as a single <c>float</c>. Reads
+    /// <see cref="OutputSize"/> on every call so resizing is picked up
+    /// automatically.
+    /// </summary>
+    public float AspectRatio
+    {
+        get
+        {
+            var (w, h) = OutputSize;
+            return h == 0 ? 0f : (float)w / h;
+        }
+    }
 
     /// <summary>The rendering scale factors.</summary>
     public abstract (float ScaleX, float ScaleY) Scale { get; set; }

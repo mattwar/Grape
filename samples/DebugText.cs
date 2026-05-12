@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Demonstrates 3D debug text. The string is updated every frame to show
 // elapsed time and frame number; the text mesh re-uploads via the renderer's
@@ -29,12 +30,11 @@ var window = new Window3D
 
 long frameCount = 0;
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     frameCount++;
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var t = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
     // Top line: a fixed banner that swings left-to-right with a gentle
     // rotational wobble and slight vertical bob.
@@ -44,12 +44,11 @@ window.Rendering += (w, rd) =>
         float bob   = 0.04f * MathF.Sin(t * 2.3f);
         float roll  = 0.15f * MathF.Sin(t * 1.7f);
         float scale = 0.08f;
-        var transform =
-            Matrix4x4.CreateTranslation(-banner.Length / 2f, -0.5f, 0f) *
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateRotationZ(roll) *
-            Matrix4x4.CreateTranslation(swing, 0.4f + bob, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateTranslation(-banner.Length / 2f, -0.5f, 0f)
+            .Scale(scale)
+            .RotateZ(roll)
+            .Translate(swing, 0.4f + bob, 0f)
+            .Scale(aspect, 1f, 1f);
         rd.DrawDebugText(banner, transform);
     }
 
@@ -58,14 +57,9 @@ window.Rendering += (w, rd) =>
         var live = $"t={t:F2}s frame={frameCount}";
         float scale = 0.06f;
         float widthInNdc = live.Length * scale;
-        var transform =
-            Matrix4x4.CreateScale(scale) *
-            Matrix4x4.CreateTranslation(-widthInNdc / 2f, -0.5f, 0f) *
-            Matrix4x4.CreateScale(aspect, 1f, 1f);
+        var transform = Matrix4x4.CreateScale(scale)
+            .Translate(-widthInNdc / 2f, -0.5f, 0f)
+            .Scale(aspect, 1f, 1f);
         rd.DrawDebugText(live, transform);
     }
-
-    w.Invalidate(); // schedule the next frame
-};
-
-await window.WaitForCloseAsync();
+});

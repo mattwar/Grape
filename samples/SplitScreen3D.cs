@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -17,6 +17,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
 {
@@ -71,25 +72,26 @@ var cameraRight = new PerspectiveCamera
 
 void DrawScene(Renderer3D r, Matrix4x4 viewProjection, float t)
 {
-    var orbitA = new Vector3(MathF.Cos(t * OrbitSpeed), 0f, MathF.Sin(t * OrbitSpeed)) * OrbitRadius;
+    var orbitA = MathG.Orbit(t, radius: OrbitRadius, speed: OrbitSpeed);
     var orbitB = -orbitA;
 
-    var spinA = Matrix4x4.CreateRotationY(t * SpinSpeed) *
-                Matrix4x4.CreateRotationX(t * SpinSpeed * 0.7f);
-    var spinB = Matrix4x4.CreateRotationY(-t * SpinSpeed) *
-                Matrix4x4.CreateRotationZ(t * SpinSpeed * 0.5f);
-
-    var modelA = Matrix4x4.CreateScale(TetraScale) * spinA * Matrix4x4.CreateTranslation(orbitA);
-    var modelB = Matrix4x4.CreateScale(TetraScale) * spinB * Matrix4x4.CreateTranslation(orbitB);
+    var modelA = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(t * SpinSpeed)
+        .RotateX(t * SpinSpeed * 0.7f)
+        .Translate(orbitA);
+    var modelB = Matrix4x4.CreateScale(TetraScale)
+        .RotateY(-t * SpinSpeed)
+        .RotateZ(t * SpinSpeed * 0.5f)
+        .Translate(orbitB);
 
     r.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     r.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 }
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
+    var t = rd.ElapsedSecondsSinceStart;
+    var (width, height) = window.Size;
 
     // Each pane is half the window's width. The aspect ratio passed to
     // the camera also halves so the scene isn't horizontally squished.
@@ -110,8 +112,4 @@ window.Rendering += (w, rd) =>
         rd.Viewport = new Rect(paneWidth, 0, paneWidth, height);
         DrawScene(rd, cameraRight.GetViewProjection(paneAspect), t);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

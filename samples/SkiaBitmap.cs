@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -134,7 +134,7 @@ var window = new Window2D(960, 540)
 // window's BackgroundColor).
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     float dt = (float)rd.ElapsedSinceLastRender.TotalSeconds;
 
@@ -162,13 +162,7 @@ window.Rendering += (w, rd) =>
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
         atlasGrid.Draw(rd, c.AtlasIndex, dst);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-
-static Confetti SpawnConfetti(Random rng, bool initial)
+});static Confetti SpawnConfetti(Random rng, bool initial)
 {
     float size = 18f + (float)rng.NextDouble() * 30f;
     return new Confetti

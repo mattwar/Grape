@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A textured triangle. Position is in NDC; UVs are in [0,1] with
 // (0,0) at the top-left of the texture and (1,1) at the bottom-right.
@@ -34,28 +35,19 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
-    var transform =
-        Matrix4x4.CreateRotationZ(seconds) *
-        Matrix4x4.CreateScale(0.8f) *
-        Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var seconds = rd.ElapsedSecondsSinceStart;
+    var transform = Matrix4x4.CreateRotationZ(seconds)
+        .Scale(0.8f)
+        .Scale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(
         triangle,
         checker,
         Shaders.PositionTextureWithTransform,
         transform);
-
-    w.Invalidate(); // schedule the next frame
-};
-
-await window.WaitForCloseAsync();
-
-static Image CreateCheckerboardImage(int width, int height, int cellSize)
+});static Image CreateCheckerboardImage(int width, int height, int cellSize)
 {
     var image = Image.Create(width, height, PixelFormat.ABGR8888);
     var dark = new Color(32, 32, 32);

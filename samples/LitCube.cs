@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -41,7 +41,7 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.5f, 5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
@@ -49,24 +49,16 @@ window.Rendering += (w, rd) =>
     // directional that orbits the cube so every face gets a turn.
     rd.AmbientLight = new Color(40, 40, 60);
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var lightDir = Vector3.Normalize(new Vector3(
-        MathF.Cos(t * 0.5f),
-        0.6f,
-        MathF.Sin(t * 0.5f)));
+    var t = rd.ElapsedSecondsSinceStart;
+    var lightDir = Vector3.Normalize(MathG.Orbit(t, speed: 0.5f) + Vector3.UnitY * 0.6f);
     rd.DirectionalLight = new DirectionalLight(lightDir, Color.White);
 
-    var model =
-        Matrix4x4.CreateRotationY(t * 0.6f) *
-        Matrix4x4.CreateRotationX(t * 0.3f);
+    var model = Matrix4x4.CreateRotationY(t * 0.6f)
+        .RotateX(t * 0.3f);
 
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
         rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(model));
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

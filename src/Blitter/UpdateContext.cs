@@ -24,6 +24,20 @@ public interface IUpdateContext
     /// state.
     /// </summary>
     TimeSpan ElapsedSinceLastUpdate { get; }
+
+    /// <summary>
+    /// <see cref="ElapsedSinceStart"/> as <c>float</c> seconds. Convenient
+    /// for shader uniforms and animation phase math.
+    /// </summary>
+    float ElapsedSecondsSinceStart =>
+        (float)ElapsedSinceStart.TotalSeconds;
+
+    /// <summary>
+    /// <see cref="ElapsedSinceLastUpdate"/> as <c>float</c> seconds.
+    /// Convenient as a per-frame <c>dt</c> for time-integrated state.
+    /// </summary>
+    float ElapsedSecondsSinceLastUpdate =>
+        (float)ElapsedSinceLastUpdate.TotalSeconds;
 }
 
 /// <summary>

@@ -14,12 +14,9 @@
 // Asset paths below resolve relative to this source file, so the
 // sample works regardless of the shell's current directory.
 
-using System.Runtime.CompilerServices;
 using Blitter;
+using Blitter.Bits;
 using Blitter.Blocks;
-
-static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
-    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
 
 // Fixed design surface. The renderer letterboxes this into whatever
 // the actual window size is, so the playfield stays a constant
@@ -37,7 +34,7 @@ var window = new Window2D(DesignW, DesignH)
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-var rocketImage = Image.Load(SampleAsset("rocket.png"));
+var rocketImage = Image.Load(Asset.GetPathRelativeToCaller("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 {
@@ -45,29 +42,23 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
     Heading = 45f
 };
 
-var sound = Sound.LoadWAV(SampleAsset("szwoopy.wav"));
+var sound = Sound.LoadWAV(Asset.GetPathRelativeToCaller("szwoopy.wav"));
 
-window.KeyDown += (_, e) =>
+await window.RunAsync(rd =>
 {
-    switch (e.Key)
-    {
-        case Key.Left:
-            rocket.Heading = (rocket.Heading + 350f) % 360f;
-            break;
-        case Key.Right:
-            rocket.Heading = (rocket.Heading + 10f) % 360f;
-            break;
-        case Key.Up:
-            rocket.Speed = Math.Min(rocket.Speed + 50f, 1000f);
-            break;
-        case Key.Down:
-            rocket.Speed = Math.Max(rocket.Speed - 50f, 0f);
-            break;
-    }
-};
+    // Per-frame input: edges for arrow-key tap response. Holding an
+    // arrow key only fires once per press, matching the original
+    // KeyDown event behavior.
+    var input = window.Input;
+    if (input.WasJustPressed(Key.Left))
+        rocket.Heading = (rocket.Heading + 350f) % 360f;
+    if (input.WasJustPressed(Key.Right))
+        rocket.Heading = (rocket.Heading + 10f) % 360f;
+    if (input.WasJustPressed(Key.Up))
+        rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
+    if (input.WasJustPressed(Key.Down))
+        rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
 
-window.Rendering += (w, rd) =>
-{
     if (rocket.Update(rd.GetUpdateContext()))
     {
         var bounce = false;
@@ -108,13 +99,9 @@ window.Rendering += (w, rd) =>
 
     rocket.Draw(rd);
 
-    rd.DrawColor = new Color(255, 255, 255);
+    rd.DrawColor = Color.White;
     rd.DrawDebugText(
         0, 10,
         $"heading: {rocket.Heading:#} speed: {rocket.Speed:#} rotation: {rocket.Rotation:#} x: {rocket.CenterX:#} y: {rocket.CenterY:#} dt: {rd.ElapsedSinceLastRender.TotalMilliseconds:0.000}ms",
         scale: 2f);
-
-    w.Invalidate(); // request the next rendering
-};
-
-await window.WaitForCloseAsync();
+});

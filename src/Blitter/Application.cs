@@ -491,6 +491,46 @@ public class Application : IDisposable
     #endregion
 
     /// <summary>
+    /// Executes <paramref name="action"/> synchronously on the application's
+    /// main thread. If the caller is already on the app thread, runs inline.
+    /// </summary>
+    public void Invoke(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        if (this.Thread == Thread.CurrentThread || _context is null)
+        {
+            action();
+            return;
+        }
+        Send(static s => ((Action)s!)(), action);
+    }
+
+    /// <summary>
+    /// Executes <paramref name="func"/> synchronously on the application's
+    /// main thread and returns its result. If the caller is already on the
+    /// app thread, runs inline.
+    /// </summary>
+    public T Invoke<T>(Func<T> func)
+    {
+        ArgumentNullException.ThrowIfNull(func);
+        if (this.Thread == Thread.CurrentThread || _context is null)
+            return func();
+        var box = new InvokeBox<T> { Func = func };
+        Send(static s =>
+        {
+            var b = (InvokeBox<T>)s!;
+            b.Result = b.Func();
+        }, box);
+        return box.Result;
+    }
+
+    private sealed class InvokeBox<T>
+    {
+        public Func<T> Func = null!;
+        public T Result = default!;
+    }
+
+    /// <summary>
     /// Executes the callback asynchronously on the application's main thread.
     /// </summary>
     public void Post(SendOrPostCallback callback, object? state = null)

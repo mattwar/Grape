@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -13,12 +13,13 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // A colored triangle in model space (centered at the origin, ~1 unit tall).
 var triangle = Mesh.Create([
-    new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), new Color(255, 0,   0)),
-    new ColorVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), new Color(0,   255, 0)),
-    new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255))
+    new ColorVertex3D(new Vertex3D( 0.0f,  0.5f, 0f), Color.Red),
+    new ColorVertex3D(new Vertex3D( 0.5f, -0.5f, 0f), Color.Green),
+    new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), Color.Blue)
     ]);
 
 var window = new Window3D
@@ -29,19 +30,13 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
-    var transform =
-        Matrix4x4.CreateRotationZ(seconds) *
-        Matrix4x4.CreateScale(0.8f) *
-        Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var seconds = rd.ElapsedSecondsSinceStart;
+    // Inverse aspect on X keeps the triangle proportional in a wide window.
+    var transform = Matrix4x4.CreateRotationZ(seconds)
+        .Scale(0.8f)
+        .Scale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
-
-    w.Invalidate(); // schedule the next frame
-};
-
-await window.WaitForCloseAsync();
+});

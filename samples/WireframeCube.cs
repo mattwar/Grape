@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -23,6 +23,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // 8 unique cube corners + 36 triangle indices (12 triangles, CCW from
 // outside). Identical to the IndexedCube sample.
@@ -63,15 +64,13 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1.0f, 6.5f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
-    var spin =
-        Matrix4x4.CreateRotationY(t * 0.7f) *
-        Matrix4x4.CreateRotationX(t * 0.4f);
+    var spin = Matrix4x4.CreateRotationY(t * 0.7f)
+        .RotateX(t * 0.4f);
 
     var modelLeft  = spin * Matrix4x4.CreateTranslation(-1.8f, 0f, 0f);
     var modelRight = spin * Matrix4x4.CreateTranslation( 1.8f, 0f, 0f);
@@ -104,19 +103,13 @@ window.Rendering += (w, rd) =>
         DrawLabel(rd, "Solid",     offsetX: -1.8f, viewProjection);
         DrawLabel(rd, "Wireframe", offsetX:  1.8f, viewProjection);
     }
-
-    w.Invalidate();
-};
+});
 
 static void DrawLabel(Renderer3D renderer, string text, float offsetX, Matrix4x4 viewProjection)
 {
     const float scale = 0.08f;
-    var transform =
-        Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f) *
-        Matrix4x4.CreateScale(scale) *
-        Matrix4x4.CreateTranslation(offsetX, -1.7f, 0f) *
-        viewProjection;
-    renderer.DrawDebugText(text, transform);
+    var transform = Matrix4x4.CreateTranslation(-text.Length / 2f, 0f, 0f)
+        .Scale(scale)
+        .Translate(offsetX, -1.7f, 0f);
+    renderer.DrawDebugText(text, transform * viewProjection);
 }
-
-await window.WaitForCloseAsync();

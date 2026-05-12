@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -62,31 +62,26 @@ var camera = new PerspectiveCamera
     Position = new Vector3(0f, 1f, 4f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
     rd.AmbientLight = new Color(30, 30, 50);
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // The light "lives" at this orbit position. Direction to feed the
     // shader is from the cube (origin) toward this point, so the lit
     // face is the one pointing at the marker.
-    const float orbitRadius = 2.5f;
-    const float orbitSpeed  = 0.6f;
-    var lightPos = new Vector3(
-        MathF.Cos(t * orbitSpeed) * orbitRadius,
-        MathF.Sin(t * 0.4f) * 0.8f + 1.2f,
-        MathF.Sin(t * orbitSpeed) * orbitRadius);
+    var lightPos = MathG.Orbit(t, radius: 2.5f, speed: 0.6f)
+        + Vector3.UnitY * (MathF.Sin(t * 0.4f) * 0.8f + 1.2f);
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(lightPos),
         Color.White);
 
     // Big cube: small (~0.6 unit half-extent) and gently spinning.
-    var bigModel =
-        Matrix4x4.CreateScale(0.6f) *
-        Matrix4x4.CreateRotationY(t * 0.5f) *
-        Matrix4x4.CreateRotationX(t * 0.25f);
+    var bigModel = Matrix4x4.CreateScale(0.6f)
+        .RotateY(t * 0.5f)
+        .RotateX(t * 0.25f);
 
     using (rd.PushState())
     {
@@ -97,17 +92,12 @@ window.Rendering += (w, rd) =>
     // Marker: small unlit white cube parked at the light's orbit
     // position. Uses the unlit transform shader -- it ignores ambient
     // and directional state entirely.
-    var markerModel =
-        Matrix4x4.CreateScale(0.08f) *
-        Matrix4x4.CreateTranslation(lightPos);
+    var markerModel = Matrix4x4.CreateScale(0.08f)
+        .Translate(lightPos);
 
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
         rd.DrawMesh(marker, Shaders.PositionColorWithTransform, markerModel);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

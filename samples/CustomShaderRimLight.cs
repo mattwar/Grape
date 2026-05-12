@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -127,16 +127,15 @@ var camera = new PerspectiveCamera
     Target   = new Vector3(0f, 0f, 0f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     // Sphere on the left with a cool cyan rim that pulses thinner/wider.
-    var sphereModel =
-        Matrix4x4.CreateRotationY(t * 0.4f) *
-        Matrix4x4.CreateTranslation(-1.4f, 0f, 0f);
+    var sphereModel = Matrix4x4.CreateRotationY(t * 0.4f)
+        .Translate(-1.4f, 0f, 0f);
     var rimPower = 2.5f + 1.5f * MathF.Sin(t * 0.8f); // 1.0 .. 4.0
     rd.DrawMesh(sphere, rimShader, new RimArgs
     {
@@ -148,23 +147,16 @@ window.Rendering += (w, rd) =>
 
     // Torus on the right with a warm orange rim and a fixed (thinner)
     // power so you can see how the same shader reads on different geometry.
-    var torusModel =
-        Matrix4x4.CreateRotationX(t * 0.6f) *
-        Matrix4x4.CreateRotationY(t * 0.3f) *
-        Matrix4x4.CreateTranslation(1.4f, 0f, 0f);
+    var torusModel = Matrix4x4.CreateRotationX(t * 0.6f)
+        .RotateY(t * 0.3f)
+        .Translate(1.4f, 0f, 0f);
     rd.DrawMesh(torus, rimShader, new RimArgs
     {
         Model      = torusModel,
         CameraPos  = new Vector4(camera.Position, 1f),
         RimParams  = new Vector4(1.0f, 0.55f, 0.15f, 3.5f),
     });
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-
-// ----- Per-draw args struct ------------------------------------------------
+});// ----- Per-draw args struct ------------------------------------------------
 //
 // Slot layout matches the ShaderArgsLayout above:
 //   Vertex   slot 0 = Model           (Matrix4x4)

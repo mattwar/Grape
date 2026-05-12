@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -65,11 +65,10 @@ var camera = new PerspectiveCamera
     Target = new Vector3(0f, 0.2f, 0f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var viewProjection = camera.GetViewProjection((float)width / height);
+    var t = rd.ElapsedSecondsSinceStart;
+    var viewProjection = camera.GetViewProjection(rd);
 
     // Refresh the sine plot in-place. The mesh's Version bumps so the
     // GPU buffer re-uploads automatically.
@@ -94,12 +93,7 @@ window.Rendering += (w, rd) =>
     rd.DrawMesh(plot, Shaders.PositionColorWithTransform, plotModel * viewProjection);
 
     // Filled triangle, parked above and to the right.
-    var triModel =
-        Matrix4x4.CreateScale(0.6f) *
-        Matrix4x4.CreateTranslation(1.4f, 1.0f, 0f);
+    var triModel = Matrix4x4.CreateScale(0.6f)
+        .Translate(1.4f, 1.0f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, triModel * viewProjection);
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
+});

@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -27,10 +27,10 @@ var window = new Window2D(960, 540)
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var (width, height) = w.Size;
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var (width, height) = window.Size;
+    var seconds = rd.ElapsedSecondsSinceStart;
 
     // 1) Native Renderer2D draw underneath: a checkerboard of squares
     //    so the Skia overlays clearly composite on top of existing
@@ -94,13 +94,7 @@ window.Rendering += (w, rd) =>
         float phase = seconds + i * 0.35f;
         rd.DrawCanvas(rect, canvas => DrawGauge(canvas, rect.Width, rect.Height, phase, i));
     }
-
-    w.Invalidate(); // animate
-};
-
-await window.WaitForCloseAsync();
-
-// --- Renderer2D draws (no Skia) -------------------------------------
+});// --- Renderer2D draws (no Skia) -------------------------------------
 
 static void DrawCheckerboard(Renderer2D rd, int width, int height, int cell)
 {

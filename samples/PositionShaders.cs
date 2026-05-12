@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -13,6 +13,7 @@
 
 using System.Numerics;
 using Blitter;
+using Blitter.Bits;
 
 // Exercises every position-only built-in shader in `Shaders`:
 //   - Shaders.Position                       (white, no transform)
@@ -45,24 +46,23 @@ var window = new Window3D
     CloseKey = Key.Escape,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
-    var seconds = (float)rd.ElapsedSinceStart.TotalSeconds;
-    var (width, height) = w.Size;
-    var aspect = (float)height / width;
+    var seconds = rd.ElapsedSecondsSinceStart;
+    var aspect = 1f / rd.AspectRatio; // height / width
 
-    var fit  = Matrix4x4.CreateScale(0.35f) * Matrix4x4.CreateScale(aspect, 1f, 1f);
+    var fit  = Matrix4x4.CreateScale(0.35f).Scale(aspect, 1f, 1f);
     var spin = Matrix4x4.CreateRotationZ(seconds);
 
     // Top-left: Shaders.Position (no transform).
     rd.DrawMesh(staticTopLeft, Shaders.Position);
 
     // Top-right: Shaders.PositionWithTransform (white, spinning, translated).
-    var topRight = spin * fit * Matrix4x4.CreateTranslation(0.5f, 0.5f, 0f);
+    var topRight = (spin * fit).Translate(0.5f, 0.5f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionWithTransform, topRight);
 
     // Bottom-left: Shaders.PositionWithTransformAndColor with red.
-    var bottomLeft = spin * fit * Matrix4x4.CreateTranslation(-0.5f, -0.5f, 0f);
+    var bottomLeft = (spin * fit).Translate(-0.5f, -0.5f, 0f);
     rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColorArgs
     {
         Transform = bottomLeft,
@@ -71,22 +71,15 @@ window.Rendering += (w, rd) =>
 
     // Bottom-right: Shaders.PositionWithTransformAndColor with hue-cycling color
     // and counter-rotation.
-    var bottomRight =
-        Matrix4x4.CreateRotationZ(-seconds) * fit *
-        Matrix4x4.CreateTranslation(0.5f, -0.5f, 0f);
+    var bottomRight = (Matrix4x4.CreateRotationZ(-seconds) * fit)
+        .Translate(0.5f, -0.5f, 0f);
 
     rd.DrawMesh(triangle, Shaders.PositionWithTransformAndColor, new TransformAndFColorArgs
     {
         Transform = bottomRight,
         FColor = HueToRgb(seconds * 0.25f),
     });
-
-    w.Invalidate(); // schedule the next frame
-};
-
-await window.WaitForCloseAsync();
-
-static Vector4 HueToRgb(float hue)
+});static Vector4 HueToRgb(float hue)
 {
     hue -= MathF.Floor(hue);
     var h6 = hue * 6f;

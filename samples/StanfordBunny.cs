@@ -26,25 +26,20 @@
 // Both via Alec Jacobson's common-3d-test-models repo.
 
 using System.Numerics;
-using System.Runtime.CompilerServices;
 using Blitter;
 using Blitter.Bits;
 
 //const string ModelFile = "teapot.obj";
 const string ModelFile = "bunny.obj";
 
-static string SampleAsset(string name, [CallerFilePath] string sourcePath = "")
-    => Path.Combine(Path.GetDirectoryName(sourcePath)!, name);
-
-using var model = Model.Load(SampleAsset(ModelFile));
+using var model = Model.Load(Asset.GetPathRelativeToCaller(ModelFile));
 
 // Center + scale the model into a unit-ish bounding sphere so it
 // frames the same way regardless of which classic asset is loaded
 // (bunny is millimeter-scale and offset; teapot is ~6 units wide).
 var (center, radius) = ComputeBounds(model);
-var fitTransform =
-    Matrix4x4.CreateTranslation(-center) *
-    Matrix4x4.CreateScale(1f / radius);
+var fitTransform = Matrix4x4.CreateTranslation(-center)
+    .Scale(1f / radius);
 
 var window = new Window3D
 {
@@ -68,7 +63,7 @@ var orbiter = new CameraOrbiter(window)
     Pitch = 0.15f,
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     orbiter.Update(rd.GetUpdateContext());
     orbiter.Draw(rd);
@@ -77,9 +72,9 @@ window.Rendering += (w, rd) =>
 
     // Slow-orbiting key light so the silhouette and faceting both get
     // their turn to be visible.
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
     rd.DirectionalLight = new DirectionalLight(
-        Vector3.Normalize(new Vector3(MathF.Cos(t * 0.4f), 0.6f, MathF.Sin(t * 0.4f))),
+        Vector3.Normalize(MathG.Orbit(t, speed: 0.4f) + Vector3.UnitY * 0.6f),
         Color.White);
 
     using (rd.PushState())
@@ -87,13 +82,7 @@ window.Rendering += (w, rd) =>
         rd.CullMode = CullMode.Back;
         model.Draw(rd, fitTransform);
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-
-// --- helpers ------------------------------------------------------
+});// --- helpers ------------------------------------------------------
 
 static (Vector3 Center, float Radius) ComputeBounds(Model model)
 {

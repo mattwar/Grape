@@ -19,7 +19,7 @@ public static class Gamepad
         get
         {
             EnsureInit();
-            return SDL.HasGamepad();
+            return Application.Current.Invoke(static () => SDL.HasGamepad());
         }
     }
 
@@ -32,7 +32,7 @@ public static class Gamepad
         get
         {
             EnsureInit();
-            return Refresh();
+            return Application.Current.Invoke(static () => Refresh());
         }
     }
 
@@ -88,8 +88,11 @@ public static class Gamepad
             snapshot = _cache;
             _cache = ImmutableDictionary<uint, GamepadDevice>.Empty;
         }
-        foreach (var d in snapshot.Values)
-            d.Dispose();
+        Application.Current.Invoke(() =>
+        {
+            foreach (var d in snapshot.Values)
+                d.Dispose();
+        });
     }
 
     internal static void Forget(GamepadId id)
@@ -184,17 +187,19 @@ public static class Gamepad
 
     private static void EnsureInit()
     {
-        _ = Application.Current;
         if (_initialized)
             return;
-        lock (_sync)
+        Application.Current.Invoke(static () =>
         {
-            if (_initialized)
-                return;
-            if (!SDL.InitSubSystem(SDL.InitFlags.Gamepad))
-                throw new InvalidOperationException(
-                    $"Failed to initialize the SDL Gamepad subsystem: {SDL.GetError()}");
-            _initialized = true;
-        }
+            lock (_sync)
+            {
+                if (_initialized)
+                    return;
+                if (!SDL.InitSubSystem(SDL.InitFlags.Gamepad))
+                    throw new InvalidOperationException(
+                        $"Failed to initialize the SDL Gamepad subsystem: {SDL.GetError()}");
+                _initialized = true;
+            }
+        });
     }
 }

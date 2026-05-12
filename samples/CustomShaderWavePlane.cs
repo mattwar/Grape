@@ -1,4 +1,4 @@
-﻿#:package Blitter@*-*
+#:package Blitter@*-*
 
 // Run this file directly with .NET 10 or later:
 //
@@ -132,11 +132,11 @@ var camera = new PerspectiveCamera
     Target = new Vector3(0f, 0f, 0f),
 };
 
-window.Rendering += (w, rd) =>
+await window.RunAsync(rd =>
 {
     rd.Camera = camera;
 
-    var t = (float)rd.ElapsedSinceStart.TotalSeconds;
+    var t = rd.ElapsedSecondsSinceStart;
 
     using (rd.PushState())
     {
@@ -155,13 +155,7 @@ window.Rendering += (w, rd) =>
                 0f),
         });
     }
-
-    w.Invalidate();
-};
-
-await window.WaitForCloseAsync();
-
-// ----- Per-draw args struct ------------------------------------------------
+});// ----- Per-draw args struct ------------------------------------------------
 //
 // Two slots, both vertex-stage:
 //   slot 0 = ViewProjection (Matrix4x4)
