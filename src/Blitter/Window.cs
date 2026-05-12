@@ -124,6 +124,22 @@ public abstract class Window : IDisposable
             throw new InvalidOperationException("Window is closed");
     }
 
+    // SDL window mutation/inspection must run on the application (event)
+    // thread to be cross-platform safe — Cocoa enforces this strictly,
+    // X11/Win32 are more forgiving but can race. These helpers marshal
+    // through Application.Invoke (no-op when already on the app thread).
+    private void OnApp(Action action)
+    {
+        if (IsClosed) return;
+        Application.Current.Invoke(action);
+    }
+
+    private T OnApp<T>(Func<T> func, T closedDefault)
+    {
+        if (IsClosed) return closedDefault;
+        return Application.Current.Invoke(func);
+    }
+
     /// <summary>
     /// Disposes this window, releasing its resources.
     /// Automatically called by <see cref="Close"/>
@@ -235,7 +251,7 @@ public abstract class Window : IDisposable
             if (IsClosed || value == null)
                 return;
             _icon = value;
-            SDL.SetWindowIcon(_window, value._imageId);
+            OnApp(() => SDL.SetWindowIcon(_window, value._imageId));
         }
     }
 
@@ -263,8 +279,6 @@ public abstract class Window : IDisposable
     {
         get
         {
-            if (IsClosed)
-                return WindowFlags.None;
             const ulong creationMask =
                 (ulong)WindowFlags.OpenGL
                 | (ulong)WindowFlags.External
@@ -276,7 +290,9 @@ public abstract class Window : IDisposable
                 | (ulong)WindowFlags.Vulkan
                 | (ulong)WindowFlags.Metal
                 | (ulong)WindowFlags.Transparent;
-            return (WindowFlags)((ulong)SDL.GetWindowFlags(_window) & creationMask);
+            return OnApp(
+                () => (WindowFlags)((ulong)SDL.GetWindowFlags(_window) & creationMask),
+                WindowFlags.None);
         }
     }
 
@@ -285,18 +301,8 @@ public abstract class Window : IDisposable
     /// </summary>
     public bool Focusable
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.NotFocusable) == 0;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowFocusable(_window, value);
-        }
+        get => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.NotFocusable) == 0, false);
+        set => OnApp(() => SDL.SetWindowFocusable(_window, value));
     }
 
     /// <summary>
@@ -304,19 +310,12 @@ public abstract class Window : IDisposable
     /// </summary>
     public (float Min, float Max) AspectRatio
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0);
             SDL.GetWindowAspectRatio(_window, out float minAspect, out float maxAspect);
             return (minAspect, maxAspect);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowAspectRatio(_window, value.Min, value.Max);
-        }
+        }, (0f, 0f));
+        set => OnApp(() => SDL.SetWindowAspectRatio(_window, value.Min, value.Max));
     }
 
     /// <summary>
@@ -324,191 +323,101 @@ public abstract class Window : IDisposable
     /// </summary>
     public bool Bordered
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Borderless) == 0;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowBordered(_window, value);
-        }
+        get => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Borderless) == 0, false);
+        set => OnApp(() => SDL.SetWindowBordered(_window, value));
     }
 
     /// <summary>True if the window can be resized by the user.</summary>
     public bool Resizable
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Resizable) != 0;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowResizable(_window, value);
-        }
+        get => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Resizable) != 0, false);
+        set => OnApp(() => SDL.SetWindowResizable(_window, value));
     }
 
     /// <summary>True if the window stays above all other windows.</summary>
     public bool AlwaysOnTop
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.AlwaysOnTop) != 0;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowAlwaysOnTop(_window, value);
-        }
+        get => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.AlwaysOnTop) != 0, false);
+        set => OnApp(() => SDL.SetWindowAlwaysOnTop(_window, value));
     }
 
     /// <summary>True if the window has captured the mouse cursor.</summary>
     public bool MouseGrabbed
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return SDL.GetWindowMouseGrab(_window);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowMouseGrab(_window, value);
-        }
+        get => OnApp(() => SDL.GetWindowMouseGrab(_window), false);
+        set => OnApp(() => SDL.SetWindowMouseGrab(_window, value));
     }
 
     /// <summary>True if the window has grabbed keyboard input.</summary>
     public bool KeyboardGrabbed
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return SDL.GetWindowKeyboardGrab(_window);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowKeyboardGrab(_window, value);
-        }
+        get => OnApp(() => SDL.GetWindowKeyboardGrab(_window), false);
+        set => OnApp(() => SDL.SetWindowKeyboardGrab(_window, value));
     }
 
     /// <summary>True if the window is in relative mouse mode.</summary>
     public bool RelativeMouseMode
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return SDL.GetWindowRelativeMouseMode(_window);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowRelativeMouseMode(_window, value);
-        }
+        get => OnApp(() => SDL.GetWindowRelativeMouseMode(_window), false);
+        set => OnApp(() => SDL.SetWindowRelativeMouseMode(_window, value));
     }
 
     /// <summary>True if the window is currently modal to its parent.</summary>
     public bool Modal
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Modal) != 0;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowModal(_window, value);
-        }
+        get => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Modal) != 0, false);
+        set => OnApp(() => SDL.SetWindowModal(_window, value));
     }
 
     /// <summary>True if the window is currently hidden.</summary>
-    public bool IsHidden =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Hidden) != 0;
+    public bool IsHidden
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Hidden) != 0, false);
 
     /// <summary>True if the window is currently minimized.</summary>
-    public bool IsMinimized =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Minimized) != 0;
+    public bool IsMinimized
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Minimized) != 0, false);
 
     /// <summary>True if the window is currently maximized.</summary>
-    public bool IsMaximized =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Maximized) != 0;
+    public bool IsMaximized
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Maximized) != 0, false);
 
     /// <summary>True if the window is currently occluded.</summary>
-    public bool IsOccluded =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Occluded) != 0;
+    public bool IsOccluded
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.Occluded) != 0, false);
 
     /// <summary>True if the window currently has keyboard input focus.</summary>
-    public bool HasInputFocus =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.InputFocus) != 0;
+    public bool HasInputFocus
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.InputFocus) != 0, false);
 
     /// <summary>True if the window currently has mouse focus.</summary>
-    public bool HasMouseFocus =>
-        !IsClosed && (SDL.GetWindowFlags(_window) & SDL.WindowFlags.MouseFocus) != 0;
+    public bool HasMouseFocus
+        => OnApp(() => (SDL.GetWindowFlags(_window) & SDL.WindowFlags.MouseFocus) != 0, false);
 
     /// <summary>
     /// The size of the window borders in pixels.
     /// </summary>
     public (int Top, int Left, int Bottom, int Right) BorderSize
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0, 0, 0);
             SDL.GetWindowBordersSize(_window, out int top, out int left, out int bottom, out int right);
             return (top, left, bottom, right);
-        }
+        }, (0, 0, 0, 0));
     }
 
     /// <summary>
     /// The scale factor for the window's display.
     /// </summary>
     public float DisplayScale
-    {
-        get
-        {
-            if (IsClosed)
-                return 1.0f;
-            return SDL.GetWindowDisplayScale(_window);
-        }
-    }
+        => OnApp(() => SDL.GetWindowDisplayScale(_window), 1.0f);
 
     /// <summary>
     /// True if the window is in full-screen mode.
     /// </summary>
     public bool FullScreen
     {
-        get
-        {
-            if (IsClosed)
-                return false;
-            return SDL.GetWindowFullscreenMode(_window) != null;
-        }
-
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowFullscreen(_window, value);
-        }
+        get => OnApp(() => SDL.GetWindowFullscreenMode(_window) != null, false);
+        set => OnApp(() => SDL.SetWindowFullscreen(_window, value));
     }
 
     /// <summary>
@@ -516,20 +425,10 @@ public abstract class Window : IDisposable
     /// </summary>
     public DisplayMode FullScreenMode
     {
-        get
-        {
-            if (IsClosed)
-                return default;
-            return SDL.GetWindowFullscreenMode(_window) is { } mode
-                ? new DisplayMode(mode)
-                : default;
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowFullscreenMode(_window, value._mode);
-        }
+        get => OnApp(() => SDL.GetWindowFullscreenMode(_window) is { } mode
+            ? new DisplayMode(mode)
+            : default, default);
+        set => OnApp(() => SDL.SetWindowFullscreenMode(_window, value._mode));
     }
 
     /// <summary>
@@ -537,19 +436,12 @@ public abstract class Window : IDisposable
     /// </summary>
     public (int Width, int Height) MinimumSize
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0);
             SDL.GetWindowMinimumSize(_window, out int width, out int height);
             return (width, height);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowMinimumSize(_window, value.Width, value.Height);
-        }
+        }, (0, 0));
+        set => OnApp(() => SDL.SetWindowMinimumSize(_window, value.Width, value.Height));
     }
 
     /// <summary>
@@ -557,65 +449,37 @@ public abstract class Window : IDisposable
     /// </summary>
     public (int Width, int Height) MaximumSize
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0);
             SDL.GetWindowMaximumSize(_window, out int width, out int height);
             return (width, height);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowMaximumSize(_window, value.Width, value.Height);
-        }
+        }, (0, 0));
+        set => OnApp(() => SDL.SetWindowMaximumSize(_window, value.Width, value.Height));
     }
 
     /// <summary>
     /// The pixel density of the window.
     /// </summary>
     public float PixelDensity
-    {
-        get
-        {
-            if (IsClosed)
-                return 1;
-            return SDL.GetWindowPixelDensity(_window);
-        }
-    }
+        => OnApp(() => SDL.GetWindowPixelDensity(_window), 1f);
 
     /// <summary>
     /// The pixel format of the window.
     /// </summary>
     public PixelFormat PixelFormat
-    {
-        get
-        {
-            if (IsClosed)
-                return PixelFormat.Unknown;
-            return (PixelFormat)SDL.GetWindowPixelFormat(_window);
-        }
-    }
+        => OnApp(() => (PixelFormat)SDL.GetWindowPixelFormat(_window), PixelFormat.Unknown);
 
     /// <summary>
     /// The position of the window in the multi-display space.
     /// </summary>
     public (int X, int Y) Position
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0);
             SDL.GetWindowPosition(_window, out int x, out int y);
             return (x, y);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowPosition(_window, value.X, value.Y);
-        }
+        }, (0, 0));
+        set => OnApp(() => SDL.SetWindowPosition(_window, value.X, value.Y));
     }
 
     /// <summary>
@@ -623,19 +487,12 @@ public abstract class Window : IDisposable
     /// </summary>
     public (int Width, int Height) Size
     {
-        get
+        get => OnApp(() =>
         {
-            if (IsClosed)
-                return (0, 0);
             SDL.GetWindowSize(_window, out int width, out int height);
             return (width, height);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowSize(_window, value.Width, value.Height);
-        }
+        }, (0, 0));
+        set => OnApp(() => SDL.SetWindowSize(_window, value.Width, value.Height));
     }
 
     /// <summary>
@@ -643,67 +500,33 @@ public abstract class Window : IDisposable
     /// </summary>
     public string Title
     {
-        get
-        {
-            if (IsClosed)
-                return "";
-            return SDL.GetWindowTitle(_window);
-        }
-        set
-        {
-            if (IsClosed)
-                return;
-            SDL.SetWindowTitle(_window, value);
-        }
+        get => OnApp(() => SDL.GetWindowTitle(_window), "");
+        set => OnApp(() => SDL.SetWindowTitle(_window, value));
     }
     #endregion
 
     #region Window state methods
 
     /// <summary>Shows the window if it was hidden.</summary>
-    public void Show()
-    {
-        if (IsClosed) return;
-        SDL.ShowWindow(_window);
-    }
+    public void Show() => OnApp(() => SDL.ShowWindow(_window));
 
     /// <summary>Hides the window without destroying it.</summary>
-    public void Hide()
-    {
-        if (IsClosed) return;
-        SDL.HideWindow(_window);
-    }
+    public void Hide() => OnApp(() => SDL.HideWindow(_window));
 
     /// <summary>Minimizes the window to the taskbar/dock.</summary>
-    public void Minimize()
-    {
-        if (IsClosed) return;
-        SDL.MinimizeWindow(_window);
-    }
+    public void Minimize() => OnApp(() => SDL.MinimizeWindow(_window));
 
     /// <summary>Maximizes the window to fill its display.</summary>
-    public void Maximize()
-    {
-        if (IsClosed) return;
-        SDL.MaximizeWindow(_window);
-    }
+    public void Maximize() => OnApp(() => SDL.MaximizeWindow(_window));
 
     /// <summary>
     /// Restores the window from a minimized or maximized state to its
     /// previous size and position.
     /// </summary>
-    public void Restore()
-    {
-        if (IsClosed) return;
-        SDL.RestoreWindow(_window);
-    }
+    public void Restore() => OnApp(() => SDL.RestoreWindow(_window));
 
     /// <summary>Brings the window above other windows and gives it focus.</summary>
-    public void Raise()
-    {
-        if (IsClosed) return;
-        SDL.RaiseWindow(_window);
-    }
+    public void Raise() => OnApp(() => SDL.RaiseWindow(_window));
 
     #endregion
 

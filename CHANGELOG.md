@@ -167,8 +167,18 @@ All notable changes to this project will be documented in this file.
   `Digits`, `UppercaseLatin`, `LowercaseLatin`).
 - New samples: `SkiaCanvas`, `SkiaBitmap`, `FontText` showcasing the
   SkiaSharp rendering integration and `Blitter.Bits.Font`.
+- `Application.Invoke(Action)` / `Invoke<T>(Func<T>)` marshal work to
+  the application thread without the `SendOrPostCallback` ceremony;
+  short-circuits when called from the app thread.
 
 ### Changed
+- `Clipboard`, `Window` SDL-backed properties (`Title`, `Size`,
+  `Position`, `FullScreen`, `Bordered`, `Resizable`, `Modal`, etc.)
+  and state methods (`Show`/`Hide`/`Minimize`/`Maximize`/`Restore`/
+  `Raise`), and `Gamepad.HasGamepad`/`Devices`/`Reset` now self-marshal
+  to the application thread, so they're safe to call from any thread
+  (including `RunAsync` loop bodies and `await` continuations) on
+  every platform.
 - Renamed `ShaderSet`/`ShaderSet<>`/`ShaderSet<,>` to
   `Shader`/`Shader<>`/`Shader<,>` and `ShaderSets` to `Shaders`.
 - Renamed `InstancedShaderSet<,,>` to `Shader<,,>` (a sibling of

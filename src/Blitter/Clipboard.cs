@@ -2,6 +2,8 @@ namespace Blitter;
 
 /// <summary>
 /// Access to the system clipboard. All operations are UTF-8 friendly.
+/// Calls are safe from any thread; they marshal to the application thread
+/// internally.
 /// </summary>
 public static class Clipboard
 {
@@ -12,18 +14,16 @@ public static class Clipboard
     /// </summary>
     public static string Text
     {
-        get
-        {
-            _ = Application.Current;
-            return SDL.GetClipboardText();
-        }
+        get => Application.Current.Invoke(static () => SDL.GetClipboardText());
         set
         {
-            _ = Application.Current;
             ArgumentNullException.ThrowIfNull(value);
-            if (!SDL.SetClipboardText(value))
-                throw new InvalidOperationException(
-                    $"Failed to set clipboard text: {SDL.GetError()}");
+            Application.Current.Invoke(() =>
+            {
+                if (!SDL.SetClipboardText(value))
+                    throw new InvalidOperationException(
+                        $"Failed to set clipboard text: {SDL.GetError()}");
+            });
         }
     }
 
@@ -31,13 +31,7 @@ public static class Clipboard
     /// True if the clipboard currently contains a non-empty text string.
     /// </summary>
     public static bool HasText
-    {
-        get
-        {
-            _ = Application.Current;
-            return SDL.HasClipboardText();
-        }
-    }
+        => Application.Current.Invoke(static () => SDL.HasClipboardText());
 
     /// <summary>
     /// True if the clipboard currently has data of the given MIME type.
@@ -45,22 +39,18 @@ public static class Clipboard
     public static bool Has(string mimeType)
     {
         ArgumentException.ThrowIfNullOrEmpty(mimeType);
-        _ = Application.Current;
-        return SDL.HasClipboardData(mimeType);
+        return Application.Current.Invoke(() => SDL.HasClipboardData(mimeType));
     }
 
     /// <summary>
     /// The MIME types currently advertised by the clipboard.
     /// </summary>
     public static IReadOnlyList<string> MimeTypes
-    {
-        get
+        => Application.Current.Invoke(static () =>
         {
-            _ = Application.Current;
             var types = SDL.GetClipboardMimeTypes(out _);
-            return types ?? System.Array.Empty<string>();
-        }
-    }
+            return (IReadOnlyList<string>)(types ?? System.Array.Empty<string>());
+        });
 
     /// <summary>
     /// Returns the clipboard data for the given MIME type, or null if there
@@ -69,23 +59,25 @@ public static class Clipboard
     public static byte[]? Get(string mimeType)
     {
         ArgumentException.ThrowIfNullOrEmpty(mimeType);
-        _ = Application.Current;
-        var ptr = SDL.GetClipboardData(mimeType, out var size);
-        if (ptr == 0)
-            return null;
-        try
+        return Application.Current.Invoke(() =>
         {
-            var len = (int)size;
-            if (len <= 0)
-                return System.Array.Empty<byte>();
-            var buffer = new byte[len];
-            System.Runtime.InteropServices.Marshal.Copy(ptr, buffer, 0, len);
-            return buffer;
-        }
-        finally
-        {
-            SDL.Free(ptr);
-        }
+            var ptr = SDL.GetClipboardData(mimeType, out var size);
+            if (ptr == 0)
+                return null;
+            try
+            {
+                var len = (int)size;
+                if (len <= 0)
+                    return System.Array.Empty<byte>();
+                var buffer = new byte[len];
+                System.Runtime.InteropServices.Marshal.Copy(ptr, buffer, 0, len);
+                return buffer;
+            }
+            finally
+            {
+                SDL.Free(ptr);
+            }
+        });
     }
 
     /// <summary>
@@ -93,10 +85,12 @@ public static class Clipboard
     /// </summary>
     public static void Clear()
     {
-        _ = Application.Current;
-        if (!SDL.ClearClipboardData())
-            throw new InvalidOperationException(
-                $"Failed to clear clipboard: {SDL.GetError()}");
+        Application.Current.Invoke(static () =>
+        {
+            if (!SDL.ClearClipboardData())
+                throw new InvalidOperationException(
+                    $"Failed to clear clipboard: {SDL.GetError()}");
+        });
     }
 
     /// <summary>
@@ -110,29 +104,18 @@ public static class Clipboard
         /// True if the primary selection contains a non-empty text string.
         /// </summary>
         public static bool HasText
-        {
-            get
-            {
-                _ = Application.Current;
-                return SDL.HasPrimarySelectionText();
-            }
-        }
+            => Application.Current.Invoke(static () => SDL.HasPrimarySelectionText());
 
         /// <summary>
         /// Gets or sets the UTF-8 text in the primary selection.
         /// </summary>
         public static string Text
         {
-            get
-            {
-                _ = Application.Current;
-                return SDL.GetPrimarySelectionText();
-            }
+            get => Application.Current.Invoke(static () => SDL.GetPrimarySelectionText());
             set
             {
-                _ = Application.Current;
                 ArgumentNullException.ThrowIfNull(value);
-                SDL.SetPrimarySelectionText(value);
+                Application.Current.Invoke(() => SDL.SetPrimarySelectionText(value));
             }
         }
     }
