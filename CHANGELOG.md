@@ -77,8 +77,31 @@ All notable changes to this project will be documented in this file.
 - `Renderer3D.DrawMesh<TVertex,TArgs,TInstance>` (textured, scene-aware):
   composes camera/lights into the per-call args via `IUniformArgs` then
   forwards to the existing `DrawMeshRaw` instanced path.
+- `Cubemap.RenderFace` / `Cubemap.RenderAllFaces`: render a 3D scene
+  into one or all faces of a cubemap, mirroring `Image.Render3D`.
+  Synchronous; bumps `Version` so subsequent binds re-upload.
+- `CubeFace` enum + `CubeFaceExtensions.GetForward` / `GetUp` /
+  `All` for driving a per-face camera during cubemap bakes.
+- `Cubemaps` static class (Blitter.Bits): catalog of process-shared
+  cubemaps. Exposes a default `Sky` (procedural zenith/horizon/
+  ground gradient + sun disc), a generic `Bake(faceSize, dir→color)`
+  builder, and a parameterised `BakeSky(...)` for custom palettes.
+- `Cubemaps.SkyIrradiance` + `Cubemaps.BakeIrradiance(source, ...)`:
+  diffuse-IBL irradiance map. Cosine-weighted hemisphere integral
+  via Hammersley + tangent-frame importance sampling. Sample by
+  surface normal for the diffuse environment term.
 
 ### Changed
+- `Image.Render3D` now reports the destination image's own
+  dimensions and aspect ratio to the renderer (previously inherited
+  a 16:9 fallback, which silently squished scenes rendered into
+  non-16:9 images).
+- `Image.Render3D` now honors the destination image's `PixelFormat`
+  instead of always rendering to an 8-bit `R8G8B8A8Unorm` target.
+  `PixelFormat.RGBA64Float` images render into a half-float GPU
+  target (no precision loss); other 8-bit RGBA variants keep the
+  existing per-pixel conversion path. Foundational for upcoming
+  HDR / IBL bakes.
 - **Breaking.** `Submesh` renamed to `ModelPart` and `Model.Submeshes`
   to `Model.Parts`. The type describes a *part of a model* (a
   `Mesh` + `Material` + optional `Name`), not a kind of `Mesh` --

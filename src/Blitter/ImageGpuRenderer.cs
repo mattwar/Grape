@@ -1,12 +1,7 @@
 namespace Blitter;
 
 /// <summary>
-/// A 3D renderer that draws into a CPU-resident <see cref="Image"/>
-/// instead of a window swapchain. Each <see cref="Renderer3D.Render"/>
-/// flushes the queued draws to a GPU-side off-screen color target, then
-/// downloads the result and copies it into the image's pixel bytes
-/// before returning. The renderer holds its own GPU color/depth
-/// textures and download buffer for the lifetime of the instance.
+/// A 3D renderer that draws into an image.
 /// </summary>
 internal sealed class ImageGpuRenderer : GpuRenderer
 {
@@ -14,17 +9,21 @@ internal sealed class ImageGpuRenderer : GpuRenderer
     // bytes R, G, B, A. SDL's PixelFormat.ABGR8888 -- a packed uint32
     // with A in the high byte -- has the same byte order on
     // little-endian platforms, so we can memcpy texels straight into
-    // the surface (the "fast path"). Any other PixelFormat takes the
-    // "slow path": per-pixel Get/Set against the user's image, with
-    // SDL's mapping doing the format conversion the same way our
-    // SkiaSharp bridge does.
-    private const PixelFormat FastPathFormat = PixelFormat.ABGR8888;
-    private const SDL.GPUTextureFormat ColorTargetFormat = SDL.GPUTextureFormat.R8G8B8A8Unorm;
+    // the surface (the "fast path"). RGBA64Float maps to
+    // R16G16B16A16Float and also direct-copies because the half-float
+    // byte order matches. Any other PixelFormat takes the "slow path":
+    // the GPU target stays R8G8B8A8Unorm and per-pixel Get/Set against
+    // the user's image converts to/from the surface's native layout.
 
     private readonly Image _image;
     private readonly uint _width;
     private readonly uint _height;
     private readonly bool _directCopy;
+    private readonly SDL.GPUTextureFormat _colorTargetFormat;
+    // Bytes per pixel for the GPU color target. Equals the image's
+    // BytesPerPixel on the direct-copy path; equals 4 on the slow path
+    // (the GPU target is R8G8B8A8Unorm regardless).
+    private readonly uint _gpuBpp;
     private GpuTexture? _ownedColorTarget;
     private GpuDownloadBuffer? _downloadBuffer;
     // Lazily created when the user requests additive rendering: holds
@@ -46,14 +45,15 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         _image = image;
         _width = (uint)image.Size.Width;
         _height = (uint)image.Size.Height;
-        _directCopy = image.PixelFormat == FastPathFormat;
+        (_colorTargetFormat, _directCopy) = MapPixelFormatToGpu(image.PixelFormat);
+        _gpuBpp = _directCopy ? (uint)image.BytesPerPixel : 4u;
 
-        var pixelBytes = checked(_width * _height * 4u);
+        var pixelBytes = checked(_width * _height * _gpuBpp);
 
         _ownedColorTarget = device.CreateTexture(new GpuTextureCreateInfo
         {
             Type = SDL.GPUTextureType.Texturetype2D,
-            Format = ColorTargetFormat,
+            Format = _colorTargetFormat,
             // Sampler usage is included so the resulting texture could
             // be re-bound as input to a later pass on the same device;
             // ColorTarget alone would be enough for write-only usage.
@@ -66,6 +66,43 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         });
         _downloadBuffer = GpuDownloadBuffer.Create(device, pixelBytes);
     }
+
+    protected override float GetTargetAspectRatio() =>
+        _height > 0 ? (float)_width / _height : base.GetTargetAspectRatio();
+
+    protected override (int Width, int Height) GetTargetSize() =>
+        ((int)_width, (int)_height);
+
+    // Picks the GPU color target format for an image of the given
+    // surface pixel format, and reports whether the GPU bytes and the
+    // surface bytes have identical layout (so a render pass result can
+    // be memcpy'd straight into the surface). Throws for formats with
+    // no GPU equivalent we know how to render into.
+    private static (SDL.GPUTextureFormat Format, bool DirectCopy) MapPixelFormatToGpu(PixelFormat format) => 
+        format switch
+        {
+            // Surface bytes R, G, B, A; matches R8G8B8A8Unorm exactly.
+            PixelFormat.ABGR8888 => (SDL.GPUTextureFormat.R8G8B8A8Unorm, true),
+
+            // Surface bytes R, G, B, A as little-endian half-floats;
+            // matches R16G16B16A16Float exactly.
+            PixelFormat.RGBA64Float => (SDL.GPUTextureFormat.R16G16B16A16Float, true),
+
+            // Other 8-bit-per-channel layouts: render into R8G8B8A8Unorm
+            // and pay per-pixel conversion on upload/download.
+            PixelFormat.ARGB8888 or
+            PixelFormat.BGRA8888 or
+            PixelFormat.RGBA8888 or
+            PixelFormat.XRGB8888 or
+            PixelFormat.XBGR8888 or
+            PixelFormat.RGBX8888 or
+            PixelFormat.BGRX8888 => (SDL.GPUTextureFormat.R8G8B8A8Unorm, false),
+
+            _ => throw new NotSupportedException(
+                $"Pixel format {format} is not supported as a GPU render target. " +
+                "Use ABGR8888 (default) or RGBA64Float, or one of the 8-bit-per-" +
+                "channel RGBA variants."),
+        };
 
     /// <summary>
     /// Configures the renderer for either a clear-then-draw frame
@@ -109,7 +146,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         if (!_uploadWallpaper || _ownedColorTarget is null || _ownedColorTarget.IsDisposed)
             return;
 
-        var byteCount = checked((uint)(_width * _height * 4));
+        var byteCount = checked(_width * _height * _gpuBpp);
 
         // Allocate the upload staging buffer once per renderer
         // instance; reused across frames if the user calls Render
@@ -157,7 +194,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         }
 
         colorTarget = _ownedColorTarget;
-        colorFormat = ColorTargetFormat;
+        colorFormat = _colorTargetFormat;
         width = _width;
         height = _height;
         return true;
@@ -194,7 +231,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         using var fence = frame.SubmitAndAcquireFence();
         fence.Wait();
 
-        var pixelBytes = checked((int)(_width * _height * 4u));
+        var pixelBytes = checked((int)(_width * _height * _gpuBpp));
         if (_directCopy)
         {
             // Fast path: GPU's R,G,B,A bytes match the image's

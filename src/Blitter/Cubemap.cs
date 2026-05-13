@@ -35,41 +35,54 @@ public sealed class Cubemap
     private int _version;
 
     private Cubemap(
-        Image positiveX, Image negativeX,
-        Image positiveY, Image negativeY,
-        Image positiveZ, Image negativeZ,
+        MipmappedImage positiveX, MipmappedImage negativeX,
+        MipmappedImage positiveY, MipmappedImage negativeY,
+        MipmappedImage positiveZ, MipmappedImage negativeZ,
         bool mipmaps)
     {
-        PositiveX = positiveX;
-        NegativeX = negativeX;
-        PositiveY = positiveY;
-        NegativeY = negativeY;
-        PositiveZ = positiveZ;
-        NegativeZ = negativeZ;
+        PositiveXLevels = positiveX;
+        NegativeXLevels = negativeX;
+        PositiveYLevels = positiveY;
+        NegativeYLevels = negativeY;
+        PositiveZLevels = positiveZ;
+        NegativeZLevels = negativeZ;
         Mipmaps = mipmaps;
         _version = 1;
 
-        var (size, _) = positiveX.Size;
-        Size = size;
+        Size = positiveX.Width;
         Format = positiveX.PixelFormat;
+        LevelCount = positiveX.LevelCount;
     }
 
     /// <summary>The +X face: looking toward world +X (right).</summary>
-    public Image PositiveX { get; }
+    public Image PositiveX => PositiveXLevels.Base;
     /// <summary>The -X face: looking toward world -X (left).</summary>
-    public Image NegativeX { get; }
+    public Image NegativeX => NegativeXLevels.Base;
     /// <summary>The +Y face: looking toward world +Y (up).</summary>
-    public Image PositiveY { get; }
+    public Image PositiveY => PositiveYLevels.Base;
     /// <summary>The -Y face: looking toward world -Y (down).</summary>
-    public Image NegativeY { get; }
+    public Image NegativeY => NegativeYLevels.Base;
     /// <summary>The +Z face: looking toward world +Z (forward in a left-handed system, backward in a right-handed system).</summary>
-    public Image PositiveZ { get; }
+    public Image PositiveZ => PositiveZLevels.Base;
     /// <summary>The -Z face: looking toward world -Z.</summary>
-    public Image NegativeZ { get; }
+    public Image NegativeZ => NegativeZLevels.Base;
+
+    /// <summary>The +X face's mip chain.</summary>
+    public MipmappedImage PositiveXLevels { get; }
+    /// <summary>The -X face's mip chain.</summary>
+    public MipmappedImage NegativeXLevels { get; }
+    /// <summary>The +Y face's mip chain.</summary>
+    public MipmappedImage PositiveYLevels { get; }
+    /// <summary>The -Y face's mip chain.</summary>
+    public MipmappedImage NegativeYLevels { get; }
+    /// <summary>The +Z face's mip chain.</summary>
+    public MipmappedImage PositiveZLevels { get; }
+    /// <summary>The -Z face's mip chain.</summary>
+    public MipmappedImage NegativeZLevels { get; }
 
     /// <summary>
-    /// Edge length of every face, in pixels. All six faces are square
-    /// and share this size.
+    /// Edge length of every face's base mip level, in pixels. All six
+    /// faces are square and share this size.
     /// </summary>
     public int Size { get; }
 
@@ -77,6 +90,13 @@ public sealed class Cubemap
     /// Pixel format shared by all six faces.
     /// </summary>
     public PixelFormat Format { get; }
+
+    /// <summary>
+    /// Number of mip levels supplied per face. <c>1</c> means only a
+    /// base level was provided. When <c>&gt; 1</c>, every face's
+    /// <see cref="MipmappedImage.LevelCount"/> is this same value.
+    /// </summary>
+    public int LevelCount { get; }
 
     /// <summary>
     /// When <c>true</c>, hints to renderers to generate a full mipmap
@@ -99,6 +119,74 @@ public sealed class Cubemap
     public void Invalidate()
     {
         unchecked { _version++; }
+    }
+
+    /// <summary>
+    /// Returns the face image identified by <paramref name="face"/>.
+    /// </summary>
+    public Image GetFace(CubeFace face) => face switch
+    {
+        CubeFace.PositiveX => PositiveX,
+        CubeFace.NegativeX => NegativeX,
+        CubeFace.PositiveY => PositiveY,
+        CubeFace.NegativeY => NegativeY,
+        CubeFace.PositiveZ => PositiveZ,
+        CubeFace.NegativeZ => NegativeZ,
+        _ => throw new ArgumentOutOfRangeException(nameof(face), face, null),
+    };
+
+    /// <summary>
+    /// Renders into one face of the cubemap using a 3D renderer,
+    /// clearing the face first to <paramref name="backgroundColor"/>.
+    /// The call is synchronous: when it returns, the face image's
+    /// pixels reflect the final GPU output and the cubemap's
+    /// <see cref="Version"/> has been bumped so the next bind
+    /// re-uploads.
+    /// </summary>
+    /// <param name="face">The cubemap face to render into.</param>
+    /// <param name="backgroundColor">The background painted behind the draws.</param>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    /// <remarks>
+    /// Caller is responsible for setting the renderer's camera --
+    /// typically a 90°-FOV <see cref="PerspectiveCamera"/> with
+    /// <c>Target</c> / <c>Up</c> from <see cref="CubeFaceExtensions.GetForward"/>
+    /// and <see cref="CubeFaceExtensions.GetUp"/>.
+    /// </remarks>
+    public void RenderFace(CubeFace face, Color backgroundColor, Action<Renderer3D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        GetFace(face).Render3D(backgroundColor, renderAction);
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Renders into one face of the cubemap using a 3D renderer,
+    /// preserving the face's existing pixels as a wallpaper behind
+    /// the draws. The call is synchronous.
+    /// </summary>
+    /// <param name="face">The cubemap face to render into.</param>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    public void RenderFace(CubeFace face, Action<Renderer3D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        GetFace(face).Render3D(renderAction);
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Renders all six faces in turn, clearing each first to
+    /// <paramref name="backgroundColor"/> and invoking
+    /// <paramref name="renderAction"/> with the active face. Call is
+    /// synchronous; the cubemap is invalidated once at the end.
+    /// </summary>
+    /// <param name="backgroundColor">Background painted behind each face's draws.</param>
+    /// <param name="renderAction">Callback invoked once per face.</param>
+    public void RenderAllFaces(Color backgroundColor, Action<CubeFace, Renderer3D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        foreach (var face in CubeFaceExtensions.All)
+            GetFace(face).Render3D(backgroundColor, rd => renderAction(face, rd));
+        Invalidate();
     }
 
     /// <summary>
@@ -129,34 +217,81 @@ public sealed class Cubemap
         ArgumentNullException.ThrowIfNull(positiveZ);
         ArgumentNullException.ThrowIfNull(negativeZ);
 
-        var (w, h) = positiveX.Size;
+        return Create(
+            MipmappedImage.FromBase(positiveX),
+            MipmappedImage.FromBase(negativeX),
+            MipmappedImage.FromBase(positiveY),
+            MipmappedImage.FromBase(negativeY),
+            MipmappedImage.FromBase(positiveZ),
+            MipmappedImage.FromBase(negativeZ),
+            mipmaps);
+    }
+
+    /// <summary>
+    /// Builds a cubemap from six face mip chains. Each face must have
+    /// a square base level, all faces must share their base level
+    /// size, <see cref="PixelFormat"/>, and number of mip levels.
+    /// </summary>
+    /// <param name="positiveX">Mip chain for the +X face.</param>
+    /// <param name="negativeX">Mip chain for the -X face.</param>
+    /// <param name="positiveY">Mip chain for the +Y face.</param>
+    /// <param name="negativeY">Mip chain for the -Y face.</param>
+    /// <param name="positiveZ">Mip chain for the +Z face.</param>
+    /// <param name="negativeZ">Mip chain for the -Z face.</param>
+    /// <param name="mipmaps">
+    /// When <c>true</c> AND each face is a single-level chain,
+    /// renderers will auto-generate a mip chain by downsampling the
+    /// base. Ignored when the supplied chains already have more than
+    /// one level (the explicit content always wins).
+    /// </param>
+    public static Cubemap Create(
+        MipmappedImage positiveX, MipmappedImage negativeX,
+        MipmappedImage positiveY, MipmappedImage negativeY,
+        MipmappedImage positiveZ, MipmappedImage negativeZ,
+        bool mipmaps = false)
+    {
+        ArgumentNullException.ThrowIfNull(positiveX);
+        ArgumentNullException.ThrowIfNull(negativeX);
+        ArgumentNullException.ThrowIfNull(positiveY);
+        ArgumentNullException.ThrowIfNull(negativeY);
+        ArgumentNullException.ThrowIfNull(positiveZ);
+        ArgumentNullException.ThrowIfNull(negativeZ);
+
+        int w = positiveX.Width;
+        int h = positiveX.Height;
         if (w != h)
             throw new ArgumentException(
-                $"Cubemap faces must be square; +X face is {w}x{h}.",
+                $"Cubemap faces must be square; +X base is {w}x{h}.",
                 nameof(positiveX));
 
         var format = positiveX.PixelFormat;
+        var levelCount = positiveX.LevelCount;
         var faces = new[]
         {
-            (Name: "negativeX", Image: negativeX),
-            (Name: "positiveY", Image: positiveY),
-            (Name: "negativeY", Image: negativeY),
-            (Name: "positiveZ", Image: positiveZ),
-            (Name: "negativeZ", Image: negativeZ),
+            (Name: "negativeX", Chain: negativeX),
+            (Name: "positiveY", Chain: positiveY),
+            (Name: "negativeY", Chain: negativeY),
+            (Name: "positiveZ", Chain: positiveZ),
+            (Name: "negativeZ", Chain: negativeZ),
         };
-        foreach (var (name, image) in faces)
+        foreach (var (name, chain) in faces)
         {
-            var (fw, fh) = image.Size;
-            if (fw != w || fh != h)
+            if (chain.Width != w || chain.Height != h)
                 throw new ArgumentException(
-                    $"All cubemap faces must have the same dimensions; +X is {w}x{h} but {name} is {fw}x{fh}.",
+                    $"All cubemap faces must share base size; +X is {w}x{h} but {name} is {chain.Width}x{chain.Height}.",
                     name);
-            if (image.PixelFormat != format)
+            if (chain.PixelFormat != format)
                 throw new ArgumentException(
-                    $"All cubemap faces must share the same PixelFormat; +X is {format} but {name} is {image.PixelFormat}.",
+                    $"All cubemap faces must share PixelFormat; +X is {format} but {name} is {chain.PixelFormat}.",
+                    name);
+            if (chain.LevelCount != levelCount)
+                throw new ArgumentException(
+                    $"All cubemap faces must have the same mip-level count; +X has {levelCount} but {name} has {chain.LevelCount}.",
                     name);
         }
 
-        return new Cubemap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ, mipmaps);
+        // Explicit multi-level chains supersede the auto-generate flag.
+        bool effectiveAutoMip = mipmaps && levelCount == 1;
+        return new Cubemap(positiveX, negativeX, positiveY, negativeY, positiveZ, negativeZ, effectiveAutoMip);
     }
 }
