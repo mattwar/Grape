@@ -57,7 +57,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private GpuSampler? _cubemapSampler;
-    private Image? _debugFontAtlas;
+    private BitmapImage? _debugFontAtlas;
 
     // Textures whose base mip level was just (re)uploaded this frame and
     // need their mip chain regenerated. Drained after the copy pass closes,
@@ -961,7 +961,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             in argsTransform);
     }
 
-    private Image GetDebugFontAtlas()
+    private BitmapImage GetDebugFontAtlas()
     {
         if (_debugFontAtlas is { IsDisposed: false })
             return _debugFontAtlas;
@@ -1580,6 +1580,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private void EnsureTextureUploaded(GpuCopyPass copyPass, Image image)
     {
+        if (image is not BitmapImage bitmap)
+            throw new NotSupportedException(
+                $"GpuRenderer texture upload only supports {nameof(BitmapImage)} sources today; got {image.GetType().Name}.");
+        EnsureTextureUploadedCore(copyPass, bitmap);
+    }
+
+    private void EnsureTextureUploadedCore(GpuCopyPass copyPass, BitmapImage image)
+    {
         for (int i = 0; i < _textureResources.Count; i++)
         {
             var entry = _textureResources[i];
@@ -1775,7 +1783,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         for (uint layer = 0; layer < 6; layer++)
         {
-            var pixels = faces[layer].GetPixels();
+            // CPU upload requires a BitmapImage face; see Cubemap.GetBitmapFace.
+            if (faces[layer] is not BitmapImage bitmapFace)
+                throw new NotSupportedException(
+                    $"Cubemap face {(CubeFace)layer} is not a BitmapImage; " +
+                    $"GPU upload of non-bitmap cubemap faces is not yet supported.");
+            var pixels = bitmapFace.GetPixels();
             // One-shot upload buffer per face. The cubemap path is not
             // a per-frame hot path, so allocating six small buffers and
             // disposing them is fine; pooling can come later if needed.
@@ -1929,7 +1942,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // image's per-pixel accessor, which knows how to decode any SDL
     // surface format. The caller MUST pass the returned `rented` array
     // back to ReleaseUploadBytes after the upload is queued.
-    private static ReadOnlySpan<byte> GetUploadBytes(Image image, out byte[]? rented)
+    private static ReadOnlySpan<byte> GetUploadBytes(BitmapImage image, out byte[]? rented)
     {
         var fmt = image.PixelFormat;
         if (fmt == PixelFormat.ABGR8888 || fmt == PixelFormat.ARGB8888)

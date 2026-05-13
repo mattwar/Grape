@@ -9,7 +9,7 @@ public class ImageTransformTests
     //   src layout (x,y) -> color:
     //   (0,0) red       (1,0) green      (2,0) blue
     //   (0,1) yellow    (1,1) magenta    (2,1) cyan
-    private static (Image image, Color[,] expected) BuildSample()
+    private static (BitmapImage image, Color[,] expected) BuildSample()
     {
         var img = Image.Create(3, 2, PixelFormat.RGBA8888);
         var grid = new Color[3, 2];

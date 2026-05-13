@@ -1,27 +1,10 @@
 namespace Blitter;
 
 /// <summary>
-/// An image with an explicit mip chain: a base level plus one or more
+/// An image with an explicit mip chain: a base image plus one or more
 /// successively-halved lower-resolution levels supplied by the caller.
-/// Used when each mip level carries different content (e.g. a
-/// prefiltered specular environment map, where mip N is the
-/// environment blurred for roughness N), rather than just a
-/// downsampled copy of the base.
 /// </summary>
-/// <remarks>
-/// <para>
-/// For the much more common case of "I want renderers to generate a
-/// mip chain by downsampling my image", set
-/// <see cref="Image.Mipmaps"/> on a plain <see cref="Image"/> instead;
-/// this type is only needed when the chain's contents are non-trivial.
-/// </para>
-/// <para>
-/// Mip levels are zero-indexed: <see cref="Base"/> is level 0; each
-/// subsequent level has dimensions <c>max(1, prev / 2)</c>. The chain
-/// does not have to descend all the way to 1×1.
-/// </para>
-/// </remarks>
-public sealed class MipmappedImage
+public sealed class MipmappedImage : Image
 {
     private MipmappedImage(IReadOnlyList<Image> levels)
     {
@@ -37,17 +20,52 @@ public sealed class MipmappedImage
     /// <summary>The highest-resolution level (mip 0).</summary>
     public Image Base => Levels[0];
 
-    /// <summary>Number of mip levels in the chain. Always at least 1.</summary>
-    public int LevelCount => Levels.Count;
+    /// <inheritdoc/>
+    public override int LevelCount => Levels.Count;
 
-    /// <summary>Width of the base level, in pixels.</summary>
-    public int Width => Base.Size.Width;
+    /// <inheritdoc/>
+    public override int Width => Base.Width;
 
-    /// <summary>Height of the base level, in pixels.</summary>
-    public int Height => Base.Size.Height;
+    /// <inheritdoc/>
+    public override int Height => Base.Height;
 
-    /// <summary>Pixel format shared by every level.</summary>
-    public PixelFormat PixelFormat => Base.PixelFormat;
+    /// <inheritdoc/>
+    public override PixelFormat PixelFormat => Base.PixelFormat;
+
+    /// <inheritdoc/>
+    public override bool Mipmaps => false;
+
+    /// <inheritdoc/>
+    public override bool IsDisposed => Base.IsDisposed;
+
+    /// <inheritdoc/>
+    public override int Version
+    {
+        get
+        {
+            unchecked
+            {
+                int v = 0;
+                for (int i = 0; i < Levels.Count; i++)
+                    v += Levels[i].Version;
+                return v;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public override void Invalidate()
+    {
+        for (int i = 0; i < Levels.Count; i++)
+            Levels[i].Invalidate();
+    }
+
+    /// <inheritdoc/>
+    public override void Dispose()
+    {
+        for (int i = 0; i < Levels.Count; i++)
+            Levels[i].Dispose();
+    }
 
     /// <summary>
     /// Builds a mipmapped image from an ordered list of levels. The

@@ -15,7 +15,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
     // the GPU target stays R8G8B8A8Unorm and per-pixel Get/Set against
     // the user's image converts to/from the surface's native layout.
 
-    private readonly Image _image;
+    private readonly BitmapImage _image;
     private readonly uint _width;
     private readonly uint _height;
     private readonly bool _directCopy;
@@ -37,7 +37,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
     private byte[]? _scratch;
     private bool _uploadWallpaper;
 
-    internal ImageGpuRenderer(GpuDevice device, Image image)
+    internal ImageGpuRenderer(GpuDevice device, BitmapImage image)
         : base(device)
     {
         ArgumentNullException.ThrowIfNull(image);

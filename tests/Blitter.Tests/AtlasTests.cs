@@ -4,7 +4,7 @@ namespace Blitter.Tests;
 
 public class AtlasTests
 {
-    private static Image CreateImage(int w = 16, int h = 16) =>
+    private static BitmapImage CreateImage(int w = 16, int h = 16) =>
         Image.Create(w, h, PixelFormat.RGBA8888);
 
     [Fact]

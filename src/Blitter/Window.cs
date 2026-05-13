@@ -13,7 +13,7 @@ public abstract class Window : IDisposable
 {
     private nint _window;
     private Properties? _properties;
-    private Image? _icon;
+    private BitmapImage? _icon;
 
     protected Window(int width, int height, WindowFlags flags = WindowFlags.None)
     {
@@ -242,7 +242,7 @@ public abstract class Window : IDisposable
     /// <summary>
     /// The current icon used for the window
     /// </summary>
-    public Image? Icon
+    public BitmapImage? Icon
     {
         get => _icon;
 

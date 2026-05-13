@@ -18,8 +18,8 @@ namespace Blitter;
 /// convention: pixel (0, 0) of each face image is the upper-left
 /// corner as seen from the cube's center looking outward through that
 /// face. If your source images come from a pack with a different
-/// orientation, use <see cref="Image.Flip"/> and
-/// <see cref="Image.Rotate"/> on each face before passing it in.
+/// orientation, use <see cref="BitmapImage.Flip"/> and
+/// <see cref="BitmapImage.Rotate"/> on each face before passing it in.
 /// </para>
 /// <para>
 /// Like <see cref="Image"/>, a <c>Cubemap</c> is a CPU-side handle.
@@ -155,7 +155,7 @@ public sealed class Cubemap
     public void RenderFace(CubeFace face, Color backgroundColor, Action<Renderer3D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
-        GetFace(face).Render3D(backgroundColor, renderAction);
+        GetBitmapFace(face).Render3D(backgroundColor, renderAction);
         Invalidate();
     }
 
@@ -169,7 +169,7 @@ public sealed class Cubemap
     public void RenderFace(CubeFace face, Action<Renderer3D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
-        GetFace(face).Render3D(renderAction);
+        GetBitmapFace(face).Render3D(renderAction);
         Invalidate();
     }
 
@@ -185,8 +185,23 @@ public sealed class Cubemap
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         foreach (var face in CubeFaceExtensions.All)
-            GetFace(face).Render3D(backgroundColor, rd => renderAction(face, rd));
+            GetBitmapFace(face).Render3D(backgroundColor, rd => renderAction(face, rd));
         Invalidate();
+    }
+
+    // Render3D and CPU pixel access require a BitmapImage face. All
+    // faces in today's API are constructed from BitmapImages (either
+    // directly via Image x 6 or as MipmappedImage.Base levels), so the
+    // cast is sound. Once GpuImage faces are supported the cast will
+    // need a fallback path.
+    private BitmapImage GetBitmapFace(CubeFace face)
+    {
+        var img = GetFace(face);
+        if (img is not BitmapImage bitmap)
+            throw new NotSupportedException(
+                $"Cubemap face is not a {nameof(BitmapImage)} (got {img.GetType().Name}); " +
+                $"CPU-side render and pixel operations require a BitmapImage base level.");
+        return bitmap;
     }
 
     /// <summary>

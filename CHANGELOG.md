@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+- `Image` is now an abstract base type. The previous CPU-surface
+  concrete class is renamed to `BitmapImage` (still the type returned
+  by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,
+  `Render2D`, `Render3D`, and SkiaSharp extensions live on
+  `BitmapImage` only. `MipmappedImage` is now a sibling subtype of
+  `Image`. `Cubemap` face accessors return the base level as `Image`;
+  CPU-only paths cast to `BitmapImage`.
+
 ### Added
 - `Textures` static class (Blitter.Bits): catalog of process-shared
   images. Currently exposes `White`, `Black`, and `SpecularLut` -- a
@@ -90,6 +99,17 @@ All notable changes to this project will be documented in this file.
   diffuse-IBL irradiance map. Cosine-weighted hemisphere integral
   via Hammersley + tangent-frame importance sampling. Sample by
   surface normal for the diffuse environment term.
+- `MipmappedImage`: caller-supplied mip chain for cases where each
+  level carries different content (e.g. a prefiltered specular
+  environment map). Distinct from `Image.Mipmaps`, which asks the
+  renderer to auto-generate a chain by downsampling.
+- `Cubemap.Create(MipmappedImage × 6)` overload + `Cubemap.LevelCount`
+  for cubemaps whose faces ship explicit mip chains. The existing
+  `Image × 6` overload still works; it builds single-level chains
+  internally.
+- `Bake(int faceSize, Func<CubeFace, Vector3, Color>)` overload on
+  `Cubemaps`: face-aware procedural baker for patterns that vary
+  per face (debug grids, per-face seeds).
 
 ### Changed
 - `Image.Render3D` now reports the destination image's own
