@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Textures` static class (Blitter.Bits): catalog of process-shared
+  images. Currently exposes `White`, `Black`, and `SpecularLut` -- a
+  256x256 precomputed split-sum BRDF integration texture for upcoming
+  PBR image-based lighting.
 - `PbrMaterial` (Blitter.Bits): metallic-roughness PBR surface with
   base color, metallic, roughness, emissive, and occlusion factors,
   each pairable with an optional texture. `Metal()` / `Dielectric()`

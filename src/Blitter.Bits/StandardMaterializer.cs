@@ -22,8 +22,6 @@ namespace Blitter.Bits;
 /// </remarks>
 public class StandardMaterializer : Materializer
 {
-    private static Image? s_whitePlaceholder;
-
     /// <summary>
     /// Process-shared instance used by the
     /// <c>Renderer3D.DrawMesh(mesh, material, ...)</c> /
@@ -57,7 +55,7 @@ public class StandardMaterializer : Materializer
                 // Hand-built parts with white vertices + a colored
                 // material won't see the tint; revisit when materials
                 // grow a per-draw uniform tier.
-                var texture = lit.DiffuseTexture ?? GetWhitePlaceholder();
+                var texture = lit.DiffuseTexture ?? Textures.White;
                 var args = new LitArgs(transform);
                 MeshDispatcher.For(mesh).DrawTextured(
                     renderer, mesh, texture, Shaders.LitTexture, in args);
@@ -80,7 +78,7 @@ public class StandardMaterializer : Materializer
         // white reduces to "use the factor unchanged". Inline-array
         // buffer keeps the four texture refs on the stack -- no per-draw
         // heap allocation -- and we hand a Span into it to the renderer.
-        var white = GetWhitePlaceholder();
+        var white = Textures.White;
         PbrTextureBuffer buffer = default;
         buffer[0] = pbr.BaseColorTexture ?? white;
         buffer[1] = pbr.MetallicRoughnessTexture ?? white;
@@ -124,7 +122,7 @@ public class StandardMaterializer : Materializer
         if (material is LitTextureMaterial lit
             && typeof(TInstance) == typeof(TransformAndColorInstance))
         {
-            var texture = lit.DiffuseTexture ?? GetWhitePlaceholder();
+            var texture = lit.DiffuseTexture ?? Textures.White;
             var args = default(LitArgs); // Model unused; per-instance transform replaces it.
             MeshDispatcher.For(mesh).DrawTexturedInstanced(
                 renderer, mesh, texture, Shaders.LitTextureInstanced, in args, instances);
@@ -134,18 +132,4 @@ public class StandardMaterializer : Materializer
         throw new MaterializerNotSupportedException(mesh, material, typeof(TInstance));
     }
 
-    private static Image GetWhitePlaceholder()
-    {
-        // Lazy + non-locked: racing threads might allocate two 1x1
-        // images on first use and the loser's gets GC'd later. Cheap
-        // enough that an Interlocked dance isn't worth the noise.
-        return s_whitePlaceholder ??= CreateWhitePlaceholder();
-    }
-
-    private static Image CreateWhitePlaceholder()
-    {
-        var image = Image.Create(1, 1, PixelFormat.ABGR8888);
-        image.SetPixel(0, 0, Color.White);
-        return image;
-    }
 }
