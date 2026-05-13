@@ -113,4 +113,12 @@ public interface IUniformArgs<TSelf>
     /// might be unallocated."
     /// </summary>
     static virtual Func<TSelf, int, TSelf>? SetPointLightCount { get; } = null;
+
+    /// <summary>
+    /// Returns a copy of the args struct with the renderer's camera
+    /// world-space position installed. Fires only when a camera is
+    /// configured. Used by view-dependent shaders (e.g. specular PBR)
+    /// that need the camera position to build a view vector.
+    /// </summary>
+    static virtual Func<TSelf, Vector3, TSelf>? SetCameraPosition { get; } = null;
 }

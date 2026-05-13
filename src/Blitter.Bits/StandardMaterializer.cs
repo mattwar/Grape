@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Blitter.Bits;
 
@@ -62,9 +63,49 @@ public class StandardMaterializer : Materializer
                     renderer, mesh, texture, Shaders.LitTexture, in args);
                 break;
 
+            case PbrMaterial pbr:
+                DrawPbrMesh(renderer, mesh, pbr, in transform);
+                break;
+
             default:
                 throw new MaterializerNotSupportedException(mesh, material);
         }
+    }
+
+    private static void DrawPbrMesh(
+        Renderer3D renderer, Mesh mesh, PbrMaterial pbr, in Matrix4x4 transform)
+    {
+        // A single 1x1 white image plugs every "missing texture" slot:
+        // the shader multiplies each sample by the matching factor, so
+        // white reduces to "use the factor unchanged". Inline-array
+        // buffer keeps the four texture refs on the stack -- no per-draw
+        // heap allocation -- and we hand a Span into it to the renderer.
+        var white = GetWhitePlaceholder();
+        PbrTextureBuffer buffer = default;
+        buffer[0] = pbr.BaseColorTexture ?? white;
+        buffer[1] = pbr.MetallicRoughnessTexture ?? white;
+        buffer[2] = pbr.OcclusionTexture ?? white;
+        buffer[3] = pbr.EmissiveTexture ?? white;
+
+        var args = new PbrArgs
+        {
+            Model = transform,
+            ViewProjection = Matrix4x4.Identity,
+            BaseColorFactor = pbr.BaseColor,
+            MaterialFactors = new Vector4(pbr.Metallic, pbr.Roughness, pbr.OcclusionStrength, 0f),
+            EmissiveFactor = pbr.Emissive,
+        };
+        MeshDispatcher.For(mesh).DrawMultiTextured(
+            renderer, mesh, buffer[..], PbrShaders.LitPbr, in args);
+    }
+
+    // 4-slot stack buffer for PBR texture binding. InlineArray gives us a
+    // Span<Image> over the fields without allocating; the renderer copies
+    // the references out before the span dies.
+    [InlineArray(4)]
+    private struct PbrTextureBuffer
+    {
+        private Image _slot0;
     }
 
     /// <inheritdoc/>

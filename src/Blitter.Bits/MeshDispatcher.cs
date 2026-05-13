@@ -26,6 +26,20 @@ internal interface IMeshDrawAdapter
         where TArgs : unmanaged, IUniformArgs<TArgs>;
 
     /// <summary>
+    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex,TArgs}, in TArgs)"/>
+    /// after casting <paramref name="mesh"/> and <paramref name="shader"/> to
+    /// the adapter's vertex/args types. Used by materials with multiple
+    /// texture inputs (e.g. PBR base color + metallic-roughness + AO + emissive).
+    /// </summary>
+    void DrawMultiTextured<TArgs>(
+        Renderer3D renderer,
+        Mesh mesh,
+        ReadOnlySpan<Image> textures,
+        Shader shader,
+        in TArgs args)
+        where TArgs : unmanaged, IUniformArgs<TArgs>;
+
+    /// <summary>
     /// Calls the scene-aware textured instanced draw entry point on
     /// <see cref="Renderer3D"/> after casting <paramref name="mesh"/>
     /// and <paramref name="shader"/> to the adapter's vertex/args/instance
@@ -58,6 +72,19 @@ internal sealed class MeshDrawAdapter<TVertex> : IMeshDrawAdapter
         var typedMesh = (Mesh<TVertex>)mesh;
         var typedShader = (Shader<TVertex, TArgs>)shader;
         renderer.DrawMesh(typedMesh, texture, typedShader, in args);
+    }
+
+    public void DrawMultiTextured<TArgs>(
+        Renderer3D renderer,
+        Mesh mesh,
+        ReadOnlySpan<Image> textures,
+        Shader shader,
+        in TArgs args)
+        where TArgs : unmanaged, IUniformArgs<TArgs>
+    {
+        var typedMesh = (Mesh<TVertex>)mesh;
+        var typedShader = (Shader<TVertex, TArgs>)shader;
+        renderer.DrawMesh(typedMesh, textures, typedShader, in args);
     }
 
     public void DrawTexturedInstanced<TArgs, TInstance>(

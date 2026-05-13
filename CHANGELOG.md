@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `PbrMaterial` (Blitter.Bits): metallic-roughness PBR surface with
+  base color, metallic, roughness, emissive, and occlusion factors,
+  each pairable with an optional texture. `Metal()` / `Dielectric()`
+  shortcuts for common cases.
+- `PbrShaders.LitPbr` (Blitter.Bits): Cook-Torrance BRDF (GGX +
+  Smith-GGX + Schlick) on `LitTextureVertex3D`. Reuses the renderer's
+  ambient + directional + point-light pipeline. Looks best on
+  dielectrics until image-based lighting lands; see `PbrSpheres.cs`.
+- `StandardMaterializer` routes `PbrMaterial` to `PbrShaders.LitPbr`,
+  binding base-color / metallic-roughness / occlusion / emissive
+  textures (1×1 white placeholders fill missing slots).
+- `IUniformArgs<TSelf>.SetCameraPosition` trait: lets view-dependent
+  shaders pull the camera world-space position from the renderer.
+- Sample: `samples/PbrSpheres.cs` -- 5×5 metallic × roughness test
+  card.
 - `ShaderTextureLayout` describes the texture/sampler bindings a shader's
   fragment stage expects; exposed as `Shader.TextureLayout`. Defaults to
   `SingleTexture2D` so existing single-texture shaders need no changes.

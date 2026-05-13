@@ -527,6 +527,12 @@ public abstract class Renderer3D
             args = setCount(args, PointLights.Count);
         }
 
+        // Camera position -> view-dependent shaders (specular PBR).
+        if (Camera is { } cam3 && TArgs.SetCameraPosition is { } setCamPos)
+        {
+            args = setCamPos(args, cam3.Position);
+        }
+
         return args;
     }
 
