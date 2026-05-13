@@ -1723,7 +1723,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 if (entry.LastUploadedVersion != cubemap.Version)
                 {
                     UploadCubemapFaces(copyPass, cubemap, entry.Texture, (uint)entry.Size);
-                    if (entry.Mipmaps && entry.NumLevels > 1)
+                    if (entry.Mipmaps && cubemap.LevelCount == 1 && entry.NumLevels > 1)
                         _pendingMipmapGeneration.Add(entry.Texture);
                     entry.LastUploadedVersion = cubemap.Version;
                 }
@@ -1733,7 +1733,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         var size = cubemap.Size;
         var format = ResolveGpuFormat(cubemap.Format);
-        var numLevels = ComputeMipLevelCount(size, size, cubemap.Mipmaps);
+        // Either an explicit per-face mip chain (LevelCount > 1) or the
+        // auto-generated full chain (Mipmaps == true) -- never both;
+        // Cubemap.Create enforces that.
+        var numLevels = cubemap.LevelCount > 1
+            ? (uint)cubemap.LevelCount
+            : ComputeMipLevelCount(size, size, cubemap.Mipmaps);
 
         var gpuTexture = _device.CreateTexture(new GpuTextureCreateInfo
         {
@@ -1750,7 +1755,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         UploadCubemapFaces(copyPass, cubemap, gpuTexture, (uint)size);
 
-        if (cubemap.Mipmaps && numLevels > 1)
+        // Only auto-generate mips when the caller asked for them AND
+        // didn't supply an explicit chain.
+        if (cubemap.Mipmaps && cubemap.LevelCount == 1 && numLevels > 1)
             _pendingMipmapGeneration.Add(gpuTexture);
 
         _cubemapResources.Add(new CubemapCacheEntry(
@@ -1771,29 +1778,36 @@ internal class GpuRenderer : Renderer3D, IDisposable
         GpuTexture destination,
         uint size)
     {
-        var faces = new[]
+        var faceChains = new[]
         {
-            cubemap.PositiveX,
-            cubemap.NegativeX,
-            cubemap.PositiveY,
-            cubemap.NegativeY,
-            cubemap.PositiveZ,
-            cubemap.NegativeZ,
+            cubemap.PositiveXLevels,
+            cubemap.NegativeXLevels,
+            cubemap.PositiveYLevels,
+            cubemap.NegativeYLevels,
+            cubemap.PositiveZLevels,
+            cubemap.NegativeZLevels,
         };
 
+        int levelCount = cubemap.LevelCount;
         for (uint layer = 0; layer < 6; layer++)
         {
-            // CPU upload requires a BitmapImage face; see Cubemap.GetBitmapFace.
-            if (faces[layer] is not BitmapImage bitmapFace)
-                throw new NotSupportedException(
-                    $"Cubemap face {(CubeFace)layer} is not a BitmapImage; " +
-                    $"GPU upload of non-bitmap cubemap faces is not yet supported.");
-            var pixels = bitmapFace.GetPixels();
-            // One-shot upload buffer per face. The cubemap path is not
-            // a per-frame hot path, so allocating six small buffers and
-            // disposing them is fine; pooling can come later if needed.
-            using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
-            copyPass.UploadToTextureLayer(upload, destination, size, size, layer, mipLevel: 0, pixels);
+            var chain = faceChains[layer];
+            for (int mip = 0; mip < levelCount; mip++)
+            {
+                // CPU upload requires a BitmapImage per level.
+                if (chain.Levels[mip] is not BitmapImage bitmapLevel)
+                    throw new NotSupportedException(
+                        $"Cubemap face {(CubeFace)layer} mip {mip} is not a BitmapImage; " +
+                        $"GPU upload of non-bitmap cubemap faces is not yet supported.");
+                var pixels = bitmapLevel.GetPixels();
+                uint mipSize = (uint)Math.Max(1, (int)size >> mip);
+                // One-shot upload buffer per level. The cubemap path
+                // is not a per-frame hot path, so allocating small
+                // buffers and disposing them is fine; pooling can come
+                // later if needed.
+                using var upload = (GpuUploadBuffer)GpuUploadBuffer.Create(_device, (uint)pixels.Length);
+                copyPass.UploadToTextureLayer(upload, destination, mipSize, mipSize, layer, mipLevel: (uint)mip, pixels);
+            }
         }
     }
 

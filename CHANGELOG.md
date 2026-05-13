@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `Cubemaps.BakePrefilteredSpecular(Cubemap, faceSize, levels, samples)`
+  and `Cubemaps.SkyPrefiltered`: GGX-importance-sampled mipmapped
+  specular environment cubemap for image-based lighting. Mip i = the
+  environment integrated at roughness i/(levels-1); shaders sample by
+  reflection vector at LOD `roughness * (levels - 1)`.
+
 ### Changed
+- `GpuRenderer` now uploads every level of an explicit cubemap mip
+  chain (when `Cubemap.LevelCount > 1`), wiring up the chains built
+  by `MipmappedImage` faces. The auto-generated-mips path
+  (`Cubemap.Mipmaps == true`) is unchanged.
 - `Image` is now an abstract base type. The previous CPU-surface
   concrete class is renamed to `BitmapImage` (still the type returned
   by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,

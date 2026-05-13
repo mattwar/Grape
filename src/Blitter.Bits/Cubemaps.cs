@@ -9,22 +9,30 @@ public static class Cubemaps
 {
     private static Cubemap? s_sky;
     private static Cubemap? s_skyIrradiance;
+    private static Cubemap? s_skyPrefiltered;
 
     /// <summary>
-    /// Default pleasant procedural sky: blue zenith fading to pale
-    /// horizon, warm ground below, with a sun disc in the
-    /// upper-right. Useful as a drop-in environment for PBR demos
-    /// when no specific environment map is supplied.
+    /// Default procedural sky: 
+    /// a blue zenith fading to pale horizon, warm ground below, with a sun disc in the upper-right. 
+    /// Useful as a drop-in environment for demos when no specific environment map is supplied.
     /// </summary>
     public static Cubemap Sky => s_sky ??= BakeSky();
 
     /// <summary>
-    /// Diffuse irradiance map derived from <see cref="Sky"/>: the
-    /// cosine-weighted hemisphere integral of the sky cubemap at every
-    /// surface-normal direction. Sample by surface normal to get the
-    /// diffuse environment term used in image-based lighting.
+    /// Diffuse irradiance map derived from <see cref="Sky"/>: 
+    /// the cosine-weighted hemisphere integral of the sky cubemap at every surface-normal direction. 
+    /// Sample by surface normal to get the diffuse environment term used in image-based lighting.
     /// </summary>
     public static Cubemap SkyIrradiance => s_skyIrradiance ??= BakeIrradiance(Sky);
+
+    /// <summary>
+    /// Prefiltered specular environment map derived from <see cref="Sky"/>.
+    /// A mipmapped cubemap where mip <c>i</c> is the GGX-integrated
+    /// reflection of the sky at roughness <c>i / (levels - 1)</c>.
+    /// Sample by the reflection vector at <c>roughness * (levels - 1)</c>
+    /// to get the specular environment term used in image-based lighting.
+    /// </summary>
+    public static Cubemap SkyPrefiltered => s_skyPrefiltered ??= BakePrefilteredSpecular(Sky);
 
     /// <summary>
     /// Bakes a cubemap by evaluating <paramref name="shade"/> per
@@ -153,6 +161,119 @@ public static class Cubemaps
         ArgumentOutOfRangeException.ThrowIfLessThan(samples, 1);
 
         return Bake(faceSize, n => IntegrateIrradiance(source, n, samples));
+    }
+
+    /// <summary>
+    /// Bakes a prefiltered specular environment cubemap from
+    /// <paramref name="source"/> for image-based lighting. Produces a
+    /// mipmapped cubemap where mip <c>i</c> is the GGX-distribution
+    /// importance-sampled integral of the environment at roughness
+    /// <c>i / (levels - 1)</c>. Mip 0 (roughness 0) is the unfiltered
+    /// environment downsampled to <paramref name="faceSize"/>; the
+    /// highest mip (roughness 1) is fully blurred. Shaders sample
+    /// this by the reflection vector at LOD
+    /// <c>roughness * (levels - 1)</c>.
+    /// </summary>
+    /// <param name="source">Environment cubemap to integrate.</param>
+    /// <param name="faceSize">Pixel size of the base (mip 0) face. 128 is a good default; the chain auto-shrinks each level.</param>
+    /// <param name="levels">Number of mip levels to bake. Defaults to a chain that ends at an 8×8 base level.</param>
+    /// <param name="samples">Importance samples per pixel for rough mips. Higher reduces specular fireflies. 1024 is the common default.</param>
+    public static Cubemap BakePrefilteredSpecular(
+        Cubemap source,
+        int faceSize = 128,
+        int? levels = null,
+        int samples = 1024)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentOutOfRangeException.ThrowIfLessThan(faceSize, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(samples, 1);
+
+        // Default chain ends near 8×8. Each level halves; the last mip
+        // is fully blurred so going smaller adds nothing visible.
+        int defaultLevels = Math.Max(1, BitOperations.Log2((uint)faceSize) - 2);
+        int levelCount = levels ?? defaultLevels;
+        ArgumentOutOfRangeException.ThrowIfLessThan(levelCount, 1);
+
+        // [face][mip] BitmapImage grid; assembled into 6 MipmappedImages
+        // and one Cubemap at the end.
+        var chains = new BitmapImage[6][];
+        for (int f = 0; f < 6; f++)
+            chains[f] = new BitmapImage[levelCount];
+
+        for (int mip = 0; mip < levelCount; mip++)
+        {
+            int mipSize = Math.Max(1, faceSize >> mip);
+            // Roughness 0 at mip 0, 1 at the last mip. Single-level
+            // chains degenerate to roughness 0 (an unfiltered copy).
+            float roughness = levelCount == 1 ? 0f : (float)mip / (levelCount - 1);
+
+            for (int f = 0; f < 6; f++)
+            {
+                var face = (CubeFace)f;
+                chains[f][mip] = BakeFace(mipSize, face,
+                    (_, n) => PrefilteredSpecular(source, n, roughness, samples));
+            }
+        }
+
+        var posXLevels = MipmappedImage.Create(chains[0]);
+        var negXLevels = MipmappedImage.Create(chains[1]);
+        var posYLevels = MipmappedImage.Create(chains[2]);
+        var negYLevels = MipmappedImage.Create(chains[3]);
+        var posZLevels = MipmappedImage.Create(chains[4]);
+        var negZLevels = MipmappedImage.Create(chains[5]);
+        return Cubemap.Create(posXLevels, negXLevels, posYLevels, negYLevels, posZLevels, negZLevels);
+    }
+
+    // Split-sum specular pre-integration assuming V == R == N: estimates
+    //   ∫ source(L) · GGX(H; roughness) · max(0, N·L) dω
+    // / ∫                                  max(0, N·L) dω
+    // with importance-sampled microfacet normals H. At roughness 0 the
+    // GGX lobe collapses to a delta function, so sample the environment
+    // directly to avoid degenerate accumulation.
+    private static Color PrefilteredSpecular(Cubemap source, Vector3 n, float roughness, int samples)
+    {
+        if (roughness <= 0f)
+            return SampleCubemap(source, n);
+
+        // Tangent frame around N; same stability trick as the
+        // irradiance integrator.
+        Vector3 up = MathF.Abs(n.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
+        Vector3 t = Vector3.Normalize(Vector3.Cross(up, n));
+        Vector3 b = Vector3.Cross(n, t);
+
+        float a = roughness * roughness;
+        float a2 = a * a;
+
+        Vector3 sum = Vector3.Zero;
+        float weight = 0f;
+        for (int i = 0; i < samples; i++)
+        {
+            var (u1, u2) = Hammersley(i, samples);
+            // GGX importance sample for the half-vector H.
+            float cosTheta = MathF.Sqrt((1f - u2) / (1f + (a2 - 1f) * u2));
+            float sinTheta = MathF.Sqrt(MathF.Max(0f, 1f - cosTheta * cosTheta));
+            float phi = MathF.Tau * u1;
+            Vector3 hLocal = new(sinTheta * MathF.Cos(phi), sinTheta * MathF.Sin(phi), cosTheta);
+            Vector3 h = t * hLocal.X + b * hLocal.Y + n * hLocal.Z;
+            // L = reflect(-V, H) with V = N.
+            Vector3 l = Vector3.Normalize(2f * Vector3.Dot(n, h) * h - n);
+
+            float nDotL = Vector3.Dot(n, l);
+            if (nDotL > 0f)
+            {
+                var c = SampleCubemap(source, l);
+                sum += new Vector3(c.R, c.G, c.B) * nDotL;
+                weight += nDotL;
+            }
+        }
+        if (weight <= 0f)
+            return SampleCubemap(source, n);
+
+        sum /= weight;
+        return new Color(
+            (byte)Math.Clamp(sum.X, 0f, 255f),
+            (byte)Math.Clamp(sum.Y, 0f, 255f),
+            (byte)Math.Clamp(sum.Z, 0f, 255f));
     }
 
     // Cosine-weighted Monte-Carlo estimate of the irradiance at
