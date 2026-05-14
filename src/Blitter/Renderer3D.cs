@@ -373,7 +373,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        Cubemap cubemap,
+        CubeTexture cubemap,
         Shader<TVertex> shader)
         where TVertex : unmanaged;
 
@@ -385,7 +385,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Cubemap cubemap,
+        CubeTexture cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -472,7 +472,7 @@ public abstract class Renderer3D
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Cubemap cubemap,
+        CubeTexture cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged

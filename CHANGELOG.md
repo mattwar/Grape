@@ -46,12 +46,12 @@ All notable changes to this project will be documented in this file.
   by `MipmappedImage` faces. The auto-generated-mips path
   (`Cubemap.Mipmaps == true`) is unchanged.
 - `Image` is now an abstract base type. The previous CPU-surface
-  concrete class is renamed to `BitmapImage` (still the type returned
+  concrete class is renamed to `Bitmap` (still the type returned
   by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,
   `Render2D`, `Render3D`, and SkiaSharp extensions live on
-  `BitmapImage` only. `MipmappedImage` is now a sibling subtype of
+  `Bitmap` only. `MipmappedImage` is now a sibling subtype of
   `Image`. `Cubemap` face accessors return the base level as `Image`;
-  CPU-only paths cast to `BitmapImage`.
+  CPU-only paths cast to `Bitmap`.
 
 ### Added
 - `Textures` static class (Blitter.Bits): catalog of process-shared

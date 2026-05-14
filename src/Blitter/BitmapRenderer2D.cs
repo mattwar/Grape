@@ -292,9 +292,9 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
     private BitmapSurface CreateTexture(Image image)
     {
         ThrowIfDisposed();
-        if (image is not BitmapImage bitmap)
+        if (image is not Bitmap bitmap)
             throw new NotSupportedException(
-                $"BitmapRenderer2D only supports {nameof(BitmapImage)} sources; got {image.GetType().Name}.");
+                $"BitmapRenderer2D only supports {nameof(Bitmap)} sources; got {image.GetType().Name}.");
         bitmap.ThrowIfDisposed();
         var id = SDL.CreateTextureFromSurface(_rendererId, bitmap._imageId);
         return new BitmapSurface(this, id);

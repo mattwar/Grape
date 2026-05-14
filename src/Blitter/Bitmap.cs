@@ -3,13 +3,13 @@ namespace Blitter;
 /// <summary>
 /// Represents an image bitmap in memory.
 /// </summary>
-public sealed class BitmapImage : Image
+public sealed class Bitmap : Image
 {
     private readonly Application _application;
     internal nint _imageId;
     private int _version;
 
-    private BitmapImage(nint imageId, bool mipmaps = false)
+    private Bitmap(nint imageId, bool mipmaps = false)
     {
         _imageId = imageId;
         _application = Application.Current;
@@ -62,12 +62,12 @@ public sealed class BitmapImage : Image
     /// throughout Blitter; pass an explicit format only for specialized
     /// surfaces (paletted, YUV, 16-bit, float, etc.).
     /// </summary>
-    public static new BitmapImage Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
+    public static new Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
     {
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
             throw new InvalidOperationException("Cannot create image");
-        return new BitmapImage(imageId, mipmaps);
+        return new Bitmap(imageId, mipmaps);
     }
 
     /// <inheritdoc/>
@@ -98,7 +98,7 @@ public sealed class BitmapImage : Image
     internal void ThrowIfDisposed()
     {
         if (IsDisposed)
-            throw new ObjectDisposedException(nameof(BitmapImage));
+            throw new ObjectDisposedException(nameof(Bitmap));
     }
 
     /// <summary>
@@ -246,7 +246,7 @@ public sealed class BitmapImage : Image
     /// from the base image. Recommended for textures sampled at
     /// varying distances; unnecessary for full-resolution UI sprites.
     /// </param>
-    public static new BitmapImage Load(string filePath, bool mipmaps = false)
+    public static new Bitmap Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
@@ -258,7 +258,7 @@ public sealed class BitmapImage : Image
     /// Decodes an image from an encoded byte span (PNG, JPG, WebP, ...)
     /// using SkiaSharp.
     /// </summary>
-    public static new BitmapImage Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
+    public static new Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
     {
         // Always allocate ABGR8888 — the GPU fast-path sampling
         // format. CopyFromBitmap converts per pixel, so the bitmap's
@@ -266,7 +266,7 @@ public sealed class BitmapImage : Image
         // is normalized here and never reaches the GPU upload.
         using var skBitmap = SkiaSharp.SKBitmap.Decode(bytes)
             ?? throw new InvalidOperationException("SkiaSharp could not decode the supplied image bytes.");
-        var image = BitmapImage.Create(skBitmap.Width, skBitmap.Height, PixelFormat.ABGR8888, mipmaps);
+        var image = Bitmap.Create(skBitmap.Width, skBitmap.Height, PixelFormat.ABGR8888, mipmaps);
         image.CopyFromBitmap(skBitmap);
         return image;
     }
@@ -301,7 +301,7 @@ public sealed class BitmapImage : Image
         // Round-trip through an SKBitmap snapshot. The pixel-by-pixel
         // copy is the cost of converting between Blitter's surface and
         // SkiaSharp's bitmap representations; for one-shot saves this
-        // is fine, and it keeps the in-memory BitmapImage untouched.
+        // is fine, and it keeps the in-memory Bitmap untouched.
         using var bitmap = this.ToSKBitmap();
         using var stream = File.Create(filename);
         if (!bitmap.Encode(stream, format, quality))
@@ -630,11 +630,11 @@ public sealed class BitmapImage : Image
     /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
     /// flag. <see cref="FlipMode.None"/> still allocates a fresh copy.
     /// </summary>
-    public BitmapImage Flip(FlipMode mode)
+    public Bitmap Flip(FlipMode mode)
     {
         ThrowIfDisposed();
         var (width, height) = Size;
-        var result = BitmapImage.Create(width, height, PixelFormat, Mipmaps);
+        var result = Bitmap.Create(width, height, PixelFormat, Mipmaps);
         // Pixel-by-pixel via GetPixel/SetPixel so this works for every
         // PixelFormat we support (including indexed and packed formats)
         // without per-format byte arithmetic. Future optimisation: a
@@ -660,7 +660,7 @@ public sealed class BitmapImage : Image
     /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
     /// flag. <see cref="Rotation.None"/> still allocates a fresh copy.
     /// </summary>
-    public BitmapImage Rotate(Rotation rotation)
+    public Bitmap Rotate(Rotation rotation)
     {
         ThrowIfDisposed();
         var (width, height) = Size;
@@ -669,7 +669,7 @@ public sealed class BitmapImage : Image
             Rotation.Clockwise90 or Rotation.Counterclockwise90 => (height, width),
             _ => (width, height),
         };
-        var result = BitmapImage.Create(resultWidth, resultHeight, PixelFormat, Mipmaps);
+        var result = Bitmap.Create(resultWidth, resultHeight, PixelFormat, Mipmaps);
         // Pixel-by-pixel via GetPixel/SetPixel for the same reasons as
         // Flip. Future optimisation: row-stride memcpy for Half on the
         // common 32-bit formats; transposed strided copy for the 90s.
@@ -691,15 +691,15 @@ public sealed class BitmapImage : Image
     }
 
     /// <summary>
-    /// A 2D renderer that draws into an <see cref="BitmapImage"/> in CPU memory using
+    /// A 2D renderer that draws into an <see cref="Bitmap"/> in CPU memory using
     /// SDL's software renderer. Pixels written by this renderer land directly
     /// in the image's surface.
     /// </summary>
     private sealed class Renderer : BitmapRenderer2D
     {
-        private readonly BitmapImage _image;
+        private readonly Bitmap _image;
 
-        private Renderer(BitmapImage image, nint rendererId)
+        private Renderer(Bitmap image, nint rendererId)
             : base(rendererId)
         {
             _image = image;
@@ -708,7 +708,7 @@ public sealed class BitmapImage : Image
         /// <summary>
         /// Creates a software renderer that draws into <paramref name="image"/>.
         /// </summary>
-        public static Renderer Create(BitmapImage image)
+        public static Renderer Create(Bitmap image)
         {
             ArgumentNullException.ThrowIfNull(image);
             image.ThrowIfDisposed();
@@ -724,8 +724,8 @@ public sealed class BitmapImage : Image
             return new Renderer(image, rendererId);
         }
 
-        /// <summary>The <see cref="Blitter.BitmapImage"/> this renderer draws into.</summary>
-        public BitmapImage BitmapImage => _image;
+        /// <summary>The <see cref="Blitter.Bitmap"/> this renderer draws into.</summary>
+        public Bitmap Bitmap => _image;
 
         protected override void OnDisposed()
         {
@@ -739,17 +739,17 @@ public sealed class BitmapImage : Image
 }
 
 /// <summary>
-/// Mutable cursor over a single pixel of an <see cref="BitmapImage"/>, used by
-/// <see cref="BitmapImage.TransformPixels"/>.
+/// Mutable cursor over a single pixel of an <see cref="Bitmap"/>, used by
+/// <see cref="Bitmap.TransformPixels"/>.
 /// </summary>
 public struct PixelContext
 {
-    private readonly BitmapImage _surface;
+    private readonly Bitmap _surface;
 
     public int X { get; }
     public int Y { get; }
 
-    internal PixelContext(BitmapImage surface, int x, int y)
+    internal PixelContext(Bitmap surface, int x, int y)
     {
         _surface = surface;
         X = x;

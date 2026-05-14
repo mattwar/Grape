@@ -194,11 +194,11 @@ public static class Cubemaps
         int levelCount = levels ?? defaultLevels;
         ArgumentOutOfRangeException.ThrowIfLessThan(levelCount, 1);
 
-        // [face][mip] BitmapImage grid; assembled into 6 MipmappedImages
+        // [face][mip] Bitmap grid; assembled into 6 MipmappedImages
         // and one Cubemap at the end.
-        var chains = new BitmapImage[6][];
+        var chains = new Bitmap[6][];
         for (int f = 0; f < 6; f++)
-            chains[f] = new BitmapImage[levelCount];
+            chains[f] = new Bitmap[levelCount];
 
         for (int mip = 0; mip < levelCount; mip++)
         {
@@ -365,15 +365,15 @@ public static class Cubemaps
     // CPU sampling needs raw pixels. Unwrap a mip chain to its base
     // level; anything else (e.g. a future GPU-only image) can't be
     // sampled on the CPU.
-    private static BitmapImage AsBitmap(Image image) => image switch
+    private static Bitmap AsBitmap(Image image) => image switch
     {
-        BitmapImage bitmap => bitmap,
+        Bitmap bitmap => bitmap,
         MipmappedImage mipmapped => AsBitmap(mipmapped.Base),
         _ => throw new NotSupportedException(
             $"Cubemap face image of type {image.GetType().Name} cannot be sampled on the CPU."),
     };
 
-    private static BitmapImage BakeFace(int size, CubeFace face, Func<CubeFace, Vector3, Color> shade)
+    private static Bitmap BakeFace(int size, CubeFace face, Func<CubeFace, Vector3, Color> shade)
     {
         var image = Image.Create(size, size, PixelFormat.ABGR8888);
         float inv = 2f / size;

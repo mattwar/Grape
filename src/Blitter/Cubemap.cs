@@ -18,8 +18,8 @@ namespace Blitter;
 /// convention: pixel (0, 0) of each face image is the upper-left
 /// corner as seen from the cube's center looking outward through that
 /// face. If your source images come from a pack with a different
-/// orientation, use <see cref="BitmapImage.Flip"/> and
-/// <see cref="BitmapImage.Rotate"/> on each face before passing it in.
+/// orientation, use <see cref="Bitmap.Flip"/> and
+/// <see cref="Bitmap.Rotate"/> on each face before passing it in.
 /// </para>
 /// <para>
 /// Like <see cref="Image"/>, a <c>Cubemap</c> is a CPU-side handle.
@@ -30,7 +30,7 @@ namespace Blitter;
 /// six faces.
 /// </para>
 /// </remarks>
-public sealed class Cubemap : Texture
+public sealed class Cubemap : CubeTexture
 {
     private int _version;
 
@@ -84,39 +84,39 @@ public sealed class Cubemap : Texture
     /// Edge length of every face's base mip level, in pixels. All six
     /// faces are square and share this size.
     /// </summary>
-    public int Size { get; }
+    public override int Size { get; }
 
     /// <summary>
     /// Pixel format shared by all six faces.
     /// </summary>
-    public PixelFormat Format { get; }
+    public override PixelFormat Format { get; }
 
     /// <summary>
     /// Number of mip levels supplied per face. <c>1</c> means only a
     /// base level was provided. When <c>&gt; 1</c>, every face's
     /// <see cref="MipmappedImage.LevelCount"/> is this same value.
     /// </summary>
-    public int LevelCount { get; }
+    public override int LevelCount { get; }
 
     /// <summary>
     /// When <c>true</c>, hints to renderers to generate a full mipmap
     /// chain for the cubemap. Required for image-based lighting and
     /// helps reduce shimmer when sampled at oblique angles.
     /// </summary>
-    public bool Mipmaps { get; }
+    public override bool Mipmaps { get; }
 
     /// <summary>
     /// Bumped each time the cubemap's contents change. Renderers use
     /// this to detect when their cached GPU upload is stale.
     /// </summary>
-    public int Version => _version;
+    public override int Version => _version;
 
     /// <summary>
     /// Marks the cubemap contents as changed so renderers re-upload
     /// all six faces on the next draw. Call this after mutating any
     /// face image.
     /// </summary>
-    public void Invalidate()
+    public override void Invalidate()
     {
         unchecked { _version++; }
     }
@@ -189,18 +189,18 @@ public sealed class Cubemap : Texture
         Invalidate();
     }
 
-    // Render3D and CPU pixel access require a BitmapImage face. All
-    // faces in today's API are constructed from BitmapImages (either
+    // Render3D and CPU pixel access require a Bitmap face. All
+    // faces in today's API are constructed from Bitmaps (either
     // directly via Image x 6 or as MipmappedImage.Base levels), so the
-    // cast is sound. Once GpuImage faces are supported the cast will
+    // cast is sound. Once GpuBitmap faces are supported the cast will
     // need a fallback path.
-    private BitmapImage GetBitmapFace(CubeFace face)
+    private Bitmap GetBitmapFace(CubeFace face)
     {
         var img = GetFace(face);
-        if (img is not BitmapImage bitmap)
+        if (img is not Bitmap bitmap)
             throw new NotSupportedException(
-                $"Cubemap face is not a {nameof(BitmapImage)} (got {img.GetType().Name}); " +
-                $"CPU-side render and pixel operations require a BitmapImage base level.");
+                $"Cubemap face is not a {nameof(Bitmap)} (got {img.GetType().Name}); " +
+                $"CPU-side render and pixel operations require a Bitmap base level.");
         return bitmap;
     }
 

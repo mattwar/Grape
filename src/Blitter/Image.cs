@@ -2,7 +2,7 @@ namespace Blitter;
 
 /// <summary>
 /// Base type for any 2D image asset the renderer can sample as a
-/// texture. Concrete subtypes include <see cref="BitmapImage"/>
+/// texture. Concrete subtypes include <see cref="Bitmap"/>
 /// (CPU-backed surface with full pixel access) and
 /// <see cref="MipmappedImage"/> (an explicit mip chain of images).
 /// </summary>
@@ -48,23 +48,23 @@ public abstract class Image : Texture, IDisposable
     public (int Width, int Height) Size => (Width, Height);
 
     /// <summary>
-    /// Creates a new in-memory <see cref="BitmapImage"/> of the given
-    /// size. Shortcut for <see cref="BitmapImage.Create"/>.
+    /// Creates a new in-memory <see cref="Bitmap"/> of the given
+    /// size. Shortcut for <see cref="Bitmap.Create"/>.
     /// </summary>
-    public static BitmapImage Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
-        => BitmapImage.Create(width, height, format, mipmaps);
+    public static Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
+        => Bitmap.Create(width, height, format, mipmaps);
 
     /// <summary>
-    /// Loads a <see cref="BitmapImage"/> from disk. Shortcut for
-    /// <see cref="BitmapImage.Load"/>.
+    /// Loads a <see cref="Bitmap"/> from disk. Shortcut for
+    /// <see cref="Bitmap.Load"/>.
     /// </summary>
-    public static BitmapImage Load(string filePath, bool mipmaps = false)
-        => BitmapImage.Load(filePath, mipmaps);
+    public static Bitmap Load(string filePath, bool mipmaps = false)
+        => Bitmap.Load(filePath, mipmaps);
 
     /// <summary>
-    /// Decodes a <see cref="BitmapImage"/> from encoded bytes.
-    /// Shortcut for <see cref="BitmapImage.Decode"/>.
+    /// Decodes a <see cref="Bitmap"/> from encoded bytes.
+    /// Shortcut for <see cref="Bitmap.Decode"/>.
     /// </summary>
-    public static BitmapImage Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
-        => BitmapImage.Decode(bytes, mipmaps);
+    public static Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
+        => Bitmap.Decode(bytes, mipmaps);
 }

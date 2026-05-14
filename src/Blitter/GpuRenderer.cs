@@ -29,7 +29,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // texture doesn't tear down the entire frame mid-pass and turn the
     // window black. Logged once per offender via Console.Error.
     private readonly HashSet<Image> _failedTextureUploads = new();
-    private readonly HashSet<Cubemap> _failedCubemapUploads = new();
+    private readonly HashSet<CubeTexture> _failedCubemapUploads = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<StageShader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
@@ -57,7 +57,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private GpuSampler? _defaultSampler;
     private GpuSampler? _debugTextSampler;
     private GpuSampler? _cubemapSampler;
-    private BitmapImage? _debugFontAtlas;
+    private Bitmap? _debugFontAtlas;
 
     // Textures whose base mip level was just (re)uploaded this frame and
     // need their mip chain regenerated. Drained after the copy pass closes,
@@ -539,7 +539,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        Cubemap cubemap,
+        CubeTexture cubemap,
         Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -558,7 +558,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Cubemap cubemap,
+        CubeTexture cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
@@ -972,7 +972,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             in argsTransform);
     }
 
-    private BitmapImage GetDebugFontAtlas()
+    private Bitmap GetDebugFontAtlas()
     {
         if (_debugFontAtlas is { IsDisposed: false })
             return _debugFontAtlas;
@@ -1213,7 +1213,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                                             $"Affected draws will be skipped for the rest of this session.");
                                     }
                                     break;
-                                case Cubemap multiCube:
+                                case CubeTexture multiCube:
                                     if (_failedCubemapUploads.Contains(multiCube)) break;
                                     try { EnsureCubemapUploaded(copyPass!, multiCube); }
                                     catch (Exception ex)
@@ -1443,7 +1443,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                                     binds[i] = new GpuTextureSamplerBinding(gpuTex, sampler2D);
                                     break;
                                 }
-                                case Cubemap cube:
+                                case CubeTexture cube:
                                 {
                                     var gpuTex = LookupCubemap(cube)
                                         ?? throw new InvalidOperationException(
@@ -1556,6 +1556,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private GpuTexture? LookupTexture(Image image)
     {
+        // GpuBitmap owns its texture directly; bypass the upload cache.
+        if (image is GpuBitmap gpu)
+            return gpu.Texture;
+
         for (int i = 0; i < _textureResources.Count; i++)
         {
             var entry = _textureResources[i];
@@ -1621,13 +1625,16 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private void EnsureTextureUploaded(GpuCopyPass copyPass, Image image)
     {
-        if (image is not BitmapImage bitmap)
+        // GpuBitmap already lives on the GPU; nothing to upload.
+        if (image is GpuBitmap)
+            return;
+        if (image is not Bitmap bitmap)
             throw new NotSupportedException(
-                $"GpuRenderer texture upload only supports {nameof(BitmapImage)} sources today; got {image.GetType().Name}.");
+                $"GpuRenderer texture upload only supports {nameof(Bitmap)} sources today; got {image.GetType().Name}.");
         EnsureTextureUploadedCore(copyPass, bitmap);
     }
 
-    private void EnsureTextureUploadedCore(GpuCopyPass copyPass, BitmapImage image)
+    private void EnsureTextureUploadedCore(GpuCopyPass copyPass, Bitmap image)
     {
         for (int i = 0; i < _textureResources.Count; i++)
         {
@@ -1732,8 +1739,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
         });
     }
 
-    private GpuTexture? LookupCubemap(Cubemap cubemap)
+    private GpuTexture? LookupCubemap(CubeTexture cubemap)
     {
+        // GpuCubemap owns its texture directly; bypass the upload cache.
+        if (cubemap is GpuCubemap gpu)
+            return gpu.Texture;
+
         for (int i = 0; i < _cubemapResources.Count; i++)
         {
             var entry = _cubemapResources[i];
@@ -1753,7 +1764,18 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // versions -- this keeps the API simple at the cost of always
     // re-uploading all 6 faces when any one changes (acceptable: cubemap
     // contents rarely change at runtime; this isn't a per-frame stream).
-    private void EnsureCubemapUploaded(GpuCopyPass copyPass, Cubemap cubemap)
+    private void EnsureCubemapUploaded(GpuCopyPass copyPass, CubeTexture CubeTexture)
+    {
+        // GpuCubemap already lives on the GPU; nothing to upload.
+        if (CubeTexture is GpuCubemap)
+            return;
+        if (CubeTexture is not Cubemap cubemap)
+            throw new NotSupportedException(
+                $"GpuRenderer cubemap upload only supports {nameof(Cubemap)} sources today; got {CubeTexture.GetType().Name}.");
+        EnsureCubemapUploadedCore(copyPass, cubemap);
+    }
+
+    private void EnsureCubemapUploadedCore(GpuCopyPass copyPass, Cubemap cubemap)
     {
         for (int i = 0; i < _cubemapResources.Count; i++)
         {
@@ -1835,10 +1857,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             var chain = faceChains[layer];
             for (int mip = 0; mip < levelCount; mip++)
             {
-                // CPU upload requires a BitmapImage per level.
-                if (chain.Levels[mip] is not BitmapImage bitmapLevel)
+                // CPU upload requires a Bitmap per level.
+                if (chain.Levels[mip] is not Bitmap bitmapLevel)
                     throw new NotSupportedException(
-                        $"Cubemap face {(CubeFace)layer} mip {mip} is not a BitmapImage; " +
+                        $"Cubemap face {(CubeFace)layer} mip {mip} is not a Bitmap; " +
                         $"GPU upload of non-bitmap cubemap faces is not yet supported.");
                 var pixels = bitmapLevel.GetPixels();
                 uint mipSize = (uint)Math.Max(1, (int)size >> mip);
@@ -1997,7 +2019,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // image's per-pixel accessor, which knows how to decode any SDL
     // surface format. The caller MUST pass the returned `rented` array
     // back to ReleaseUploadBytes after the upload is queued.
-    private static ReadOnlySpan<byte> GetUploadBytes(BitmapImage image, out byte[]? rented)
+    private static ReadOnlySpan<byte> GetUploadBytes(Bitmap image, out byte[]? rented)
     {
         var fmt = image.PixelFormat;
         if (fmt == PixelFormat.ABGR8888 || fmt == PixelFormat.ARGB8888)
@@ -2497,7 +2519,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public Mesh Mesh { get; private protected set; } = null!;
         public Shader Pipeline { get; private protected set; } = null!;
         public Image? Texture { get; private protected set; }
-        public Cubemap? Cubemap { get; private protected set; }
+        public CubeTexture? Cubemap { get; private protected set; }
         // Multi-texture path. When non-null, the bind site reads the
         // first TextureCount entries and ignores Texture/Cubemap. The
         // backing array is rented from ArrayPool<Texture>.Shared and is
@@ -2604,7 +2626,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Mesh mesh, 
             Shader shader,
             Image? texture,
-            Cubemap? cubemap,
+            CubeTexture? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2686,7 +2708,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Mesh mesh, 
             Shader shader,            
             Image? texture,
-            Cubemap? cubemap,
+            CubeTexture? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2817,7 +2839,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             Mesh mesh, 
             Shader shader,
             Image? texture,
-            Cubemap? cubemap,
+            CubeTexture? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
