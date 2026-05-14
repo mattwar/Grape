@@ -94,7 +94,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private uint _currentTargetHeight;
     // For 2D and swapchain targets these are always zero. Subclasses
     // that target a single (face, mip) of a layered texture (e.g.
-    // CubemapFaceRenderer) populate them so the color attachment
+    // GpuCubemapFaceRenderer) populate them so the color attachment
     // points at the right slice.
     private uint _currentTargetLayer;
     private uint _currentTargetMipLevel;
@@ -693,8 +693,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
             var actual = tex switch
             {
-                Cubemap => ShaderTextureDimension.TextureCube,
-                Image   => ShaderTextureDimension.Texture2D,
+                CubeTexture => ShaderTextureDimension.TextureCube,
+                Image       => ShaderTextureDimension.Texture2D,
                 _ => throw new ArgumentException(
                     $"Unsupported Texture subtype at index {i}: {tex.GetType().Name}.",
                     nameof(textures)),

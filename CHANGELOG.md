@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `EnvironmentBaker` (Blitter.Bits): GPU-driven IBL bakes for
+  irradiance, prefiltered specular, and the split-sum BRDF LUT.
+- `Cubemaps.SkyIrradiance` and `Cubemaps.SkyPrefiltered` now bake on
+  the GPU, cutting first-frame latency from ~2s to negligible.
 - `Texture` abstract base type for any GPU-samplable texture. `Image`
   and `Cubemap` now both inherit from it, so multi-texture draw
   overloads can bind a mixed list of 2D images and cubemaps.

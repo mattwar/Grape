@@ -8,8 +8,8 @@ namespace Blitter.Bits;
 public static class Cubemaps
 {
     private static Cubemap? s_sky;
-    private static Cubemap? s_skyIrradiance;
-    private static Cubemap? s_skyPrefiltered;
+    private static CubeTexture? s_skyIrradiance;
+    private static CubeTexture? s_skyPrefiltered;
 
     /// <summary>
     /// Default procedural sky: 
@@ -23,7 +23,7 @@ public static class Cubemaps
     /// the cosine-weighted hemisphere integral of the sky cubemap at every surface-normal direction. 
     /// Sample by surface normal to get the diffuse environment term used in image-based lighting.
     /// </summary>
-    public static Cubemap SkyIrradiance => s_skyIrradiance ??= BakeIrradiance(Sky);
+    public static CubeTexture SkyIrradiance => s_skyIrradiance ??= EnvironmentBaker.BakeIrradiance(Sky);
 
     /// <summary>
     /// Prefiltered specular environment map derived from <see cref="Sky"/>.
@@ -32,7 +32,7 @@ public static class Cubemaps
     /// Sample by the reflection vector at <c>roughness * (levels - 1)</c>
     /// to get the specular environment term used in image-based lighting.
     /// </summary>
-    public static Cubemap SkyPrefiltered => s_skyPrefiltered ??= BakePrefilteredSpecular(Sky);
+    public static CubeTexture SkyPrefiltered => s_skyPrefiltered ??= EnvironmentBaker.BakePrefilteredSpecular(Sky);
 
     /// <summary>
     /// Bakes a cubemap by evaluating <paramref name="shade"/> per

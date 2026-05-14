@@ -5,7 +5,7 @@ namespace Blitter;
 /// <see cref="GpuCubemap"/>. Used by GPU cubemap bakers (irradiance,
 /// prefiltered specular) that issue one fullscreen pass per face/mip.
 /// </summary>
-internal sealed class CubemapFaceRenderer : GpuRenderer
+internal sealed class GpuCubemapFaceRenderer : GpuRenderer
 {
     private readonly GpuCubemap _target;
     private readonly CubeFace _face;
@@ -14,7 +14,7 @@ internal sealed class CubemapFaceRenderer : GpuRenderer
     private readonly uint _faceSizeAtMip;
     private readonly bool _useDepth;
 
-    internal CubemapFaceRenderer(GpuDevice device, GpuCubemap target, CubeFace face, int mip, bool useDepth = true)
+    internal GpuCubemapFaceRenderer(GpuDevice device, GpuCubemap target, CubeFace face, int mip, bool useDepth = true)
         : base(device)
     {
         ArgumentNullException.ThrowIfNull(target);

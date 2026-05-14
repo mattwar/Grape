@@ -109,7 +109,7 @@ public sealed class GpuCubemap : CubeTexture, IDisposable
 
         foreach (var face in CubeFaceExtensions.All)
         {
-            using var renderer = new CubemapFaceRenderer(_device, this, face, mip: 0);
+            using var renderer = new GpuCubemapFaceRenderer(_device, this, face, mip: 0);
             if (backgroundColor is { } c)
             {
                 renderer.BackgroundColor = c;
