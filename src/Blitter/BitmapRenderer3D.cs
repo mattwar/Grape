@@ -3,7 +3,7 @@ namespace Blitter;
 /// <summary>
 /// A 3D renderer that draws into an image.
 /// </summary>
-internal sealed class ImageGpuRenderer : GpuRenderer
+internal sealed class BitmapRenderer3D : GpuRenderer
 {
     // SDL_GPU's R8G8B8A8Unorm color targets store pixels as in-memory
     // bytes R, G, B, A. SDL's PixelFormat.ABGR8888 -- a packed uint32
@@ -37,7 +37,7 @@ internal sealed class ImageGpuRenderer : GpuRenderer
     private byte[]? _scratch;
     private bool _uploadWallpaper;
 
-    internal ImageGpuRenderer(GpuDevice device, Bitmap image)
+    internal BitmapRenderer3D(GpuDevice device, Bitmap image)
         : base(device)
     {
         ArgumentNullException.ThrowIfNull(image);
@@ -182,8 +182,12 @@ internal sealed class ImageGpuRenderer : GpuRenderer
         out GpuTexture? colorTarget,
         out SDL.GPUTextureFormat colorFormat,
         out uint width,
-        out uint height)
+        out uint height,
+        out uint layer,
+        out uint mipLevel)
     {
+        layer = 0;
+        mipLevel = 0;
         if (_ownedColorTarget is null || _ownedColorTarget.IsDisposed)
         {
             colorTarget = null;

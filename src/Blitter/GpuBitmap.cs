@@ -83,6 +83,42 @@ public sealed class GpuBitmap : Image
     internal GpuTexture Texture =>
         _texture ?? throw new ObjectDisposedException(nameof(GpuBitmap));
 
+    /// <summary>
+    /// Render into this bitmap using a 3D renderer, preserving any
+    /// existing pixels (the bitmap acts as wallpaper underneath the
+    /// new draws). The call is synchronous; when it returns, the
+    /// bitmap's GPU texture reflects the final output.
+    /// </summary>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    public void Render3D(Action<Renderer3D> renderAction)
+        => Render3DCore(null, renderAction);
+
+    /// <summary>
+    /// Render into this bitmap using a 3D renderer, clearing to
+    /// <paramref name="backgroundColor"/> first. The call is
+    /// synchronous; when it returns, the bitmap's GPU texture
+    /// reflects the final output.
+    /// </summary>
+    /// <param name="backgroundColor">The background painted behind the draws.</param>
+    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
+    public void Render3D(Color backgroundColor, Action<Renderer3D> renderAction)
+        => Render3DCore(backgroundColor, renderAction);
+
+    private void Render3DCore(Color? backgroundColor, Action<Renderer3D> renderAction)
+    {
+        ArgumentNullException.ThrowIfNull(renderAction);
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuBitmap));
+        using var renderer = new GpuBitmapRenderer(_device, this);
+        renderer.Configure(backgroundColor);
+        renderAction(renderer);
+        renderer.Render();
+        // Lower mips (if any) become stale after a render into level 0;
+        // bump the version so any dependent caches refresh. Call
+        // GenerateMipmaps separately if a mip chain is required.
+        Invalidate();
+    }
+
     /// <inheritdoc/>
     public override void Dispose()
     {

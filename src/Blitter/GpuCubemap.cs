@@ -82,6 +82,51 @@ public sealed class GpuCubemap : CubeTexture, IDisposable
     internal GpuTexture Texture =>
         _texture ?? throw new ObjectDisposedException(nameof(GpuCubemap));
 
+    /// <summary>
+    /// Render into each of the six faces of this cubemap, preserving
+    /// any existing pixels in each face. The callback runs once per
+    /// face (base mip level) with a renderer already targeting that
+    /// face. The user sets up their own camera per face if needed.
+    /// </summary>
+    /// <param name="drawAction">Callback invoked for each face.</param>
+    public void Render(Action<Renderer3D, CubeFace> drawAction)
+        => RenderCore(null, drawAction);
+
+    /// <summary>
+    /// Render into each of the six faces of this cubemap, clearing
+    /// each face to <paramref name="backgroundColor"/> first.
+    /// </summary>
+    /// <param name="backgroundColor">The background painted behind the draws on every face.</param>
+    /// <param name="drawAction">Callback invoked for each face.</param>
+    public void Render(Color backgroundColor, Action<Renderer3D, CubeFace> drawAction)
+        => RenderCore(backgroundColor, drawAction);
+
+    private void RenderCore(Color? backgroundColor, Action<Renderer3D, CubeFace> drawAction)
+    {
+        ArgumentNullException.ThrowIfNull(drawAction);
+        if (IsDisposed)
+            throw new ObjectDisposedException(nameof(GpuCubemap));
+
+        foreach (var face in CubeFaceExtensions.All)
+        {
+            using var renderer = new CubemapFaceRenderer(_device, this, face, mip: 0);
+            if (backgroundColor is { } c)
+            {
+                renderer.BackgroundColor = c;
+                renderer.AutoClear = true;
+            }
+            else
+            {
+                renderer.AutoClear = false;
+            }
+            drawAction(renderer, face);
+            renderer.Render();
+        }
+        // Lower mips (if any) become stale after a render into level 0;
+        // bump the version so dependent caches refresh.
+        Invalidate();
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {

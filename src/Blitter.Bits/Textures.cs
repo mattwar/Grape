@@ -44,10 +44,10 @@ public static class Textures
     // The integral is purely a function of (NdotV, roughness) -- no
     // scene inputs -- so we can fill the image directly via SetPixel
     // without going through the GPU render path. CPU also sidesteps
-    // ImageGpuRenderer's 8-bit color target hard-coding; the output
+    // BitmapRenderer3D's 8-bit color target hard-coding; the output
     // here is still 8-bit-per-channel, but the math runs at full
     // float precision and we avoid an extra round-trip. Move to a GPU
-    // bake into RGBA16F once ImageGpuRenderer supports float targets.
+    // bake into RGBA16F once BitmapRenderer3D supports float targets.
     private static Image BakeSpecularLut()
     {
         const int Size = 256;

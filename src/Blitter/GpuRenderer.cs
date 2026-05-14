@@ -92,6 +92,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private SDL.GPUSampleCount _currentSampleCount = SDL.GPUSampleCount.SampleCount1;
     private uint _currentTargetWidth;
     private uint _currentTargetHeight;
+    // For 2D and swapchain targets these are always zero. Subclasses
+    // that target a single (face, mip) of a layered texture (e.g.
+    // CubemapFaceRenderer) populate them so the color attachment
+    // points at the right slice.
+    private uint _currentTargetLayer;
+    private uint _currentTargetMipLevel;
     // One vertex buffer per DrawDebugText call within a frame. Each draw
     // gets its own array so the array-keyed mesh cache resolves to a
     // distinct Mesh per draw; otherwise multiple text strings in the same
@@ -247,12 +253,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         _renderFrame = _device.BeginFrame();
 
-        if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height))
+        if (TryAcquireColorTarget(_renderFrame, out _colorTarget, out _colorFormat, out var width, out var height, out var layer, out var mipLevel))
         {
             _currentSampleCount = MapAntialiasing(Antialiasing);
             _currentTargetWidth = width;
             _currentTargetHeight = height;
-            EnsureDepthTexture(width, height, _currentSampleCount);
+            _currentTargetLayer = layer;
+            _currentTargetMipLevel = mipLevel;
+            if (UsesDepthBuffer)
+                EnsureDepthTexture(width, height, _currentSampleCount);
             EnsureMsaaColorTexture(width, height, _colorFormat, _currentSampleCount);
         }
         else
@@ -275,18 +284,25 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// implementation acquires the next swapchain image of the bound
     /// window. Subclasses that own their target (e.g. an image-bound
     /// renderer) override this to return their owned texture.
+    /// <paramref name="layer"/> and <paramref name="mipLevel"/> select
+    /// a single slice of a layered texture; both are zero for 2D and
+    /// swapchain targets.
     /// </summary>
     protected virtual bool TryAcquireColorTarget(
         GpuRenderFrame frame,
         out GpuTexture? colorTarget,
         out SDL.GPUTextureFormat colorFormat,
         out uint width,
-        out uint height)
+        out uint height,
+        out uint layer,
+        out uint mipLevel)
     {
         colorTarget = null;
         colorFormat = SDL.GPUTextureFormat.Invalid;
         width = 0;
         height = 0;
+        layer = 0;
+        mipLevel = 0;
 
         if (_window is null)
             return false;
@@ -317,6 +333,15 @@ internal class GpuRenderer : Renderer3D, IDisposable
     {
         _renderFrame!.Submit();
     }
+
+    /// <summary>
+    /// Whether this renderer needs a depth/stencil scratch attached to
+    /// its render pass. Defaults to <c>true</c>. Subclasses that only
+    /// run depth-less passes (e.g. fullscreen-tri postprocess bakes)
+    /// override to <c>false</c> so no depth texture is allocated and
+    /// no depth attachment is bound.
+    /// </summary>
+    protected virtual bool UsesDepthBuffer => true;
 
     /// <summary>
     /// Hook invoked at the start of the frame's main copy pass, before
@@ -1280,6 +1305,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
             GpuColorTargetInfo colorTargetInfo;
             if (_msaaColorTexture is not null)
             {
+                // The MSAA scratch is a plain 2D texture (layer/mip 0).
+                // The resolve target is the actual destination slice;
+                // layer/mip there select the cube face / mip if any.
                 colorTargetInfo = new GpuColorTargetInfo
                 {
                     Texture = _msaaColorTexture,
@@ -1287,6 +1315,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
                     StoreOp = SDL.GPUStoreOp.Resolve,
                     ResolveTexture = _colorTarget,
+                    ResolveLayer = _currentTargetLayer,
+                    ResolveMipLevel = _currentTargetMipLevel,
                 };
             }
             else
@@ -1294,6 +1324,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
                 colorTargetInfo = new GpuColorTargetInfo
                 {
                     Texture = _colorTarget,
+                    LayerOrDepthPlane = _currentTargetLayer,
+                    MipLevel = _currentTargetMipLevel,
                     ClearColor = _clearColor,
                     LoadOp = AutoClear ? SDL.GPULoadOp.Clear : SDL.GPULoadOp.Load,
                     StoreOp = SDL.GPUStoreOp.Store,
@@ -1305,15 +1337,20 @@ internal class GpuRenderer : Renderer3D, IDisposable
             // Clear depth to 1.0 (the far plane in normalized device
             // coordinates) at the start of every frame and discard the
             // contents at the end -- nothing reads them after the frame.
-            var depthTarget = new GpuDepthStencilTargetInfo
-            {
-                Texture = _depthTexture,
-                ClearDepth = 1f,
-                LoadOp = SDL.GPULoadOp.Clear,
-                StoreOp = SDL.GPUStoreOp.DontCare,
-                StencilLoadOp = SDL.GPULoadOp.DontCare,
-                StencilStoreOp = SDL.GPUStoreOp.DontCare,
-            };
+            // When the subclass opts out of depth (UsesDepthBuffer ==
+            // false), Texture stays null and the native layer skips the
+            // depth attachment entirely.
+            var depthTarget = UsesDepthBuffer
+                ? new GpuDepthStencilTargetInfo
+                {
+                    Texture = _depthTexture,
+                    ClearDepth = 1f,
+                    LoadOp = SDL.GPULoadOp.Clear,
+                    StoreOp = SDL.GPUStoreOp.DontCare,
+                    StencilLoadOp = SDL.GPULoadOp.DontCare,
+                    StencilStoreOp = SDL.GPUStoreOp.DontCare,
+                }
+                : default;
 
             if (!_renderFrame.TryBeginRenderPass(
                 colorTargets,

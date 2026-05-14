@@ -208,7 +208,7 @@ public sealed class Bitmap : Image
     {
         ArgumentNullException.ThrowIfNull(renderAction);
         ThrowIfDisposed();
-        using var renderer = new ImageGpuRenderer(GpuDevice.Default, this);
+        using var renderer = new BitmapRenderer3D(GpuDevice.Default, this);
         renderer.Configure(backgroundColor);
         renderAction(renderer);
         renderer.Render();
