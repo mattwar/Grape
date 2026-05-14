@@ -377,7 +377,12 @@ public static class Cubemaps
     {
         var image = Image.Create(size, size, PixelFormat.ABGR8888);
         float inv = 2f / size;
-        for (int y = 0; y < size; y++)
+        // Rows are independent; SetPixel writes distinct byte ranges
+        // per (x, y), so parallelising the outer loop is safe. This is
+        // the hot path for `BakePrefilteredSpecular` -- one cube level
+        // at default 128² with 1024 samples is millions of integrand
+        // evaluations.
+        System.Threading.Tasks.Parallel.For(0, size, y =>
         {
             // Image v in [-1, 1]; matches D3D / Vulkan convention
             // where image-row 0 is the "top" of the face as seen
@@ -389,7 +394,7 @@ public static class Cubemaps
                 var dir = Vector3.Normalize(FaceUVToDirection(face, u, v));
                 image.SetPixel(x, y, shade(face, dir));
             }
-        }
+        });
         return image;
     }
 
