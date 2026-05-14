@@ -6,7 +6,7 @@ namespace Blitter;
 /// (CPU-backed surface with full pixel access) and
 /// <see cref="MipmappedImage"/> (an explicit mip chain of images).
 /// </summary>
-public abstract class Image : IDisposable
+public abstract class Image : Texture, IDisposable
 {
     /// <summary>Width of the (base level of the) image in pixels.</summary>
     public abstract int Width { get; }

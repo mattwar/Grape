@@ -22,7 +22,7 @@ public abstract class Shader
         Vertex = vertex;
         Fragment = fragment;
         VertexLayout = vertexLayout;
-        TextureLayout = textureLayout ?? ShaderTextureLayout.SingleTexture2D;
+        TextureLayout = textureLayout ?? ShaderTextureLayout.Empty;
     }
 
     /// <summary>The vertex stage.</summary>
@@ -38,9 +38,9 @@ public abstract class Shader
 
     /// <summary>
     /// The texture/sampler bindings the shader's fragment stage expects.
-    /// Defaults to <see cref="ShaderTextureLayout.SingleTexture2D"/>; pass
-    /// <see cref="ShaderTextureLayout.Empty"/> for shaders that bind no
-    /// textures.
+    /// Defaults to <see cref="ShaderTextureLayout.Empty"/>; pass an
+    /// explicit layout (e.g. <see cref="ShaderTextureLayout.SingleTexture2D"/>)
+    /// for shaders that bind textures.
     /// </summary>
     public ShaderTextureLayout TextureLayout { get; }
 }

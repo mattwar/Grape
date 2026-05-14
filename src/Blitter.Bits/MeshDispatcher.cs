@@ -26,7 +26,7 @@ internal interface IMeshDrawAdapter
         where TArgs : unmanaged, IUniformArgs<TArgs>;
 
     /// <summary>
-    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex,TArgs}, in TArgs)"/>
+    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, ReadOnlySpan{Texture}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// after casting <paramref name="mesh"/> and <paramref name="shader"/> to
     /// the adapter's vertex/args types. Used by materials with multiple
     /// texture inputs (e.g. PBR base color + metallic-roughness + AO + emissive).
@@ -34,7 +34,7 @@ internal interface IMeshDrawAdapter
     void DrawMultiTextured<TArgs>(
         Renderer3D renderer,
         Mesh mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader shader,
         in TArgs args)
         where TArgs : unmanaged, IUniformArgs<TArgs>;
@@ -77,7 +77,7 @@ internal sealed class MeshDrawAdapter<TVertex> : IMeshDrawAdapter
     public void DrawMultiTextured<TArgs>(
         Renderer3D renderer,
         Mesh mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader shader,
         in TArgs args)
         where TArgs : unmanaged, IUniformArgs<TArgs>

@@ -52,12 +52,15 @@ public static class PbrShaders
 
     // Cook-Torrance microfacet BRDF: GGX (Trowbridge-Reitz) NDF, Smith-GGX
     // geometry term (height-correlated), Schlick Fresnel. Diffuse is
-    // Lambert weighted by (1 - F) * (1 - metallic). No IBL / no shadows
-    // yet; ambient is a flat term so dark-side pixels aren't black.
+    // Lambert weighted by (1 - F) * (1 - metallic). Image-based
+    // lighting (IBL) uses Karis split-sum: a diffuse irradiance cube
+    // sampled by N, plus a roughness-LOD-encoded prefiltered specular
+    // cube sampled by R combined with the split-sum BRDF 2D LUT.
     //
-    // Sampled textures occupy t0..t3 in space2; SDL_GPU packs storage
+    // Sampled textures occupy t0..t6 in space2 (4 user PBR + 3 IBL),
+    // matching slots 0..6 of PbrTextureLayout. SDL_GPU packs storage
     // buffers AFTER sampled textures within space2, so the point-light
-    // structured buffer lands at t4.
+    // structured buffer lands at t7.
     private const string LitPbrFragHlsl = """
         struct PointLight
         {
@@ -73,12 +76,18 @@ public static class PbrShaders
         SamplerState      occSmp       : register(s2, space2);
         Texture2D<float4> emissiveTex  : register(t3, space2);
         SamplerState      emissiveSmp  : register(s3, space2);
-        StructuredBuffer<PointLight> pointLights : register(t4, space2);
+        TextureCube<float4> irradianceTex  : register(t4, space2);
+        SamplerState        irradianceSmp  : register(s4, space2);
+        TextureCube<float4> prefilteredTex : register(t5, space2);
+        SamplerState        prefilteredSmp : register(s5, space2);
+        Texture2D<float4>   brdfLutTex     : register(t6, space2);
+        SamplerState        brdfLutSmp     : register(s6, space2);
+        StructuredBuffer<PointLight> pointLights : register(t7, space2);
 
         cbuffer Material : register(b0, space3)
         {
             float4 baseColorFactor;     // rgba
-            float4 matFactors;          // x metallic, y roughness, z occlusion, w _
+            float4 matFactors;          // x metallic, y roughness, z occlusion, w prefilterMaxMip
             float4 emissiveFactor;      // rgb, w _
             float4 cameraPosition;      // xyz world-space camera, w _
         };
@@ -115,6 +124,16 @@ public static class PbrShaders
         {
             float f = pow(saturate(1.0f - VdotH), 5.0f);
             return F0 + (1.0f - F0) * f;
+        }
+
+        // Roughness-aware Schlick Fresnel for IBL ambient. As roughness
+        // climbs the grazing Fresnel pulls toward (1-roughness) instead
+        // of pure white so rough metals don't get an unphysically bright
+        // edge highlight from the environment.
+        float3 F_SchlickRoughness(float cosTheta, float3 F0, float roughness)
+        {
+            float f = pow(saturate(1.0f - cosTheta), 5.0f);
+            return F0 + (max(float3(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), F0) - F0) * f;
         }
 
         float3 BRDF(float3 N, float3 V, float3 L, float3 albedo, float metallic, float roughness)
@@ -167,15 +186,25 @@ public static class PbrShaders
 
             // View vector: world-space camera minus pixel position.
             float3 V = normalize(cameraPosition.xyz - input.WorldPos);
+            float NdotV = saturate(dot(N, V));
 
-            // Ambient term. Without IBL there's no environment to
-            // reflect, so this is just a flat fill that keeps unlit
-            // pixels from being pure black. Metals have no diffuse
-            // response, so the (1 - metallic) factor zeros their
-            // ambient body color -- they will look dark until a real
-            // environment-lighting pass (cubemap prefilter + BRDF LUT)
-            // gives them something to mirror.
-            float3 lit = ambient.rgb * albedo * ao * (1.0f - metallic);
+            // -- Image-based lighting (Karis split-sum)
+            //   - diffuse: irradiance(N) modulated by (1 - F_rough) * (1 - metallic)
+            //   - specular: prefiltered(R, roughness*maxMip) * (F * lut.r + lut.g)
+            float3 F0  = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
+            float3 Fr  = F_SchlickRoughness(NdotV, F0, roughness);
+            float3 kd  = (1.0f - Fr) * (1.0f - metallic);
+            float3 irr = irradianceTex.Sample(irradianceSmp, N).rgb;
+            float3 R   = reflect(-V, N);
+            float  maxMip = matFactors.w;
+            float3 pref   = prefilteredTex.SampleLevel(prefilteredSmp, R, roughness * maxMip).rgb;
+            float2 brdf   = brdfLutTex.Sample(brdfLutSmp, float2(NdotV, roughness)).rg;
+            float3 iblDiffuse  = irr * albedo * kd;
+            float3 iblSpecular = pref * (Fr * brdf.x + brdf.y);
+            // Tinted by the renderer's ambient color so authors can dim
+            // or warm the IBL contribution per-scene without rebaking
+            // cubemaps.
+            float3 lit = (iblDiffuse + iblSpecular) * ao * ambient.rgb;
 
             // -- Directional light
             float dirLen = length(dirLightDir.xyz);
@@ -230,7 +259,10 @@ public static class PbrShaders
         new ShaderTextureSlot("baseColor",         ShaderTextureDimension.Texture2D),
         new ShaderTextureSlot("metallicRoughness", ShaderTextureDimension.Texture2D),
         new ShaderTextureSlot("occlusion",         ShaderTextureDimension.Texture2D),
-        new ShaderTextureSlot("emissive",          ShaderTextureDimension.Texture2D));
+        new ShaderTextureSlot("emissive",          ShaderTextureDimension.Texture2D),
+        new ShaderTextureSlot("irradiance",        ShaderTextureDimension.TextureCube),
+        new ShaderTextureSlot("prefiltered",       ShaderTextureDimension.TextureCube),
+        new ShaderTextureSlot("specularLut",       ShaderTextureDimension.Texture2D));
 
     /// <summary>
     /// Cook-Torrance PBR shader (GGX + Smith + Schlick) on

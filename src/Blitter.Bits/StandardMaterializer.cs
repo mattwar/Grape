@@ -73,37 +73,58 @@ public class StandardMaterializer : Materializer
     private static void DrawPbrMesh(
         Renderer3D renderer, Mesh mesh, PbrMaterial pbr, in Matrix4x4 transform)
     {
-        // A single 1x1 white image plugs every "missing texture" slot:
-        // the shader multiplies each sample by the matching factor, so
-        // white reduces to "use the factor unchanged". Inline-array
-        // buffer keeps the four texture refs on the stack -- no per-draw
-        // heap allocation -- and we hand a Span into it to the renderer.
+        // Materializer is responsible for filling every slot the PBR
+        // shader declares: four material textures (slots 0..3, falling
+        // back to a 1x1 white image when the material doesn't supply
+        // one -- the shader's per-channel factor scales each sample, so
+        // white reduces to "use the factor unchanged"), plus the three
+        // IBL textures (slots 4..6) sourced from Renderer3D.Environment.
+        // Inline-array buffer keeps the seven refs on the stack and we
+        // hand a Span into it to the renderer.
+        var env = renderer.Environment
+            ?? throw new InvalidOperationException(
+                $"PBR draws require an {nameof(Environment3D)} for IBL inputs; " +
+                $"set {nameof(Renderer3D)}.{nameof(Renderer3D.Environment)} " +
+                $"(e.g. to {nameof(EnvironmentMaps)}.{nameof(EnvironmentMaps.Sky)}) before drawing.");
+
         var white = Textures.White;
         PbrTextureBuffer buffer = default;
         buffer[0] = pbr.BaseColorTexture ?? white;
         buffer[1] = pbr.MetallicRoughnessTexture ?? white;
         buffer[2] = pbr.OcclusionTexture ?? white;
         buffer[3] = pbr.EmissiveTexture ?? white;
+        buffer[4] = env.Irradiance;
+        buffer[5] = env.Prefiltered;
+        buffer[6] = env.SpecularLut;
 
         var args = new PbrArgs
         {
             Model = transform,
             ViewProjection = Matrix4x4.Identity,
             BaseColorFactor = pbr.BaseColor,
-            MaterialFactors = new Vector4(pbr.Metallic, pbr.Roughness, pbr.OcclusionStrength, 0f),
+            // .W carries the prefiltered cubemap's max mip index so the
+            // shader can scale roughness to a valid LOD without hard-
+            // coding the chain depth. Filled here rather than on
+            // PbrMaterial so authors don't have to track it.
+            MaterialFactors = new Vector4(
+                pbr.Metallic,
+                pbr.Roughness,
+                pbr.OcclusionStrength,
+                Math.Max(0, env.Prefiltered.LevelCount - 1)),
             EmissiveFactor = pbr.Emissive,
         };
         MeshDispatcher.For(mesh).DrawMultiTextured(
             renderer, mesh, buffer[..], PbrShaders.LitPbr, in args);
     }
 
-    // 4-slot stack buffer for PBR texture binding. InlineArray gives us a
-    // Span<Image> over the fields without allocating; the renderer copies
-    // the references out before the span dies.
-    [InlineArray(4)]
+    // 7-slot stack buffer for PBR texture binding. InlineArray gives us
+    // a Span<Texture> over the fields without allocating; the renderer
+    // copies the references out before the span dies. Holds a mix of
+    // Image (material maps + BRDF LUT) and Cubemap (IBL) entries.
+    [InlineArray(7)]
     private struct PbrTextureBuffer
     {
-        private Image _slot0;
+        private Texture _slot0;
     }
 
     /// <inheritdoc/>

@@ -5,13 +5,42 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `Texture` abstract base type for any GPU-samplable texture. `Image`
+  and `Cubemap` now both inherit from it, so multi-texture draw
+  overloads can bind a mixed list of 2D images and cubemaps.
+- `Environment3D` and `Renderer3D.Environment`: scene-wide IBL state
+  bundling an irradiance cubemap, a prefiltered specular cubemap, and
+  a BRDF LUT. The engine doesn't consume the value directly --
+  materializers (e.g. `StandardMaterializer`) read it and bind the
+  appropriate slots when drawing PBR materials.
+- `EnvironmentMaps.Sky` (Blitter.Bits): default IBL environment built
+  from the procedural sky cubemap and `Textures.SpecularLut`.
+- `PbrShaders.LitPbr` now uses the Karis split-sum approximation for
+  image-based lighting (diffuse from irradiance, specular from
+  prefiltered + BRDF LUT). The previous flat ambient term is replaced
+  by IBL; `Renderer3D.AmbientLight` now tints the IBL result.
 - `Cubemaps.BakePrefilteredSpecular(Cubemap, faceSize, levels, samples)`
   and `Cubemaps.SkyPrefiltered`: GGX-importance-sampled mipmapped
   specular environment cubemap for image-based lighting. Mip i = the
   environment integrated at roughness i/(levels-1); shaders sample by
   reflection vector at LOD `roughness * (levels - 1)`.
 
+### Fixed
+- `Meshes.Sphere` / `Meshes.TexturedSphere` index winding was
+  inverted, so `CullMode.Back` culled the near hemisphere and showed
+  the far one. Manifested as PBR IBL reflections appearing rotated
+  through the sphere center (looking like a Y-axis flip).
+- `Shader` ctor no longer defaults `TextureLayout` to
+  `SingleTexture2D` when no layout is supplied. The new default is
+  `Empty`, so custom shaders without texture bindings work without
+  having to pass it explicitly.
+
 ### Changed
+- Multi-texture `DrawMesh` / `DrawMeshRaw` overloads now take
+  `ReadOnlySpan<Texture>` instead of `ReadOnlySpan<Image>`, allowing
+  callers to bind a mixed sequence of 2D images and cubemaps. Each
+  span entry's runtime kind must match its slot's declared
+  `ShaderTextureDimension`.
 - `GpuRenderer` now uploads every level of an explicit cubemap mip
   chain (when `Cubemap.LevelCount > 1`), wiring up the chains built
   by `MipmappedImage` faces. The auto-generated-mips path

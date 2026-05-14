@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Numerics;
 
 namespace Blitter;
@@ -177,7 +177,7 @@ public abstract class Renderer3D
     /// is a good baseline upgrade. Memory and fill-rate cost scale
     /// linearly with the sample count; fragment shading cost stays the
     /// same (one shader invocation per pixel, regardless of MSAA level).
-    /// MSAA does not help with texture aliasing inside surfaces — use
+    /// MSAA does not help with texture aliasing inside surfaces � use
     /// mipmaps (<see cref="Image.Mipmaps"/>) for that.
     /// </remarks>
     public Antialiasing Antialiasing { get; set; } = Antialiasing.None;
@@ -205,11 +205,20 @@ public abstract class Renderer3D
     /// Optional infinitely-distant light. When non-null and the args
     /// struct opts in via <see cref="IUniformArgs{TSelf}.SetDirectionalLight"/>,
     /// lit shaders combine its contribution with <see cref="AmbientLight"/>
-    /// using a Lambertian (N·L) term. <c>null</c> (the default) skips
+    /// using a Lambertian (N�L) term. <c>null</c> (the default) skips
     /// the directional contribution entirely; lit surfaces fall back to
     /// just the ambient term.
     /// </summary>
     public DirectionalLight? DirectionalLight { get; set; }
+
+    /// <summary>
+    /// Scene-wide image-based-lighting environment. The engine itself
+    /// doesn't read this -- it's exposed for materializers (e.g.
+    /// <c>StandardMaterializer</c>) that want a single per-renderer
+    /// place to source IBL inputs without threading them through every
+    /// draw call.
+    /// </summary>
+    public Environment3D? Environment { get; set; }
 
     /// <summary>
     /// Mutable list of point lights that lit shaders accumulate per
@@ -329,7 +338,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex> shader)
         where TVertex : unmanaged;
 
@@ -345,12 +354,12 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Raw multi-texture draw with no scene composition. See
-    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Texture}, Shader{TVertex})"/>
     /// for binding semantics.
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -441,12 +450,12 @@ public abstract class Renderer3D
     /// Scene-aware multi-texture draw. See
     /// <see cref="DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>
     /// for trait-application behavior, and
-    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Texture}, Shader{TVertex})"/>
     /// for texture-binding semantics.
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -578,13 +587,13 @@ public abstract class Renderer3D
 
     /// <summary>
     /// Multi-texture variant of the instanced draw overload. See
-    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Image}, Shader{TVertex})"/>
+    /// <see cref="DrawMesh{TVertex}(Mesh{TVertex}, ReadOnlySpan{Texture}, Shader{TVertex})"/>
     /// for texture-binding semantics; the bound textures are shared by
     /// every instance in the call.
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)

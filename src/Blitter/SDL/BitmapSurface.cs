@@ -4,12 +4,12 @@ namespace Blitter;
 /// <summary>
 /// A bitmap stored on the GPU that can be drawn.
 /// </summary>
-internal sealed class Texture : IDisposable
+internal sealed class BitmapSurface : IDisposable
 {
     private readonly BitmapRenderer2D _renderer;
     private nint _textureId;
 
-    internal Texture(BitmapRenderer2D renderer, nint surfaceId)
+    internal BitmapSurface(BitmapRenderer2D renderer, nint surfaceId)
     {
         _renderer = renderer;
         _textureId = surfaceId;
@@ -17,9 +17,9 @@ internal sealed class Texture : IDisposable
     }
 
     /// <summary>
-    /// The <see cref="Renderer"/> that created this <see cref="Texture"/>.
+    /// The <see cref="Renderer"/> that created this <see cref="BitmapSurface"/>.
     /// </summary>
-    public BitmapRenderer2D Renderer => _renderer;
+    internal BitmapRenderer2D Renderer => _renderer;
 
     internal nint Id => _textureId;
 

@@ -131,7 +131,9 @@ await window.RunAsync(rd =>
         rd.DrawMesh(innerCube, Shaders.PositionColorWithTransform,
             model * viewProjection);
     }
-});static Image MakeFace(Color fill)
+});
+
+static Image MakeFace(Color fill)
 {
     var image = Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
     var border = Color.Black;

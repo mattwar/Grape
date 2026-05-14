@@ -280,16 +280,16 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
 
     #region Textures
 
-    private Texture CreateTexture(int width, int height, PixelFormat pixelFormat, SDL.TextureAccess access)
+    private BitmapSurface CreateTexture(int width, int height, PixelFormat pixelFormat, SDL.TextureAccess access)
     {
         ThrowIfDisposed();
         var id = SDL.CreateTexture(_rendererId, (SDL.PixelFormat)pixelFormat, access, width, height);
         if (id == 0)
             throw new InvalidOperationException($"SDL.CreateTexture failed: {SDL.GetError()}");
-        return new Texture(this, id);
+        return new BitmapSurface(this, id);
     }
 
-    private Texture CreateTexture(Image image)
+    private BitmapSurface CreateTexture(Image image)
     {
         ThrowIfDisposed();
         if (image is not BitmapImage bitmap)
@@ -297,18 +297,18 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
                 $"BitmapRenderer2D only supports {nameof(BitmapImage)} sources; got {image.GetType().Name}.");
         bitmap.ThrowIfDisposed();
         var id = SDL.CreateTextureFromSurface(_rendererId, bitmap._imageId);
-        return new Texture(this, id);
+        return new BitmapSurface(this, id);
     }
 
     private readonly ConditionalWeakTable<Image, ImageTextureEntry> _imageTextureCache = new();
 
     private sealed class ImageTextureEntry
     {
-        public Texture Texture { get; set; } = null!;
+        public BitmapSurface Texture { get; set; } = null!;
         public int Version { get; set; }
     }
 
-    private bool TryGetOrCreateTexture(Image image, [NotNullWhen(true)] out Texture? texture)
+    private bool TryGetOrCreateTexture(Image image, [NotNullWhen(true)] out BitmapSurface? texture)
     {
         if (!_imageTextureCache.TryGetValue(image, out var entry))
         {

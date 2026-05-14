@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections.Immutable;
 using System.Runtime.InteropServices;
 using System.Numerics;
@@ -77,7 +77,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private const SDL.GPUTextureFormat DepthFormat = SDL.GPUTextureFormat.D32Float;
 
     // Multisample color scratch target. Allocated only when the active
-    // antialiasing level is greater than 1Ã—; the render pass writes into
+    // antialiasing level is greater than 1×; the render pass writes into
     // this texture and resolves it down to the actual color target
     // (swapchain image, owned image, etc.) at end-of-pass.
     private GpuTexture? _msaaColorTexture;
@@ -617,7 +617,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <inheritdoc/>
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -633,7 +633,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <inheritdoc/>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
@@ -648,9 +648,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     // Validates a multi-texture span against the shader's TextureLayout:
-    // matching count, every supplied image is non-null, every declared
-    // slot is Texture2D (mixed dimensions need a future per-slot API).
-    private static void ValidateTextureSpan(Shader shader, ReadOnlySpan<Image> textures)
+    // matching count, every entry non-null, and each entry's runtime
+    // kind matches the declared slot Dimension (Image -> Texture2D,
+    // Cubemap -> TextureCube).
+    private static void ValidateTextureSpan(Shader shader, ReadOnlySpan<Texture> textures)
     {
         var layout = shader.TextureLayout;
         if (textures.Length != layout.Count)
@@ -660,14 +661,24 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         for (int i = 0; i < layout.Count; i++)
         {
-            if (layout.Slots[i].Dimension != ShaderTextureDimension.Texture2D)
-                throw new ArgumentException(
-                    $"Shader texture slot {i} ({layout.Slots[i].Name}) expects {layout.Slots[i].Dimension}; " +
-                    $"the ReadOnlySpan<Image> overloads support only Texture2D slots.",
-                    nameof(textures));
-
-            if (textures[i] is null)
+            var slot = layout.Slots[i];
+            var tex = textures[i];
+            if (tex is null)
                 throw new ArgumentException($"Texture at index {i} is null.", nameof(textures));
+
+            var actual = tex switch
+            {
+                Cubemap => ShaderTextureDimension.TextureCube,
+                Image   => ShaderTextureDimension.Texture2D,
+                _ => throw new ArgumentException(
+                    $"Unsupported Texture subtype at index {i}: {tex.GetType().Name}.",
+                    nameof(textures)),
+            };
+            if (actual != slot.Dimension)
+                throw new ArgumentException(
+                    $"Shader texture slot {i} ({slot.Name}) expects {slot.Dimension}; " +
+                    $"got {actual} ({tex.GetType().Name}).",
+                    nameof(textures));
         }
     }
 
@@ -689,7 +700,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         if (layout.Count != 1)
             throw new ArgumentException(
                 $"Shader expects {layout.Count} texture(s); 1 Image supplied. " +
-                $"Use the ReadOnlySpan<Image> overload to supply multiple textures.",
+                $"Use the ReadOnlySpan<Texture> overload to supply multiple textures.",
                 nameof(shader));
         if (layout.Slots[0].Dimension != ShaderTextureDimension.Texture2D)
             throw new ArgumentException(
@@ -742,7 +753,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <inheritdoc/>
     public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -794,7 +805,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private void QueueInstancedMulti<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        ReadOnlySpan<Image> textures,
+        ReadOnlySpan<Texture> textures,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -851,7 +862,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <summary>
     /// Renders ASCII debug text using SDL's built-in 8x8 bitmap font, on a
     /// strip of textured quads. The font atlas is built once on first use
-    /// (one quad per character, sampled from a shared 128Ã—64 image).
+    /// (one quad per character, sampled from a shared 128×64 image).
     /// </summary>
     /// <param name="text">The text to render. Non-ASCII characters render
     /// as the glyph at code 0.</param>
@@ -1186,21 +1197,34 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     {
                         for (int i = 0; i < command.TextureCount; i++)
                         {
-                            var multiImage = multiTextures[i];
-                            if (_failedTextureUploads.Contains(multiImage))
-                                continue;
-                            try
+                            var entry = multiTextures[i];
+                            switch (entry)
                             {
-                                EnsureTextureUploaded(copyPass!, multiImage);
-                            }
-                            catch (Exception ex)
-                            {
-                                _failedTextureUploads.Add(multiImage);
-                                Console.Error.WriteLine(
-                                    $"Blitter.GpuRenderer: failed to upload image " +
-                                    $"({multiImage.Size.Width}x{multiImage.Size.Height}, format {multiImage.PixelFormat}) " +
-                                    $"to GPU: {ex.GetType().Name}: {ex.Message}. " +
-                                    $"Affected draws will be skipped for the rest of this session.");
+                                case Image multiImage:
+                                    if (_failedTextureUploads.Contains(multiImage)) break;
+                                    try { EnsureTextureUploaded(copyPass!, multiImage); }
+                                    catch (Exception ex)
+                                    {
+                                        _failedTextureUploads.Add(multiImage);
+                                        Console.Error.WriteLine(
+                                            $"Blitter.GpuRenderer: failed to upload image " +
+                                            $"({multiImage.Size.Width}x{multiImage.Size.Height}, format {multiImage.PixelFormat}) " +
+                                            $"to GPU: {ex.GetType().Name}: {ex.Message}. " +
+                                            $"Affected draws will be skipped for the rest of this session.");
+                                    }
+                                    break;
+                                case Cubemap multiCube:
+                                    if (_failedCubemapUploads.Contains(multiCube)) break;
+                                    try { EnsureCubemapUploaded(copyPass!, multiCube); }
+                                    catch (Exception ex)
+                                    {
+                                        _failedCubemapUploads.Add(multiCube);
+                                        Console.Error.WriteLine(
+                                            $"Blitter.GpuRenderer: failed to upload cubemap to GPU: " +
+                                            $"{ex.GetType().Name}: {ex.Message}. " +
+                                            $"Affected draws will be skipped for the rest of this session.");
+                                    }
+                                    break;
                             }
                         }
                     }
@@ -1378,45 +1402,62 @@ internal class GpuRenderer : Renderer3D, IDisposable
                     }
 
                     command.PushArgs(renderPass);
-                    if (command.Textures is { } textures && command.TextureCount > 0)
+
+                    // Texture binding: walk the shader's declared slot
+                    // layout once. For a multi-texture command, slot i
+                    // is filled from command.Textures[i]; for a single-
+                    // texture command, slot 0 is filled from
+                    // command.Texture or command.Cubemap. Each entry is
+                    // dispatched on its runtime kind to the matching
+                    // sampler (2D vs cube). The whole layout is bound
+                    // contiguously starting at fragment sampler slot 0;
+                    // the shader's HLSL register layout must follow the
+                    // same order.
+                    var fsLayout = shader.TextureLayout;
+                    if (fsLayout.Count > 0)
                     {
-                        // Multi-texture path: bind each Image to slots
-                        // 0..N-1 with the current default sampler. A
-                        // future per-slot sampler API would replace
-                        // DefaultSampler here. GpuTextureSamplerBinding
-                        // is a managed struct (holds GpuTexture/GpuSampler
-                        // references) so we can't stackalloc; rent from
-                        // the pool and return immediately after the bind.
-                        var sampler = command.Sampler ?? DefaultSampler;
-                        var count = command.TextureCount;
-                        var binds = ArrayPool<GpuTextureSamplerBinding>.Shared.Rent(count);
-                        for (int i = 0; i < count; i++)
+                        var sampler2D = command.Sampler ?? DefaultSampler;
+                        var samplerCube = command.Sampler ?? CubemapSampler;
+                        var binds = ArrayPool<GpuTextureSamplerBinding>.Shared.Rent(fsLayout.Count);
+                        for (int i = 0; i < fsLayout.Count; i++)
                         {
-                            var gpuTexture = LookupTexture(textures[i])
-                                ?? throw new InvalidOperationException(
-                                    "Texture upload was not recorded for this image.");
-                            binds[i] = new GpuTextureSamplerBinding(gpuTexture, sampler);
+                            var slot = fsLayout.Slots[i];
+                            Texture entry;
+                            if (command.Textures is { } multi && command.TextureCount > 0)
+                                entry = multi[i];
+                            else if (command.Texture is { } singleImage)
+                                entry = singleImage;
+                            else if (command.Cubemap is { } singleCube)
+                                entry = singleCube;
+                            else
+                                throw new InvalidOperationException(
+                                    $"Shader slot {i} ({slot.Name}) expects a texture but the command has none.");
+
+                            switch (entry)
+                            {
+                                case Image img:
+                                {
+                                    var gpuTex = LookupTexture(img)
+                                        ?? throw new InvalidOperationException(
+                                            "Texture upload was not recorded for this image.");
+                                    binds[i] = new GpuTextureSamplerBinding(gpuTex, sampler2D);
+                                    break;
+                                }
+                                case Cubemap cube:
+                                {
+                                    var gpuTex = LookupCubemap(cube)
+                                        ?? throw new InvalidOperationException(
+                                            "Cubemap upload was not recorded for this cubemap.");
+                                    binds[i] = new GpuTextureSamplerBinding(gpuTex, samplerCube);
+                                    break;
+                                }
+                                default:
+                                    throw new InvalidOperationException(
+                                        $"Unsupported Texture subtype at slot {i}: {entry.GetType().Name}.");
+                            }
                         }
-                        renderPass.BindFragmentSamplers(0, binds.AsSpan(0, count));
+                        renderPass.BindFragmentSamplers(0, binds.AsSpan(0, fsLayout.Count));
                         ArrayPool<GpuTextureSamplerBinding>.Shared.Return(binds, clearArray: true);
-                    }
-                    else if (command.Texture is { } image)
-                    {
-                        var gpuTexture = LookupTexture(image)
-                            ?? throw new InvalidOperationException(
-                                "Texture upload was not recorded for this image.");
-                        var sampler = command.Sampler ?? DefaultSampler;
-                        renderPass.BindFragmentSamplers(0,
-                            [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
-                    }
-                    else if (command.Cubemap is { } cubemap)
-                    {
-                        var gpuTexture = LookupCubemap(cubemap)
-                            ?? throw new InvalidOperationException(
-                                "Cubemap upload was not recorded for this cubemap.");
-                        var sampler = command.Sampler ?? CubemapSampler;
-                        renderPass.BindFragmentSamplers(0,
-                            [new GpuTextureSamplerBinding(gpuTexture, sampler)]);
                     }
 
                     // Bind the per-frame point-light buffer to any
@@ -2459,9 +2500,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public Cubemap? Cubemap { get; private protected set; }
         // Multi-texture path. When non-null, the bind site reads the
         // first TextureCount entries and ignores Texture/Cubemap. The
-        // backing array is rented from ArrayPool<Image>.Shared and is
-        // returned in Release.
-        public Image[]? Textures { get; private protected set; }
+        // backing array is rented from ArrayPool<Texture>.Shared and is
+        // returned in Release. May contain a mix of Image and Cubemap
+        // entries; the bind path dispatches on each entry's runtime kind.
+        public Texture[]? Textures { get; private protected set; }
         public int TextureCount { get; private protected set; }
         public GpuSampler? Sampler { get; private protected set; }
         public DepthMode DepthMode { get; private protected set; }
@@ -2515,9 +2557,9 @@ internal class GpuRenderer : Renderer3D, IDisposable
         /// Balanced by <see cref="ReturnRentedTextures"/> in
         /// <see cref="Release"/>.
         /// </summary>
-        private protected void RentTextures(ReadOnlySpan<Image> textures)
+        private protected void RentTextures(ReadOnlySpan<Texture> textures)
         {
-            var array = ArrayPool<Image>.Shared.Rent(textures.Length);
+            var array = ArrayPool<Texture>.Shared.Rent(textures.Length);
             textures.CopyTo(array);
             Textures = array;
             TextureCount = textures.Length;
@@ -2534,7 +2576,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             {
                 // clearArray: true so we don't keep dead Image references
                 // alive in the pool slot after the command is recycled.
-                ArrayPool<Image>.Shared.Return(array, clearArray: true);
+                ArrayPool<Texture>.Shared.Return(array, clearArray: true);
                 Textures = null;
                 TextureCount = 0;
             }
@@ -2591,7 +2633,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh,
             Shader shader,
-            ReadOnlySpan<Image> textures,
+            ReadOnlySpan<Texture> textures,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2677,7 +2719,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh,
             Shader shader,
-            ReadOnlySpan<Image> textures,
+            ReadOnlySpan<Texture> textures,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2813,7 +2855,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh,
             Shader shader,
-            ReadOnlySpan<Image> textures,
+            ReadOnlySpan<Texture> textures,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,

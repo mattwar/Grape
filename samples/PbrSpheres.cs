@@ -66,40 +66,41 @@ for (int row = 0; row < Rows; row++)
     }
 }
 
-var window = new Window3D
+var window = new Window3D(800, 600)
 {
     Title = "PBR test card: metallic (rows) x roughness (cols)",
     BackgroundColor = new Color(12, 12, 18),
-    FullScreen = true,
+    //FullScreen = true,
     CloseKey = Key.Escape,
 };
 
 var camera = new PerspectiveCamera();
 
+window.Renderer.Camera = camera;
+
+// add lighting environment for the shader to reflect
+window.Renderer.Environment = EnvironmentMaps.Sky;
+
+// Cool ambient tint multiplied onto the IBL contribution; this
+// lets the scene cool down the bright sky without rebaking the
+// cubemaps. Black would disable IBL entirely.
+window.Renderer.AmbientLight = new Color(180, 200, 230);
+
+// Single bright directional light. As the camera orbits, the
+// highlight on each sphere walks across its surface -- the wider
+// and softer it is on the right side of the grid, the higher
+// that sphere's roughness.
+window.Renderer.DirectionalLight = new DirectionalLight(
+    Vector3.Normalize(new Vector3(-0.4f, 0.7f, 0.6f)),
+    Color.White);
+
 await window.RunAsync(rd =>
 { 
-    rd.Camera = camera;
-
-    // Cool ambient for shadowed pixels. Without IBL the ambient is
-    // the only fill light, and metals get none of it (they have no
-    // Lambertian response), so the metal row will look dark on the
-    // unlit side -- correct behavior, just unflattering.
-    rd.AmbientLight = new Color(35, 45, 65);
-
-    // Single bright directional light. As the camera orbits, the
-    // highlight on each sphere walks across its surface -- the wider
-    // and softer it is on the right side of the grid, the higher
-    // that sphere's roughness.
-    rd.DirectionalLight = new DirectionalLight(
-        Vector3.Normalize(new Vector3(-0.4f, 0.7f, 0.6f)),
-        Color.White);
-
     // No point lights: with multiple lights on these spheres the
     // hard NdotL terminator from each one creates banded colored
     // patches that read as "patterned" rather than "metallic." The
     // shader's hemisphere ambient fills the same role (a soft
     // environment fill) without any per-light boundaries.
-
     var t = rd.ElapsedSecondsSinceStart;
     float gridWidth = (Cols - 1) * Spacing;
     float gridHeight = (Rows - 1) * Spacing;

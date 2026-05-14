@@ -30,7 +30,7 @@ namespace Blitter;
 /// six faces.
 /// </para>
 /// </remarks>
-public sealed class Cubemap
+public sealed class Cubemap : Texture
 {
     private int _version;
 
