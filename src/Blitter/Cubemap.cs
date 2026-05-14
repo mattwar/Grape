@@ -136,56 +136,32 @@ public sealed class Cubemap : CubeTexture
     };
 
     /// <summary>
-    /// Renders into one face of the cubemap using a 3D renderer,
-    /// clearing the face first to <paramref name="backgroundColor"/>.
-    /// The call is synchronous: when it returns, the face image's
-    /// pixels reflect the final GPU output and the cubemap's
-    /// <see cref="Version"/> has been bumped so the next bind
-    /// re-uploads.
-    /// </summary>
-    /// <param name="face">The cubemap face to render into.</param>
-    /// <param name="backgroundColor">The background painted behind the draws.</param>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
-    /// <remarks>
-    /// Caller is responsible for setting the renderer's camera --
-    /// typically a 90°-FOV <see cref="PerspectiveCamera"/> with
-    /// <c>Target</c> / <c>Up</c> from <see cref="CubeFaceExtensions.GetForward"/>
-    /// and <see cref="CubeFaceExtensions.GetUp"/>.
-    /// </remarks>
-    public void RenderFace(CubeFace face, Color backgroundColor, Action<Renderer3D> renderAction)
-    {
-        ArgumentNullException.ThrowIfNull(renderAction);
-        GetBitmapFace(face).Render3D(backgroundColor, renderAction);
-        Invalidate();
-    }
-
-    /// <summary>
-    /// Renders into one face of the cubemap using a 3D renderer,
-    /// preserving the face's existing pixels as a wallpaper behind
-    /// the draws. The call is synchronous.
-    /// </summary>
-    /// <param name="face">The cubemap face to render into.</param>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
-    public void RenderFace(CubeFace face, Action<Renderer3D> renderAction)
-    {
-        ArgumentNullException.ThrowIfNull(renderAction);
-        GetBitmapFace(face).Render3D(renderAction);
-        Invalidate();
-    }
-
-    /// <summary>
     /// Renders all six faces in turn, clearing each first to
     /// <paramref name="backgroundColor"/> and invoking
-    /// <paramref name="renderAction"/> with the active face. Call is
+    /// <paramref name="drawAction"/> with the active face. Call is
     /// synchronous; the cubemap is invalidated once at the end.
     /// </summary>
     /// <param name="backgroundColor">Background painted behind each face's draws.</param>
-    /// <param name="renderAction">Callback invoked once per face.</param>
-    public void RenderAllFaces(Color backgroundColor, Action<CubeFace, Renderer3D> renderAction)
+    /// <param name="drawAction">Callback invoked once per face.</param>
+    public void Render(Color backgroundColor, Action<Renderer3D, CubeFace> drawAction)
     {
-        ArgumentNullException.ThrowIfNull(renderAction);
+        ArgumentNullException.ThrowIfNull(drawAction);
         foreach (var face in CubeFaceExtensions.All)
-            GetBitmapFace(face).Render3D(backgroundColor, rd => renderAction(face, rd));
+            GetBitmapFace(face).Render3D(backgroundColor, rd => drawAction(rd, face));
+        Invalidate();
+    }
+
+    /// <summary>
+    /// Renders all six faces in turn, preserving each face's
+    /// existing pixels as a wallpaper behind the draws. Call is
+    /// synchronous; the cubemap is invalidated once at the end.
+    /// </summary>
+    /// <param name="drawAction">Callback invoked once per face.</param>
+    public void Render(Action<Renderer3D, CubeFace> drawAction)
+    {
+        ArgumentNullException.ThrowIfNull(drawAction);
+        foreach (var face in CubeFaceExtensions.All)
+            GetBitmapFace(face).Render3D(rd => drawAction(rd, face));
         Invalidate();
     }
 

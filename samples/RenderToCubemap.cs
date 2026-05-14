@@ -11,7 +11,7 @@
 // Render a scene *into* a cubemap, then sample it as a skybox.
 //
 // Unlike `Skybox.cs` (which fills each face by writing pixels with
-// `Image.SetPixel`), this sample uses `Cubemap.RenderAllFaces` to
+// `Image.SetPixel`), this sample uses `Cubemap.Render` to
 // run a 3D render pass into every face -- six colored cubes placed
 // along the world axes, photographed from the cube's center with a
 // 90 degree FOV camera per face. After the bake, the camera orbits
@@ -27,7 +27,7 @@ using Blitter.Bits;
 
 const int FaceSize = 256;
 
-// Empty faces -- contents will be replaced by RenderAllFaces.
+// Empty faces -- contents will be replaced by Render.
 static Image Blank() => Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
 var cubemap = Cubemap.Create(
     Blank(), Blank(), Blank(), Blank(), Blank(), Blank());
@@ -59,7 +59,7 @@ var faceCam = new PerspectiveCamera
     FarPlane = 100f,
 };
 
-cubemap.RenderAllFaces(new Color(20, 20, 30), (face, rd) =>
+cubemap.Render(new Color(20, 20, 30), (rd, face) =>
 {
     faceCam.Target = face.GetForward();
     faceCam.Up = face.GetUp();
@@ -87,7 +87,7 @@ var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
 var window = new Window3D
 {
-    Title = "Cubemap.RenderFace: skybox baked from a 3D render pass",
+    Title = "Cubemap.Render: skybox baked from a 3D render pass",
     BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
