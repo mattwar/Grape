@@ -10,7 +10,7 @@ public static class ImageBounds
     /// <summary>
     /// Gets the minimum axis-aligned bounding rectangle that contains every pixel.
     /// </summary>
-    public static BoundingRect ComputeOpaqueBounds(this Image image, byte alphaThreshold = 0)
+    public static BoundingRect ComputeOpaqueBounds(this Bitmap image, byte alphaThreshold = 0)
     {
         ArgumentNullException.ThrowIfNull(image);
         var (w, h) = image.Size;
@@ -46,14 +46,14 @@ public static class ImageBounds
     /// <summary>
     /// Gets the minimal axis-aligned bounding circle that contains every pixel.
     /// </summary>
-    public static BoundingCircle ComputeOpaqueCircle(this Image image, byte alphaThreshold = 0) =>
+    public static BoundingCircle ComputeOpaqueCircle(this Bitmap image, byte alphaThreshold = 0) =>
         BoundingCircle.FromRect(image.ComputeOpaqueBounds(alphaThreshold));
 
     /// <summary>
     /// Computes a nominal set of axis-aligned bounding rectangles that cover every pixel.
     /// </summary>
     public static BoundingRect[] ComputeOpaqueRects(
-        this Image image,
+        this Bitmap image,
         int cellSize = 8,
         byte alphaThreshold = 0)
     {

@@ -5,13 +5,14 @@ namespace Blitter.Bits;
 
 /// <summary>
 /// glTF 2.0 / glb model loader. Internal entry point sits behind
-/// <see cref="Model.Load(string)"/>. v1 maps glTF geometry, base-color
-/// factor, and base-color texture into Blitter's
-/// <see cref="LitTextureVertex3D"/> + <see cref="Material"/> +
-/// <see cref="ModelPart"/> types. Animations, skinning, morph targets,
-/// metallic/roughness/normal/AO maps, and tangents are not yet
-/// consumed -- the loader extracts the diffuse channel only and
-/// renders Lambert.
+/// <see cref="Model.Load(string)"/>. Maps glTF geometry and the
+/// metallic-roughness material model into Blitter's
+/// <see cref="LitTextureVertex3D"/> + <see cref="PbrMaterial"/> +
+/// <see cref="ModelPart"/> types: base-color factor + texture,
+/// metallic + roughness factors + packed MR texture, emissive factor +
+/// texture, and occlusion strength + texture. Animations, skinning,
+/// morph targets, normal maps, tangents, and KHR_materials_unlit are
+/// not yet consumed.
 /// </summary>
 internal static class GLTF
 {
@@ -27,7 +28,7 @@ internal static class GLTF
         // texture share the GPU upload too.
         var imageCache = new Dictionary<SharpGLTF.Schema2.Image, Image>();
         // Same for materials.
-        var materialCache = new Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial>();
+        var materialCache = new Dictionary<SharpGLTF.Schema2.Material, PbrMaterial>();
 
         var parts = new List<ModelPart>();
 
@@ -51,7 +52,7 @@ internal static class GLTF
         Node node,
         List<ModelPart> parts,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
-        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache)
+        Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache)
     {
         if (node.Mesh is { } mesh)
         {
@@ -82,7 +83,7 @@ internal static class GLTF
         Matrix4x4 world,
         Matrix4x4 normalMatrix,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
-        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache,
+        Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache,
         string? nodeName)
     {
         var positions = prim.GetVertexAccessor("POSITION")?.AsVector3Array();
@@ -94,13 +95,10 @@ internal static class GLTF
         var colors = prim.GetVertexAccessor("COLOR_0")?.AsColorArray();
 
         var material = ConvertMaterial(prim.Material, materialCache, imageCache);
-        // Bake the material's base-color factor into the vertex tint so
-        // the LitTexture shader (sample × tint) reproduces the glTF
-        // intended color even when no per-vertex COLOR_0 is supplied.
-        // If COLOR_0 *is* present, multiply the two -- glTF spec
-        // says they compose multiplicatively.
-        var baseTint = material.DiffuseColor;
-
+        // Per-vertex tint carries only the optional COLOR_0 attribute;
+        // the PBR shader multiplies it with baseColorTex * baseColorFactor,
+        // so baking the material's base-color factor into the vertex
+        // here would double-tint. White when COLOR_0 is absent.
         var verts = new LitTextureVertex3D[positions.Count];
         for (int i = 0; i < positions.Count; i++)
         {
@@ -109,9 +107,7 @@ internal static class GLTF
                 ? Vector3.Normalize(Vector3.TransformNormal(normals[i], normalMatrix))
                 : Vector3.UnitY; // fallback if absent; will be regenerated below if we can.
             var uv = uvs is not null ? uvs[i] : Vector2.Zero;
-            var tint = colors is not null
-                ? MultiplyColors(baseTint, FloatToColor(colors[i]))
-                : baseTint;
+            var tint = colors is not null ? FloatToColor(colors[i]) : Color.White;
 
             verts[i] = new LitTextureVertex3D(pos, nrm, uv, tint);
         }
@@ -147,41 +143,90 @@ internal static class GLTF
         return new ModelPart(mesh, material, nodeName);
     }
 
-    private static LitTextureMaterial ConvertMaterial(
+    private static PbrMaterial ConvertMaterial(
         SharpGLTF.Schema2.Material? src,
-        Dictionary<SharpGLTF.Schema2.Material, LitTextureMaterial> materialCache,
+        Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache,
         Dictionary<SharpGLTF.Schema2.Image, Image> imageCache)
     {
         if (src is null)
-            return LitTextureMaterial.Default;
+            return PbrMaterial.Default;
 
         if (materialCache.TryGetValue(src, out var cached))
             return cached;
 
-        // The "BaseColor" channel covers both pbrMetallicRoughness's
-        // baseColorFactor + baseColorTexture and the legacy KHR_unlit
-        // path. We grab whichever is set.
-        var color = Color.White;
-        Image? texture = null;
-
-        var baseChannel = src.FindChannel("BaseColor");
-        if (baseChannel is { } ch)
+        // pbrMetallicRoughness: baseColorFactor + baseColorTexture.
+        var baseColor = Color.White;
+        Image? baseColorTex = null;
+        if (src.FindChannel("BaseColor") is { } bc)
         {
-            color = FloatToColor(ch.Color);
-
-            var srcImage = ch.Texture?.PrimaryImage;
-            if (srcImage is not null)
-                texture = GetOrDecodeImage(srcImage, imageCache);
+            baseColor = FloatToColor(bc.Color);
+            if (bc.Texture?.PrimaryImage is { } img)
+                baseColorTex = GetOrDecodeImage(img, imageCache);
         }
 
-        var mat = new LitTextureMaterial
+        // pbrMetallicRoughness: metallicFactor (default 1) and
+        // roughnessFactor (default 1) packed into a single channel
+        // alongside the (B=metallic, G=roughness) MR texture.
+        float metallic = 1f, roughness = 1f;
+        Image? mrTex = null;
+        if (src.FindChannel("MetallicRoughness") is { } mr)
         {
-            DiffuseColor = color,
-            DiffuseTexture = texture,
+            metallic = GetFloatParameter(mr, "MetallicFactor", 1f);
+            roughness = GetFloatParameter(mr, "RoughnessFactor", 1f);
+            if (mr.Texture?.PrimaryImage is { } img)
+                mrTex = GetOrDecodeImage(img, imageCache);
+        }
+
+        // emissiveFactor is a Vector3 (no alpha); SharpGLTF surfaces it
+        // as Vector4 with W=1, so we drop W when converting to Color.
+        var emissive = Color.Black;
+        Image? emissiveTex = null;
+        if (src.FindChannel("Emissive") is { } em)
+        {
+            var v = em.Color;
+            emissive = new Color(
+                FloatToByte(v.X), FloatToByte(v.Y), FloatToByte(v.Z), 255);
+            if (em.Texture?.PrimaryImage is { } img)
+                emissiveTex = GetOrDecodeImage(img, imageCache);
+        }
+
+        float occlusionStrength = 1f;
+        Image? occlusionTex = null;
+        if (src.FindChannel("Occlusion") is { } occ)
+        {
+            occlusionStrength = GetFloatParameter(occ, "OcclusionStrength", 1f);
+            if (occ.Texture?.PrimaryImage is { } img)
+                occlusionTex = GetOrDecodeImage(img, imageCache);
+        }
+
+        var mat = new PbrMaterial
+        {
+            BaseColor = baseColor,
+            BaseColorTexture = baseColorTex,
+            Metallic = metallic,
+            Roughness = roughness,
+            MetallicRoughnessTexture = mrTex,
+            Emissive = emissive,
+            EmissiveTexture = emissiveTex,
+            OcclusionStrength = occlusionStrength,
+            OcclusionTexture = occlusionTex,
             Name = src.Name,
         };
         materialCache[src] = mat;
         return mat;
+    }
+
+    private static float GetFloatParameter(
+        SharpGLTF.Schema2.MaterialChannel ch, string name, float defaultValue)
+    {
+        // SharpGLTF exposes per-channel scalars (MetallicFactor,
+        // RoughnessFactor, OcclusionStrength, ...) via the Parameters
+        // list. Values are boxed as float; absent parameters fall back
+        // to the glTF spec default supplied by the caller.
+        foreach (var p in ch.Parameters)
+            if (p.Name == name && p.Value is float f)
+                return f;
+        return defaultValue;
     }
 
     private static Image GetOrDecodeImage(
@@ -192,7 +237,7 @@ internal static class GLTF
             return cached;
 
         var bytes = gltfImage.Content.Content; // ReadOnlyMemory<byte>; PNG/JPG/etc.
-        var img = Image.Decode(bytes.Span, mipmaps: true);
+        var img = Bitmap.Decode(bytes.Span, mipmaps: true);
         imageCache[gltfImage] = img;
         return img;
     }
@@ -232,21 +277,14 @@ internal static class GLTF
         return Matrix4x4.Transpose(inv);
     }
 
-    private static Color FloatToColor(Vector4 v)
-    {
+    private static Color FloatToColor(Vector4 v) =>
+        new(FloatToByte(v.X), FloatToByte(v.Y), FloatToByte(v.Z), FloatToByte(v.W));
+
+    private static byte FloatToByte(float f) =>
         // glTF colors are linear-space floats 0..1. Blitter's Color is
         // sRGB byte. We pass the float values through directly --
         // Blitter's pipeline doesn't currently do gamma correction, so
         // matching the OBJ loader's behavior is more important than
         // strictly-correct color management.
-        byte ToByte(float f) => (byte)Math.Clamp((int)MathF.Round(f * 255f), 0, 255);
-        return new Color(ToByte(v.X), ToByte(v.Y), ToByte(v.Z), ToByte(v.W));
-    }
-
-    private static Color MultiplyColors(Color a, Color b)
-    {
-        // Per-channel modulate, 0..255 byte range.
-        byte M(byte x, byte y) => (byte)((x * y + 127) / 255);
-        return new Color(M(a.R, b.R), M(a.G, b.G), M(a.B, b.B), M(a.A, b.A));
-    }
+        (byte)Math.Clamp((int)MathF.Round(f * 255f), 0, 255);
 }

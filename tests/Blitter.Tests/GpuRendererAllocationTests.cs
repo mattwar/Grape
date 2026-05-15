@@ -1,9 +1,9 @@
-﻿using System.Numerics;
+using System.Numerics;
 
 namespace Blitter.Tests;
 
 // Allocation-regression tests for the GPU renderer. Drives a real
-// ImageGpuRenderer (no window required) so the test exercises the
+// BitmapRenderer3D (no window required) so the test exercises the
 // same draw/queue/present path the production renderer uses.
 //
 // Tagged Gpu so machines without a usable graphics driver can filter
@@ -48,8 +48,8 @@ public class GpuRendererAllocationTests
             new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255)),
         });
 
-        using var image = Image.Create(64, 64);
-        using var renderer = new ImageGpuRenderer(GpuDevice.Default, image);
+        using var image = Bitmap.Create(64, 64);
+        using var renderer = new BitmapRenderer3D(GpuDevice.Default, image);
 
         var transform = Matrix4x4.CreateScale(0.8f);
 
@@ -114,8 +114,8 @@ public class GpuRendererAllocationTests
             new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), new Color(0,   0,   255)),
         });
 
-        using var image = Image.Create(64, 64);
-        using var renderer = new ImageGpuRenderer(GpuDevice.Default, image);
+        using var image = Bitmap.Create(64, 64);
+        using var renderer = new BitmapRenderer3D(GpuDevice.Default, image);
         var transform = Matrix4x4.CreateScale(0.8f);
 
         for (var i = 0; i < 8; i++)

@@ -2,9 +2,67 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v0.5.0]
 
 ### Added
+- `SkyLights.None`: zero-energy IBL environment (black diffuse and
+  specular cubes). Used as the default fallback when
+  `Renderer3D.SkyLight` is unset, so PBR draws now work out-of-the-box
+  -- materials are lit by direct lighting only, with no environment
+  contribution. Assign a concrete sky (`SkyLights.Sun` / `Sunless` /
+  `Flat`) to opt in to IBL.
+- `Cubemaps.Black`: 1x1 black cubemap; the building block for
+  `SkyLights.None`.
+- `SkyLight.Yaw`: rotates IBL cubemap sample directions around
+  the world Y axis without regenerating the maps. For Y-symmetric
+  gradient skies this effectively moves the baked sun in azimuth at
+  no extra cost.
+- `Cubemaps.SkyDiffuse` and `Cubemaps.SkySpecular` now generate
+  on the GPU, cutting first-frame latency from ~2s to negligible.
+- `Cubemaps.SkySunless`, `SkySunlessDiffuse`,
+  `SkySunlessSpecular`, and `SkyLights.Sunless`: sun-less
+  variants for scenes where a directional light is the sun.
+- `Cubemaps.SkyFlat`, `SkyFlatDiffuse`, `SkyFlatSpecular`, and
+  `SkyLights.Flat`: uniform-tint IBL with no horizon band or
+  sun, for neutral material previews.
+- `Texture` abstract base type for any GPU-samplable texture. `Image`
+  and `CubeTexture` now both inherit from it, so multi-texture draw
+  overloads can bind a mixed list of 2D images and cubemaps.
+- `SkyLight` and `Renderer3D.SkyLight`: scene-wide IBL state
+  bundling a diffuse environment cubemap, a specular environment
+  cubemap, and a BRDF LUT. The engine doesn't consume the value
+  directly -- materializers (e.g. `StandardMaterializer`) read it and
+  bind the appropriate slots when drawing PBR materials.
+- `SkyLights.Sun` (Blitter.Bits): default IBL environment built
+  from the procedural sky cubemap and `Textures.SpecularLut`.
+- `PbrShaders.LitPbr` now uses the Karis split-sum approximation for
+  image-based lighting (diffuse environment cube + specular
+  environment cube + BRDF LUT). The previous flat ambient term is
+  replaced by IBL; `Renderer3D.AmbientLight` now tints the IBL result.
+- `Cubemaps.CreateSpecular(CubeTexture, faceSize, levels, samples)`
+  and `Cubemaps.SkySpecular`: GGX-importance-sampled mipmapped
+  specular environment cubemap for image-based lighting. Mip i = the
+  environment integrated at roughness i/(levels-1); shaders read by
+  reflection vector at LOD `roughness * (levels - 1)`.
+- `Textures` static class (Blitter.Bits): catalog of process-shared
+  images. Currently exposes `White`, `Black`, and `SpecularLut` -- a
+  256x256 precomputed split-sum BRDF integration texture for upcoming
+  PBR image-based lighting.
+- `PbrMaterial` (Blitter.Bits): metallic-roughness PBR surface with
+  base color, metallic, roughness, emissive, and occlusion factors,
+  each pairable with an optional texture. `Metal()` / `Dielectric()`
+  shortcuts for common cases.
+- `PbrShaders.LitPbr` (Blitter.Bits): Cook-Torrance BRDF (GGX +
+  Smith-GGX + Schlick) on `LitTextureVertex3D`. Reuses the renderer's
+  ambient + directional + point-light pipeline. Looks best on
+  dielectrics until image-based lighting lands; see `PbrSpheres.cs`.
+- `StandardMaterializer` routes `PbrMaterial` to `PbrShaders.LitPbr`,
+  binding base-color / metallic-roughness / occlusion / emissive
+  textures (1×1 white placeholders fill missing slots).
+- `IUniformArgs<TSelf>.SetCameraPosition` trait: lets view-dependent
+  shaders pull the camera world-space position from the renderer.
+- Sample: `samples/PbrSpheres.cs` -- 5×5 metallic × roughness test
+  card.
 - `ShaderTextureLayout` describes the texture/sampler bindings a shader's
   fragment stage expects; exposed as `Shader.TextureLayout`. Defaults to
   `SingleTexture2D` so existing single-texture shaders need no changes.
@@ -58,8 +116,111 @@ All notable changes to this project will be documented in this file.
 - `Renderer3D.DrawMesh<TVertex,TArgs,TInstance>` (textured, scene-aware):
   composes camera/lights into the per-call args via `IUniformArgs` then
   forwards to the existing `DrawMeshRaw` instanced path.
+- `Cubemap.RenderFace` / `Cubemap.RenderAllFaces`: render a 3D scene
+  into one or all faces of a cubemap, mirroring `Image.Render3D`.
+  Synchronous; bumps `Version` so subsequent binds re-upload.
+- `CubeFace` enum + `CubeFaceExtensions.GetForward` / `GetUp` /
+  `All` for driving a per-face camera during cubemap bakes.
+- `Cubemaps` static class (Blitter.Bits): catalog of process-shared
+  cubemaps. Exposes a default `Sky` (procedural zenith/horizon/
+  ground gradient + sun disc), a generic `Bake(faceSize, dir→color)`
+  builder, and a parameterised `BakeSky(...)` for custom palettes.
+- `Cubemaps.SkyDiffuse` + `Cubemaps.CreateDiffuse(source, ...)`:
+  diffuse environment cubemap for image-based lighting. Cosine-
+  weighted hemisphere integral via Hammersley + tangent-frame
+  importance sampling. Read by surface normal for the diffuse
+  environment term.
+- `MipmappedImage`: caller-supplied mip chain for cases where each
+  level carries different content (e.g. a specular environment
+  cubemap). Distinct from `Image.Mipmaps`, which asks the renderer
+  to auto-generate a chain by downsampling.
+- `Cubemap.Create(MipmappedImage × 6)` overload + `Cubemap.LevelCount`
+  for cubemaps whose faces ship explicit mip chains. The existing
+  `Image × 6` overload still works; it builds single-level chains
+  internally.
+- `Bake(int faceSize, Func<CubeFace, Vector3, Color>)` overload on
+  `Cubemaps`: face-aware procedural baker for patterns that vary
+  per face (debug grids, per-face seeds).
+
+### Fixed
+- `Bitmap.Render3D(Color, ...)` now blends translucent background
+  colors (alpha &lt; 255) over the image's existing pixels using
+  SrcOver, instead of clearing to the literal RGBA. Opaque colors
+  still take the GPU clear fast path. Supported on ABGR8888 and the
+  8-bit-per-channel RGBA variants; throws on RGBA64Float.
+- SDL video subsystem is now initialized in the `Application` ctor
+  rather than lazily on first `Window` creation. Surface allocations
+  (`Image.Create` / `Image.Load` / `Image.Decode`) issued before any
+  `Window3D` no longer leave the later window's swapchain mis-sized.
+- `Meshes.Sphere` / `Meshes.TexturedSphere` index winding was
+  inverted, so `CullMode.Back` culled the near hemisphere and showed
+  the far one. Manifested as PBR IBL reflections appearing rotated
+  through the sphere center (looking like a Y-axis flip).
+- `Shader` ctor no longer defaults `TextureLayout` to
+  `SingleTexture2D` when no layout is supplied. The new default is
+  `Empty`, so custom shaders without texture bindings work without
+  having to pass it explicitly.
 
 ### Changed
+- Bumped target framework to `net10.0`.
+- glTF loader now emits `PbrMaterial` (was `LitTextureMaterial`),
+  reading base-color factor + texture, metallic + roughness factors +
+  packed MR texture, emissive factor + texture, and occlusion strength
+  + texture. glTF models render through the PBR pipeline instead of
+  the diffuse-only lit-texture path.
+- `Image.Create` / `Image.Load` / `Image.Decode` shortcuts removed.
+  Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
+  `Bitmap` is the concrete CPU-side image type. `Image` remains the
+  abstract base.
+- `Cubemaps.CreateIrradiance` / `CreatePrefilteredSpecular` renamed to
+  `Cubemaps.CreateDiffuse` / `CreateSpecular`. `SkyLight.Irradiance` /
+  `Prefiltered` renamed to `SkyLight.Diffuse` / `Specular`. Sky cube
+  properties similarly (`SkyIrradiance` -> `SkyDiffuse`, etc.). Same
+  outputs and behavior; the new names describe what each cubemap is
+  used for (diffuse vs specular shading) rather than the algorithm
+  that produced it.
+- `Cubemaps.CreateDiffuse` and `Cubemaps.CreateSpecular`
+  now run on the GPU (signatures take `CubeTexture` and return
+  `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.
+- `Textures.CreateSpecularLut` (new) replaces the equivalent helper on
+  the removed `EnvironmentBaker` type.
+- `Environment3D` moved from `Blitter` to `Blitter.Bits` and renamed
+  to `SkyLight` (parallel to `DirectionalLight` / `PointLight`).
+  The `Renderer3D.SkyLight` property is now a C# extension
+  property (also in `Blitter.Bits`) backed by a `ConditionalWeakTable`,
+  so the base project no longer carries the IBL-specific type. Call
+  sites: `renderer.SkyLight = SkyLights.Sun;`.
+- PBR IBL now uses Karis's analytic LUT approximation plus Fdez-Aguera
+  2019 multi-scattering compensation, fixing the bright spot at
+  `NdotV = 1` (the baked GGX importance-sampled LUT collapses to zero
+  at low-roughness grazing, which made IBL vanish at silhouettes and
+  concentrate into a dot at sphere centers).
+- Multi-texture `DrawMesh` / `DrawMeshRaw` overloads now take
+  `ReadOnlySpan<Texture>` instead of `ReadOnlySpan<Image>`, allowing
+  callers to bind a mixed sequence of 2D images and cubemaps. Each
+  span entry's runtime kind must match its slot's declared
+  `ShaderTextureDimension`.
+- `GpuRenderer` now uploads every level of an explicit cubemap mip
+  chain (when `Cubemap.LevelCount > 1`), wiring up the chains built
+  by `MipmappedImage` faces. The auto-generated-mips path
+  (`Cubemap.Mipmaps == true`) is unchanged.
+- `Image` is now an abstract base type. The previous CPU-surface
+  concrete class is renamed to `Bitmap` (still the type returned
+  by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,
+  `Render2D`, `Render3D`, and SkiaSharp extensions live on
+  `Bitmap` only. `MipmappedImage` is now a sibling subtype of
+  `Image`. `Cubemap` face accessors return the base level as `Image`;
+  CPU-only paths cast to `Bitmap`.
+- `Image.Render3D` now reports the destination image's own
+  dimensions and aspect ratio to the renderer (previously inherited
+  a 16:9 fallback, which silently squished scenes rendered into
+  non-16:9 images).
+- `Image.Render3D` now honors the destination image's `PixelFormat`
+  instead of always rendering to an 8-bit `R8G8B8A8Unorm` target.
+  `PixelFormat.RGBA64Float` images render into a half-float GPU
+  target (no precision loss); other 8-bit RGBA variants keep the
+  existing per-pixel conversion path. Foundational for upcoming
+  HDR / IBL bakes.
 - **Breaking.** `Submesh` renamed to `ModelPart` and `Model.Submeshes`
   to `Model.Parts`. The type describes a *part of a model* (a
   `Mesh` + `Material` + optional `Name`), not a kind of `Mesh` --

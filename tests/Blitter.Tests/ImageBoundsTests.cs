@@ -5,9 +5,9 @@ namespace Blitter.Tests;
 
 public class ImageBoundsTests
 {
-    private static Image MakeImage(int w, int h, Action<Image> draw)
+    private static Bitmap MakeImage(int w, int h, Action<Bitmap> draw)
     {
-        var img = Image.Create(w, h);
+        var img = Bitmap.Create(w, h);
         draw(img);
         return img;
     }
@@ -82,7 +82,7 @@ public class ImageBoundsTests
     [Fact]
     public void ComputeOpaqueBounds_NullImage_Throws()
     {
-        Assert.Throws<ArgumentNullException>(() => ((Image)null!).ComputeOpaqueBounds());
+        Assert.Throws<ArgumentNullException>(() => ((Bitmap)null!).ComputeOpaqueBounds());
     }
 
     [Fact]

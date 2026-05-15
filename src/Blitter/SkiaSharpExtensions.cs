@@ -5,7 +5,7 @@ namespace Blitter;
 
 public static class SkiaSharpExtensions
 {
-    extension(Image image)
+    extension(Bitmap image)
     {
         /// <summary>
         /// Copies pixels from <paramref name="bitmap"/> into <paramref name="image"/>.
@@ -122,7 +122,7 @@ public static class SkiaSharpExtensions
         /// </summary>
         /// <param name="sigmaX">Horizontal blur standard deviation, in pixels.</param>
         /// <param name="sigmaY">Vertical blur standard deviation, in pixels.</param>
-        public Image Blur(float sigmaX, float sigmaY)
+        public Bitmap Blur(float sigmaX, float sigmaY)
         {
             using var filter = SKImageFilter.CreateBlur(sigmaX, sigmaY);
             return ApplyImageFilter(image, filter, padLeft: 0, padTop: 0, padRight: 0, padBottom: 0);
@@ -133,7 +133,7 @@ public static class SkiaSharpExtensions
         /// uniform Gaussian blur applied.
         /// </summary>
         /// <param name="sigma">Blur standard deviation, in pixels.</param>
-        public Image Blur(float sigma) => image.Blur(sigma, sigma);
+        public Bitmap Blur(float sigma) => image.Blur(sigma, sigma);
 
         /// <summary>
         /// Returns a new image with a drop shadow composited under the
@@ -147,7 +147,7 @@ public static class SkiaSharpExtensions
         /// <param name="sigmaX">Horizontal shadow blur, in pixels.</param>
         /// <param name="sigmaY">Vertical shadow blur, in pixels.</param>
         /// <param name="color">Shadow color (alpha included).</param>
-        public Image DropShadow(float dx, float dy, float sigmaX, float sigmaY, Blitter.Color color)
+        public Bitmap DropShadow(float dx, float dy, float sigmaX, float sigmaY, Blitter.Color color)
         {
             // Pad enough to fit the shadow's blurred footprint plus
             // the offset on whichever side the shadow falls.
@@ -167,7 +167,7 @@ public static class SkiaSharpExtensions
         /// Returns a new image the same size as the source converted
         /// to grayscale via the standard luminance weights.
         /// </summary>
-        public Image Grayscale()
+        public Bitmap Grayscale()
         {
             // Rec. 601 luma coefficients applied to R, G, B; alpha untouched.
             ReadOnlySpan<float> matrix =
@@ -188,7 +188,7 @@ public static class SkiaSharpExtensions
         /// (treated as 0..1). Alpha is multiplied like the others, so
         /// a fully opaque tint preserves the source alpha.
         /// </summary>
-        public Image Tint(Blitter.Color tint)
+        public Bitmap Tint(Blitter.Color tint)
         {
             float r = tint.R / 255f;
             float g = tint.G / 255f;
@@ -213,7 +213,7 @@ public static class SkiaSharpExtensions
         /// </summary>
         /// <param name="radiusX">Horizontal dilate radius, in pixels.</param>
         /// <param name="radiusY">Vertical dilate radius, in pixels.</param>
-        public Image Dilate(int radiusX, int radiusY)
+        public Bitmap Dilate(int radiusX, int radiusY)
         {
             using var filter = SKImageFilter.CreateDilate(radiusX, radiusY);
             return ApplyImageFilter(image, filter, radiusX, radiusY, radiusX, radiusY);
@@ -226,7 +226,7 @@ public static class SkiaSharpExtensions
         /// </summary>
         /// <param name="radiusX">Horizontal erode radius, in pixels.</param>
         /// <param name="radiusY">Vertical erode radius, in pixels.</param>
-        public Image Erode(int radiusX, int radiusY)
+        public Bitmap Erode(int radiusX, int radiusY)
         {
             using var filter = SKImageFilter.CreateErode(radiusX, radiusY);
             return ApplyImageFilter(image, filter, 0, 0, 0, 0);
@@ -239,7 +239,7 @@ public static class SkiaSharpExtensions
         /// appears at (<c>max(0,-dx)+dx</c>, <c>max(0,-dy)+dy</c>) in
         /// the returned image.
         /// </summary>
-        public Image Offset(float dx, float dy)
+        public Bitmap Offset(float dx, float dy)
         {
             int padLeft   = (int)MathF.Ceiling(MathF.Max(0f, -dx));
             int padTop    = (int)MathF.Ceiling(MathF.Max(0f, -dy));
@@ -261,7 +261,7 @@ public static class SkiaSharpExtensions
         /// <param name="kernel">Row-major kernel weights.</param>
         /// <param name="gain">Output multiplier applied after convolution. Defaults to 1.</param>
         /// <param name="bias">Constant added to each channel after the gain. Defaults to 0.</param>
-        public Image Convolve(int kernelWidth, int kernelHeight, ReadOnlySpan<float> kernel, float gain = 1f, float bias = 0f)
+        public Bitmap Convolve(int kernelWidth, int kernelHeight, ReadOnlySpan<float> kernel, float gain = 1f, float bias = 0f)
         {
             if (kernel.Length != kernelWidth * kernelHeight)
                 throw new ArgumentException(
@@ -298,7 +298,7 @@ public static class SkiaSharpExtensions
         /// photographic content; <see cref="ImageSampling.Nearest"/>
         /// preserves crisp pixels for pixel-art / debug zoom uses.
         /// </param>
-        public Image Magnify(Rect lens, float zoom, float inset = 0f, ImageSampling sampling = ImageSampling.Linear)
+        public Bitmap Magnify(Rect lens, float zoom, float inset = 0f, ImageSampling sampling = ImageSampling.Linear)
         {
             var lensRect = new SKRect(lens.X, lens.Y, lens.X + lens.Width, lens.Y + lens.Height);
             var skSampling = sampling == ImageSampling.Nearest
@@ -341,7 +341,7 @@ public static class SkiaSharpExtensions
             _ => FastPath.None,
         };
 
-    private static unsafe bool TryFastCopyFromBitmap(SKBitmap bitmap, Image image, int width, int height)
+    private static unsafe bool TryFastCopyFromBitmap(SKBitmap bitmap, Bitmap image, int width, int height)
     {
         if (image.BytesPerPixel != 4)
             return false;
@@ -384,7 +384,7 @@ public static class SkiaSharpExtensions
         return true;
     }
 
-    private static unsafe bool TryFastCopyToBitmap(Image image, SKBitmap bitmap, int width, int height)
+    private static unsafe bool TryFastCopyToBitmap(Bitmap image, SKBitmap bitmap, int width, int height)
     {
         if (image.BytesPerPixel != 4)
             return false;
@@ -438,7 +438,7 @@ public static class SkiaSharpExtensions
         }
     }
 
-    private static void DrawCanvasCore(Image image, Blitter.Color? backgroundColor, Action<SKCanvas> drawAction)
+    private static void DrawCanvasCore(Bitmap image, Blitter.Color? backgroundColor, Action<SKCanvas> drawAction)
     {
         ArgumentNullException.ThrowIfNull(drawAction);
         ObjectDisposedException.ThrowIf(image.IsDisposed, image);
@@ -484,8 +484,8 @@ public static class SkiaSharpExtensions
         image.CopyFromBitmap(bitmap);
     }
 
-    private static Image ApplyImageFilter(
-        Image source, SKImageFilter filter,
+    private static Bitmap ApplyImageFilter(
+        Bitmap source, SKImageFilter filter,
         int padLeft, int padTop, int padRight, int padBottom)
     {
         ObjectDisposedException.ThrowIf(source.IsDisposed, source);
@@ -494,7 +494,7 @@ public static class SkiaSharpExtensions
         int dw = sw + padLeft + padRight;
         int dh = sh + padTop + padBottom;
         if (dw <= 0 || dh <= 0)
-            return Image.Create(Math.Max(1, dw), Math.Max(1, dh));
+            return Bitmap.Create(Math.Max(1, dw), Math.Max(1, dh));
 
         // Stage source -> SKBitmap, draw with the filter into a same-
         // sized destination SKBitmap, then snapshot back to a new
@@ -510,7 +510,7 @@ public static class SkiaSharpExtensions
             canvas.DrawBitmap(srcBitmap, padLeft, padTop, paint);
         }
 
-        var result = Image.Create(dw, dh);
+        var result = Bitmap.Create(dw, dh);
         result.CopyFromBitmap(dstBitmap);
         return result;
     }
@@ -538,11 +538,11 @@ public static class SkiaSharpExtensions
         /// Creates a new <see cref="Image"/> the same size as the bitmap
         /// and copies its pixels into it.
         /// </summary>
-        public Image ToImage(Blitter.PixelFormat? format = null)
+        public Bitmap ToImage(Blitter.PixelFormat? format = null)
         {
             ArgumentNullException.ThrowIfNull(bitmap);
 
-            var image = Image.Create(bitmap.Width, bitmap.Height, format ?? bitmap.PixelFormat);
+            var image = Bitmap.Create(bitmap.Width, bitmap.Height, format ?? bitmap.PixelFormat);
             image.CopyFromBitmap(bitmap);
             return image;
         }
@@ -587,7 +587,7 @@ public static class SkiaSharpExtensions
     /// </summary>
     private sealed class CanvasDrawState : IDisposable
     {
-        public Image? Image;
+        public Bitmap? Image;
         public SKBitmap? Bitmap;
         public SKCanvas? Canvas;
 
@@ -597,7 +597,7 @@ public static class SkiaSharpExtensions
                 return;
 
             DisposeResources();
-            Image = Blitter.Image.Create(width, height, PixelFormat.ABGR8888);
+            Image = Blitter.Bitmap.Create(width, height, PixelFormat.ABGR8888);
             var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
             Bitmap = new SKBitmap(info);
             Canvas = new SKCanvas(Bitmap);

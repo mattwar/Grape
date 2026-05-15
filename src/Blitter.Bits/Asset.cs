@@ -11,7 +11,7 @@ public static class Asset
     /// <summary>
     /// Resolves <paramref name="name"/> relative to the source file
     /// that calls this method. Lets a sample like <c>foo.cs</c> say
-    /// <c>Image.Load(Asset.GetPathRelativeToCaller("foo.png"))</c> regardless
+    /// <c>Bitmap.Load(Asset.GetPathRelativeToCaller("foo.png"))</c> regardless
     /// of the shell's current working directory.
     /// </summary>
     public static string GetPathRelativeToCaller(

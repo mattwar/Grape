@@ -125,7 +125,7 @@ static void AddQuad(
 
 static void WriteCheckerboardPng(string path, int size, int cells)
 {
-    using var image = Image.Create(size, size, PixelFormat.ABGR8888);
+    using var image = Bitmap.Create(size, size, PixelFormat.ABGR8888);
     var cell = size / cells;
     var dark = new Color(40, 60, 220);
     var light = new Color(220, 70, 80);

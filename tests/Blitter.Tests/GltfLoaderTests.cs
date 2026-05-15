@@ -63,10 +63,10 @@ public class GltfLoaderTests
         {
             var model = Model.Load(path);
             var sub = Assert.Single(model.Parts);
-            var mat = Assert.IsType<LitTextureMaterial>(sub.Material);
-            Assert.Equal(255, mat.DiffuseColor.R);
-            Assert.Equal(0, mat.DiffuseColor.G);
-            Assert.Equal(0, mat.DiffuseColor.B);
+            var mat = Assert.IsType<PbrMaterial>(sub.Material);
+            Assert.Equal(255, mat.BaseColor.R);
+            Assert.Equal(0, mat.BaseColor.G);
+            Assert.Equal(0, mat.BaseColor.B);
         }
         finally { File.Delete(path); }
     }

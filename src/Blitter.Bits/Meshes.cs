@@ -355,9 +355,9 @@ public static class Meshes
                 uint b = a + 1;
                 uint c = (uint)((lat + 1) * cols + lon);
                 uint d = c + 1;
-                // CCW from outside (looking along -normal toward origin).
-                idx.Add(a); idx.Add(c); idx.Add(b);
-                idx.Add(b); idx.Add(c); idx.Add(d);
+                // CCW from outside.
+                idx.Add(a); idx.Add(b); idx.Add(c);
+                idx.Add(b); idx.Add(d); idx.Add(c);
             }
         }
         indices = idx.ToArray();

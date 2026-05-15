@@ -34,7 +34,7 @@ var window = new Window2D(DesignW, DesignH)
 
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-var rocketImage = Image.Load(Asset.GetPathRelativeToCaller("rocket.png"));
+var rocketImage = Bitmap.Load(Asset.GetPathRelativeToCaller("rocket.png"));
 rocketImage.SetAlpha(0, rocketImage.GetPixel(0, 0)); // make the background transparent
 var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
 {

@@ -30,7 +30,7 @@ var window = new Window2D
 };
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
-using var source = Image.Load(Asset.GetPathRelativeToCaller("blitter.png"));
+using var source = Bitmap.Load(Asset.GetPathRelativeToCaller("blitter.png"));
 
 // Bake the static effects once. Each is a new image owning its own
 

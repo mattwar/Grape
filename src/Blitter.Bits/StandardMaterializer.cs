@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 
 namespace Blitter.Bits;
 
@@ -21,8 +22,6 @@ namespace Blitter.Bits;
 /// </remarks>
 public class StandardMaterializer : Materializer
 {
-    private static Image? s_whitePlaceholder;
-
     /// <summary>
     /// Process-shared instance used by the
     /// <c>Renderer3D.DrawMesh(mesh, material, ...)</c> /
@@ -56,15 +55,79 @@ public class StandardMaterializer : Materializer
                 // Hand-built parts with white vertices + a colored
                 // material won't see the tint; revisit when materials
                 // grow a per-draw uniform tier.
-                var texture = lit.DiffuseTexture ?? GetWhitePlaceholder();
+                var texture = lit.DiffuseTexture ?? Textures.White;
                 var args = new LitArgs(transform);
                 MeshDispatcher.For(mesh).DrawTextured(
                     renderer, mesh, texture, Shaders.LitTexture, in args);
                 break;
 
+            case PbrMaterial pbr:
+                DrawPbrMesh(renderer, mesh, pbr, in transform);
+                break;
+
             default:
                 throw new MaterializerNotSupportedException(mesh, material);
         }
+    }
+
+    private static void DrawPbrMesh(
+        Renderer3D renderer, Mesh mesh, PbrMaterial pbr, in Matrix4x4 transform)
+    {
+        // Materializer is responsible for filling every slot the PBR
+        // shader declares: four material textures (slots 0..3, falling
+        // back to a 1x1 white image when the material doesn't supply
+        // one -- the shader's per-channel factor scales each sample, so
+        // white reduces to "use the factor unchanged"), plus the three
+        // IBL textures (aka SkyLight) (slots 4..6) sourced from the renderer's
+        // SkyLight. Inline-array buffer keeps the seven refs
+        // on the stack and we hand a Span into it to the renderer.
+        // When the renderer has no SkyLight assigned we fall back to
+        // SkyLights.None (black IBL cubes), so the IBL term multiplies
+        // to zero and the material is lit purely by direct lighting.
+        var sky = renderer.SkyLight ?? SkyLights.None;
+
+        var white = Textures.White;
+        PbrTextureBuffer buffer = default;
+        buffer[0] = pbr.BaseColorTexture ?? white;
+        buffer[1] = pbr.MetallicRoughnessTexture ?? white;
+        buffer[2] = pbr.OcclusionTexture ?? white;
+        buffer[3] = pbr.EmissiveTexture ?? white;
+        buffer[4] = sky.Diffuse;
+        buffer[5] = sky.Specular;
+        buffer[6] = sky.SpecularLut;
+
+        var args = new PbrArgs
+        {
+            Model = transform,
+            ViewProjection = Matrix4x4.Identity,
+            BaseColorFactor = pbr.BaseColor,
+            // .W carries the specular cubemap's max mip index so the
+            // shader can scale roughness to a valid LOD without hard-
+            // coding the chain depth. Filled here rather than on
+            // PbrMaterial so authors don't have to track it.
+            MaterialFactors = new Vector4(
+                pbr.Metallic,
+                pbr.Roughness,
+                pbr.OcclusionStrength,
+                Math.Max(0, sky.Specular.LevelCount - 1)),
+            // Pack env yaw into the unused EmissiveFactor.w so the
+            // PBR fragment shader can rotate cubemap sample directions
+            // without spending another fragment cbuffer (SDL_GPU caps
+            // us at 4).
+            EmissiveFactor = new Vector4(pbr.Emissive.R / 255f, pbr.Emissive.G / 255f, pbr.Emissive.B / 255f, sky.Yaw),
+        };
+        MeshDispatcher.For(mesh).DrawMultiTextured(
+            renderer, mesh, buffer[..], PbrShaders.LitPbr, in args);
+    }
+
+    // 7-slot stack buffer for PBR texture binding. InlineArray gives us
+    // a Span<Texture> over the fields without allocating; the renderer
+    // copies the references out before the span dies. Holds a mix of
+    // Image (material maps + BRDF LUT) and Cubemap (IBL) entries.
+    [InlineArray(7)]
+    private struct PbrTextureBuffer
+    {
+        private Texture _slot0;
     }
 
     /// <inheritdoc/>
@@ -83,7 +146,7 @@ public class StandardMaterializer : Materializer
         if (material is LitTextureMaterial lit
             && typeof(TInstance) == typeof(TransformAndColorInstance))
         {
-            var texture = lit.DiffuseTexture ?? GetWhitePlaceholder();
+            var texture = lit.DiffuseTexture ?? Textures.White;
             var args = default(LitArgs); // Model unused; per-instance transform replaces it.
             MeshDispatcher.For(mesh).DrawTexturedInstanced(
                 renderer, mesh, texture, Shaders.LitTextureInstanced, in args, instances);
@@ -93,18 +156,4 @@ public class StandardMaterializer : Materializer
         throw new MaterializerNotSupportedException(mesh, material, typeof(TInstance));
     }
 
-    private static Image GetWhitePlaceholder()
-    {
-        // Lazy + non-locked: racing threads might allocate two 1x1
-        // images on first use and the loser's gets GC'd later. Cheap
-        // enough that an Interlocked dance isn't worth the noise.
-        return s_whitePlaceholder ??= CreateWhitePlaceholder();
-    }
-
-    private static Image CreateWhitePlaceholder()
-    {
-        var image = Image.Create(1, 1, PixelFormat.ABGR8888);
-        image.SetPixel(0, 0, Color.White);
-        return image;
-    }
 }

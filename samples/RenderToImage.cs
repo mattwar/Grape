@@ -19,7 +19,7 @@ var triangle = Mesh.Create([
     new ColorVertex3D(new Vertex3D(-0.5f, -0.5f, 0f), Color.Blue)
 ]);
 
-using var image = Image.Create(800, 600);
+using var image = Bitmap.Create(800, 600);
 
 image.Render3D(new Color(0, 0, 32), rd =>
 {

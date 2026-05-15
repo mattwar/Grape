@@ -4,7 +4,7 @@
 [![NuGet](https://img.shields.io/nuget/v/Blitter.svg?logo=nuget)](https://www.nuget.org/packages/Blitter)
 [![Downloads](https://img.shields.io/nuget/dt/Blitter.svg?logo=nuget)](https://www.nuget.org/packages/Blitter)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![.NET 9](https://img.shields.io/badge/.NET-9.0-512BD4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-512BD4.svg?logo=dotnet)](https://dotnet.microsoft.com/)
 
 **Blitter** is a small, friendly 2D & 3D graphics programming library for .NET, built on top of [SDL3](https://www.libsdl.org/) (via the [SDL3-CS](https://github.com/edwardgushchin/SDL3-CS) bindings) and integrated with [SkiaSharp](https://github.com/mono/SkiaSharp). It wraps many of SDL3's APIs in clean, idiomatic C# classes — and bridges SkiaSharp (which draws into bitmaps) so the pixels you paint with Skia end up on screen — so you can focus on drawing things and making them move instead of wrestling with native interop and low level GPU concepts.
 
@@ -45,7 +45,7 @@ dotnet add package Blitter
 
 The native SDL3 binaries are pulled in automatically via the `SDL3-CS.Native` and `SDL3-CS.Native.Shadercross` package dependencies — there is nothing to install separately.
 
-Targets **.NET 9**.
+Targets **.NET 10**.
 
 ## A 2D example
 

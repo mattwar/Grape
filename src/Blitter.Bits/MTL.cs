@@ -118,7 +118,7 @@ internal static class MTL
             return null;
         try
         {
-            return Image.Load(path, mipmaps: true);
+            return Bitmap.Load(path, mipmaps: true);
         }
         catch
         {

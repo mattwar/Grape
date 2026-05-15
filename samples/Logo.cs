@@ -222,7 +222,7 @@ void DrawLogo(Renderer2D rd)
 
 if (SavePng)
 {
-    using var image = Image.Create(
+    using var image = Bitmap.Create(
         CanvasW * CellSize, CanvasH * CellSize, PixelFormat.ABGR8888);
 
     // Transparent background so the saved PNG drops cleanly onto any
