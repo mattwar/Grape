@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v0.5.0]
 
 ### Added
 - `SkyLights.None`: zero-energy IBL environment (black diffuse and
@@ -44,78 +44,6 @@ All notable changes to this project will be documented in this file.
   specular environment cubemap for image-based lighting. Mip i = the
   environment integrated at roughness i/(levels-1); shaders read by
   reflection vector at LOD `roughness * (levels - 1)`.
-
-### Fixed
-- `Bitmap.Render3D(Color, ...)` now blends translucent background
-  colors (alpha &lt; 255) over the image's existing pixels using
-  SrcOver, instead of clearing to the literal RGBA. Opaque colors
-  still take the GPU clear fast path. Supported on ABGR8888 and the
-  8-bit-per-channel RGBA variants; throws on RGBA64Float.
-- SDL video subsystem is now initialized in the `Application` ctor
-  rather than lazily on first `Window` creation. Surface allocations
-  (`Image.Create` / `Image.Load` / `Image.Decode`) issued before any
-  `Window3D` no longer leave the later window's swapchain mis-sized.
-- `Meshes.Sphere` / `Meshes.TexturedSphere` index winding was
-  inverted, so `CullMode.Back` culled the near hemisphere and showed
-  the far one. Manifested as PBR IBL reflections appearing rotated
-  through the sphere center (looking like a Y-axis flip).
-- `Shader` ctor no longer defaults `TextureLayout` to
-  `SingleTexture2D` when no layout is supplied. The new default is
-  `Empty`, so custom shaders without texture bindings work without
-  having to pass it explicitly.
-
-### Changed
-- Bumped target framework to `net10.0`.
-- glTF loader now emits `PbrMaterial` (was `LitTextureMaterial`),
-  reading base-color factor + texture, metallic + roughness factors +
-  packed MR texture, emissive factor + texture, and occlusion strength
-  + texture. glTF models render through the PBR pipeline instead of
-  the diffuse-only lit-texture path.
-- `Image.Create` / `Image.Load` / `Image.Decode` shortcuts removed.
-  Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
-  `Bitmap` is the concrete CPU-side image type. `Image` remains the
-  abstract base.
-- `Cubemaps.CreateIrradiance` / `CreatePrefilteredSpecular` renamed to
-  `Cubemaps.CreateDiffuse` / `CreateSpecular`. `SkyLight.Irradiance` /
-  `Prefiltered` renamed to `SkyLight.Diffuse` / `Specular`. Sky cube
-  properties similarly (`SkyIrradiance` -> `SkyDiffuse`, etc.). Same
-  outputs and behavior; the new names describe what each cubemap is
-  used for (diffuse vs specular shading) rather than the algorithm
-  that produced it.
-- `Cubemaps.CreateDiffuse` and `Cubemaps.CreateSpecular`
-  now run on the GPU (signatures take `CubeTexture` and return
-  `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.
-- `Textures.CreateSpecularLut` (new) replaces the equivalent helper on
-  the removed `EnvironmentBaker` type.
-- `Environment3D` moved from `Blitter` to `Blitter.Bits` and renamed
-  to `SkyLight` (parallel to `DirectionalLight` / `PointLight`).
-  The `Renderer3D.SkyLight` property is now a C# extension
-  property (also in `Blitter.Bits`) backed by a `ConditionalWeakTable`,
-  so the base project no longer carries the IBL-specific type. Call
-  sites: `renderer.SkyLight = SkyLights.Sun;`.
-- PBR IBL now uses Karis's analytic LUT approximation plus Fdez-Aguera
-  2019 multi-scattering compensation, fixing the bright spot at
-  `NdotV = 1` (the baked GGX importance-sampled LUT collapses to zero
-  at low-roughness grazing, which made IBL vanish at silhouettes and
-  concentrate into a dot at sphere centers).
-- Multi-texture `DrawMesh` / `DrawMeshRaw` overloads now take
-  `ReadOnlySpan<Texture>` instead of `ReadOnlySpan<Image>`, allowing
-  callers to bind a mixed sequence of 2D images and cubemaps. Each
-  span entry's runtime kind must match its slot's declared
-  `ShaderTextureDimension`.
-- `GpuRenderer` now uploads every level of an explicit cubemap mip
-  chain (when `Cubemap.LevelCount > 1`), wiring up the chains built
-  by `MipmappedImage` faces. The auto-generated-mips path
-  (`Cubemap.Mipmaps == true`) is unchanged.
-- `Image` is now an abstract base type. The previous CPU-surface
-  concrete class is renamed to `Bitmap` (still the type returned
-  by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,
-  `Render2D`, `Render3D`, and SkiaSharp extensions live on
-  `Bitmap` only. `MipmappedImage` is now a sibling subtype of
-  `Image`. `Cubemap` face accessors return the base level as `Image`;
-  CPU-only paths cast to `Bitmap`.
-
-### Added
 - `Textures` static class (Blitter.Bits): catalog of process-shared
   images. Currently exposes `White`, `Black`, and `SpecularLut` -- a
   256x256 precomputed split-sum BRDF integration texture for upcoming
@@ -197,14 +125,15 @@ All notable changes to this project will be documented in this file.
   cubemaps. Exposes a default `Sky` (procedural zenith/horizon/
   ground gradient + sun disc), a generic `Bake(faceSize, dir→color)`
   builder, and a parameterised `BakeSky(...)` for custom palettes.
-- `Cubemaps.SkyIrradiance` + `Cubemaps.BakeIrradiance(source, ...)`:
-  diffuse-IBL irradiance map. Cosine-weighted hemisphere integral
-  via Hammersley + tangent-frame importance sampling. Sample by
-  surface normal for the diffuse environment term.
+- `Cubemaps.SkyDiffuse` + `Cubemaps.CreateDiffuse(source, ...)`:
+  diffuse environment cubemap for image-based lighting. Cosine-
+  weighted hemisphere integral via Hammersley + tangent-frame
+  importance sampling. Read by surface normal for the diffuse
+  environment term.
 - `MipmappedImage`: caller-supplied mip chain for cases where each
-  level carries different content (e.g. a prefiltered specular
-  environment map). Distinct from `Image.Mipmaps`, which asks the
-  renderer to auto-generate a chain by downsampling.
+  level carries different content (e.g. a specular environment
+  cubemap). Distinct from `Image.Mipmaps`, which asks the renderer
+  to auto-generate a chain by downsampling.
 - `Cubemap.Create(MipmappedImage × 6)` overload + `Cubemap.LevelCount`
   for cubemaps whose faces ship explicit mip chains. The existing
   `Image × 6` overload still works; it builds single-level chains
@@ -213,7 +142,75 @@ All notable changes to this project will be documented in this file.
   `Cubemaps`: face-aware procedural baker for patterns that vary
   per face (debug grids, per-face seeds).
 
+### Fixed
+- `Bitmap.Render3D(Color, ...)` now blends translucent background
+  colors (alpha &lt; 255) over the image's existing pixels using
+  SrcOver, instead of clearing to the literal RGBA. Opaque colors
+  still take the GPU clear fast path. Supported on ABGR8888 and the
+  8-bit-per-channel RGBA variants; throws on RGBA64Float.
+- SDL video subsystem is now initialized in the `Application` ctor
+  rather than lazily on first `Window` creation. Surface allocations
+  (`Image.Create` / `Image.Load` / `Image.Decode`) issued before any
+  `Window3D` no longer leave the later window's swapchain mis-sized.
+- `Meshes.Sphere` / `Meshes.TexturedSphere` index winding was
+  inverted, so `CullMode.Back` culled the near hemisphere and showed
+  the far one. Manifested as PBR IBL reflections appearing rotated
+  through the sphere center (looking like a Y-axis flip).
+- `Shader` ctor no longer defaults `TextureLayout` to
+  `SingleTexture2D` when no layout is supplied. The new default is
+  `Empty`, so custom shaders without texture bindings work without
+  having to pass it explicitly.
+
 ### Changed
+- Bumped target framework to `net10.0`.
+- glTF loader now emits `PbrMaterial` (was `LitTextureMaterial`),
+  reading base-color factor + texture, metallic + roughness factors +
+  packed MR texture, emissive factor + texture, and occlusion strength
+  + texture. glTF models render through the PBR pipeline instead of
+  the diffuse-only lit-texture path.
+- `Image.Create` / `Image.Load` / `Image.Decode` shortcuts removed.
+  Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
+  `Bitmap` is the concrete CPU-side image type. `Image` remains the
+  abstract base.
+- `Cubemaps.CreateIrradiance` / `CreatePrefilteredSpecular` renamed to
+  `Cubemaps.CreateDiffuse` / `CreateSpecular`. `SkyLight.Irradiance` /
+  `Prefiltered` renamed to `SkyLight.Diffuse` / `Specular`. Sky cube
+  properties similarly (`SkyIrradiance` -> `SkyDiffuse`, etc.). Same
+  outputs and behavior; the new names describe what each cubemap is
+  used for (diffuse vs specular shading) rather than the algorithm
+  that produced it.
+- `Cubemaps.CreateDiffuse` and `Cubemaps.CreateSpecular`
+  now run on the GPU (signatures take `CubeTexture` and return
+  `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.
+- `Textures.CreateSpecularLut` (new) replaces the equivalent helper on
+  the removed `EnvironmentBaker` type.
+- `Environment3D` moved from `Blitter` to `Blitter.Bits` and renamed
+  to `SkyLight` (parallel to `DirectionalLight` / `PointLight`).
+  The `Renderer3D.SkyLight` property is now a C# extension
+  property (also in `Blitter.Bits`) backed by a `ConditionalWeakTable`,
+  so the base project no longer carries the IBL-specific type. Call
+  sites: `renderer.SkyLight = SkyLights.Sun;`.
+- PBR IBL now uses Karis's analytic LUT approximation plus Fdez-Aguera
+  2019 multi-scattering compensation, fixing the bright spot at
+  `NdotV = 1` (the baked GGX importance-sampled LUT collapses to zero
+  at low-roughness grazing, which made IBL vanish at silhouettes and
+  concentrate into a dot at sphere centers).
+- Multi-texture `DrawMesh` / `DrawMeshRaw` overloads now take
+  `ReadOnlySpan<Texture>` instead of `ReadOnlySpan<Image>`, allowing
+  callers to bind a mixed sequence of 2D images and cubemaps. Each
+  span entry's runtime kind must match its slot's declared
+  `ShaderTextureDimension`.
+- `GpuRenderer` now uploads every level of an explicit cubemap mip
+  chain (when `Cubemap.LevelCount > 1`), wiring up the chains built
+  by `MipmappedImage` faces. The auto-generated-mips path
+  (`Cubemap.Mipmaps == true`) is unchanged.
+- `Image` is now an abstract base type. The previous CPU-surface
+  concrete class is renamed to `Bitmap` (still the type returned
+  by `Image.Create` / `Image.Load` / `Image.Decode`). Pixel access,
+  `Render2D`, `Render3D`, and SkiaSharp extensions live on
+  `Bitmap` only. `MipmappedImage` is now a sibling subtype of
+  `Image`. `Cubemap` face accessors return the base level as `Image`;
+  CPU-only paths cast to `Bitmap`.
 - `Image.Render3D` now reports the destination image's own
   dimensions and aspect ratio to the renderer (previously inherited
   a 16:9 fallback, which silently squished scenes rendered into
