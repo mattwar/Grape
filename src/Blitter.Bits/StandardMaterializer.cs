@@ -78,13 +78,13 @@ public class StandardMaterializer : Materializer
         // back to a 1x1 white image when the material doesn't supply
         // one -- the shader's per-channel factor scales each sample, so
         // white reduces to "use the factor unchanged"), plus the three
-        // IBL textures (slots 4..6) sourced from the renderer's
+        // IBL textures (aka SkyLight) (slots 4..6) sourced from the renderer's
         // SkyLight. Inline-array buffer keeps the seven refs
         // on the stack and we hand a Span into it to the renderer.
         // When the renderer has no SkyLight assigned we fall back to
         // SkyLights.None (black IBL cubes), so the IBL term multiplies
         // to zero and the material is lit purely by direct lighting.
-        var env = renderer.SkyLight ?? SkyLights.None;
+        var sky = renderer.SkyLight ?? SkyLights.None;
 
         var white = Textures.White;
         PbrTextureBuffer buffer = default;
@@ -92,9 +92,9 @@ public class StandardMaterializer : Materializer
         buffer[1] = pbr.MetallicRoughnessTexture ?? white;
         buffer[2] = pbr.OcclusionTexture ?? white;
         buffer[3] = pbr.EmissiveTexture ?? white;
-        buffer[4] = env.Irradiance;
-        buffer[5] = env.Prefiltered;
-        buffer[6] = env.SpecularLut;
+        buffer[4] = sky.Irradiance;
+        buffer[5] = sky.Prefiltered;
+        buffer[6] = sky.SpecularLut;
 
         var args = new PbrArgs
         {
@@ -109,12 +109,12 @@ public class StandardMaterializer : Materializer
                 pbr.Metallic,
                 pbr.Roughness,
                 pbr.OcclusionStrength,
-                Math.Max(0, env.Prefiltered.LevelCount - 1)),
+                Math.Max(0, sky.Prefiltered.LevelCount - 1)),
             // Pack env yaw into the unused EmissiveFactor.w so the
             // PBR fragment shader can rotate cubemap sample directions
             // without spending another fragment cbuffer (SDL_GPU caps
             // us at 4).
-            EmissiveFactor = new Vector4(pbr.Emissive.R / 255f, pbr.Emissive.G / 255f, pbr.Emissive.B / 255f, env.Yaw),
+            EmissiveFactor = new Vector4(pbr.Emissive.R / 255f, pbr.Emissive.G / 255f, pbr.Emissive.B / 255f, sky.Yaw),
         };
         MeshDispatcher.For(mesh).DrawMultiTextured(
             renderer, mesh, buffer[..], PbrShaders.LitPbr, in args);

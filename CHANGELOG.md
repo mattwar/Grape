@@ -66,6 +66,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Bumped target framework to `net10.0`.
+- glTF loader now emits `PbrMaterial` (was `LitTextureMaterial`),
+  reading base-color factor + texture, metallic + roughness factors +
+  packed MR texture, emissive factor + texture, and occlusion strength
+  + texture. glTF models render through the PBR pipeline instead of
+  the diffuse-only lit-texture path.
 - `Image.Create` / `Image.Load` / `Image.Decode` shortcuts removed.
   Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
   `Bitmap` is the concrete CPU-side image type. `Image` remains the
