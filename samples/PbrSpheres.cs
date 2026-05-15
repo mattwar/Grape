@@ -79,7 +79,7 @@ var camera = new PerspectiveCamera();
 window.Renderer.Camera = camera;
 
 // add environment lighting environment for the spheres to reflect
-window.Renderer.EnvironmentLight = EnvironmentLights.SkySunless;
+window.Renderer.SkyLight = SkyLights.Sunless;
 
 // set the ambient light to a bright color so we can see the environment reflections
 window.Renderer.AmbientLight = new Color(180, 200, 230);

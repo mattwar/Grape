@@ -1,15 +1,15 @@
 namespace Blitter.Bits;
 
 /// <summary>
-/// Built-in <see cref="EnvironmentLight"/> instances for image-based lighting.
-/// Assign one to <see cref="Renderer3D"/>'s <c>EnvironmentLight</c> extension
+/// Built-in <see cref="SkyLight"/> instances for image-based lighting.
+/// Assign one to <see cref="Renderer3D"/>'s <c>SkyLight</c> extension
 /// property before drawing any material (e.g. <see cref="PbrMaterial"/>) that consumes IBL.
 /// </summary>
-public static class EnvironmentLights
+public static class SkyLights
 {
-    private static EnvironmentLight? s_sky;
-    private static EnvironmentLight? s_skySunless;
-    private static EnvironmentLight? s_skyFlat;
+    private static SkyLight? s_sky;
+    private static SkyLight? s_skySunless;
+    private static SkyLight? s_skyFlat;
 
     /// <summary>
     /// Default sky environment: procedural day-sky cubemap baked into
@@ -17,7 +17,7 @@ public static class EnvironmentLights
     /// with the split-sum BRDF LUT. Lazily built on first access and
     /// cached for the process lifetime.
     /// </summary>
-    public static EnvironmentLight Sky => s_sky ??= new()
+    public static SkyLight Sun => s_sky ??= new()
     {
         Irradiance = Cubemaps.SkyIrradiance,
         Prefiltered = Cubemaps.SkyPrefiltered,
@@ -25,11 +25,11 @@ public static class EnvironmentLights
     };
 
     /// <summary>
-    /// Sun-less variant of <see cref="Sky"/>: same sky tint, no sun
+    /// Sun-less variant of <see cref="Sun"/>: same sky tint, no sun
     /// disc. Use when a directional light is the actual sun and you
     /// don't want a second specular highlight reflected from the sky.
     /// </summary>
-    public static EnvironmentLight SkySunless => s_skySunless ??= new()
+    public static SkyLight Sunless => s_skySunless ??= new()
     {
         Irradiance = Cubemaps.SkySunlessIrradiance,
         Prefiltered = Cubemaps.SkySunlessPrefiltered,
@@ -41,7 +41,7 @@ public static class EnvironmentLights
     /// horizon band or sun, so shiny surfaces reflect a uniform tone.
     /// Useful as a neutral IBL baseline for material previews.
     /// </summary>
-    public static EnvironmentLight SkyFlat => s_skyFlat ??= new()
+    public static SkyLight Flat => s_skyFlat ??= new()
     {
         Irradiance = Cubemaps.SkyFlatIrradiance,
         Prefiltered = Cubemaps.SkyFlatPrefiltered,

@@ -79,13 +79,13 @@ public class StandardMaterializer : Materializer
         // one -- the shader's per-channel factor scales each sample, so
         // white reduces to "use the factor unchanged"), plus the three
         // IBL textures (slots 4..6) sourced from the renderer's
-        // EnvironmentLight. Inline-array buffer keeps the seven refs
+        // SkyLight. Inline-array buffer keeps the seven refs
         // on the stack and we hand a Span into it to the renderer.
-        var env = renderer.EnvironmentLight
+        var env = renderer.SkyLight
             ?? throw new InvalidOperationException(
-                $"PBR draws require an {nameof(EnvironmentLight)} for IBL inputs; " +
-                $"set {nameof(Renderer3D)}.EnvironmentLight " +
-                $"(e.g. to {nameof(EnvironmentLights)}.{nameof(EnvironmentLights.Sky)}) before drawing.");
+                $"PBR draws require a {nameof(SkyLight)} for IBL inputs; " +
+                $"set {nameof(Renderer3D)}.SkyLight " +
+                $"(e.g. to {nameof(SkyLights)}.{nameof(SkyLights.Sun)}) before drawing.");
 
         var white = Textures.White;
         PbrTextureBuffer buffer = default;
