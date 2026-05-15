@@ -494,7 +494,7 @@ public static class SkiaSharpExtensions
         int dw = sw + padLeft + padRight;
         int dh = sh + padTop + padBottom;
         if (dw <= 0 || dh <= 0)
-            return Image.Create(Math.Max(1, dw), Math.Max(1, dh));
+            return Bitmap.Create(Math.Max(1, dw), Math.Max(1, dh));
 
         // Stage source -> SKBitmap, draw with the filter into a same-
         // sized destination SKBitmap, then snapshot back to a new
@@ -510,7 +510,7 @@ public static class SkiaSharpExtensions
             canvas.DrawBitmap(srcBitmap, padLeft, padTop, paint);
         }
 
-        var result = Image.Create(dw, dh);
+        var result = Bitmap.Create(dw, dh);
         result.CopyFromBitmap(dstBitmap);
         return result;
     }
@@ -542,7 +542,7 @@ public static class SkiaSharpExtensions
         {
             ArgumentNullException.ThrowIfNull(bitmap);
 
-            var image = Image.Create(bitmap.Width, bitmap.Height, format ?? bitmap.PixelFormat);
+            var image = Bitmap.Create(bitmap.Width, bitmap.Height, format ?? bitmap.PixelFormat);
             image.CopyFromBitmap(bitmap);
             return image;
         }
@@ -597,7 +597,7 @@ public static class SkiaSharpExtensions
                 return;
 
             DisposeResources();
-            Image = Blitter.Image.Create(width, height, PixelFormat.ABGR8888);
+            Image = Blitter.Bitmap.Create(width, height, PixelFormat.ABGR8888);
             var info = new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
             Bitmap = new SKBitmap(info);
             Canvas = new SKCanvas(Bitmap);

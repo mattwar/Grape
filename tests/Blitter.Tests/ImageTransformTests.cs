@@ -11,7 +11,7 @@ public class ImageTransformTests
     //   (0,1) yellow    (1,1) magenta    (2,1) cyan
     private static (Bitmap image, Color[,] expected) BuildSample()
     {
-        var img = Image.Create(3, 2, PixelFormat.RGBA8888);
+        var img = Bitmap.Create(3, 2, PixelFormat.RGBA8888);
         var grid = new Color[3, 2];
         grid[0, 0] = new Color(255, 0, 0);
         grid[1, 0] = new Color(0, 255, 0);
@@ -125,7 +125,7 @@ public class ImageTransformTests
     [Fact]
     public void Transform_PreservesMipmapsFlag()
     {
-        var src = Image.Create(2, 2, PixelFormat.RGBA8888, mipmaps: true);
+        var src = Bitmap.Create(2, 2, PixelFormat.RGBA8888, mipmaps: true);
         using var flipped = src.Flip(FlipMode.Horizontal);
         using var rotated = src.Rotate(Rotation.Clockwise90);
         Assert.True(flipped.Mipmaps);

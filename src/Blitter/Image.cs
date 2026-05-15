@@ -46,25 +46,4 @@ public abstract class Image : Texture, IDisposable
 
     /// <summary>Size of the (base level of the) image in pixels.</summary>
     public (int Width, int Height) Size => (Width, Height);
-
-    /// <summary>
-    /// Creates a new in-memory <see cref="Bitmap"/> of the given
-    /// size. Shortcut for <see cref="Bitmap.Create"/>.
-    /// </summary>
-    public static Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
-        => Bitmap.Create(width, height, format, mipmaps);
-
-    /// <summary>
-    /// Loads a <see cref="Bitmap"/> from disk. Shortcut for
-    /// <see cref="Bitmap.Load"/>.
-    /// </summary>
-    public static Bitmap Load(string filePath, bool mipmaps = false)
-        => Bitmap.Load(filePath, mipmaps);
-
-    /// <summary>
-    /// Decodes a <see cref="Bitmap"/> from encoded bytes.
-    /// Shortcut for <see cref="Bitmap.Decode"/>.
-    /// </summary>
-    public static Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
-        => Bitmap.Decode(bytes, mipmaps);
 }

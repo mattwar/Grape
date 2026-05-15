@@ -28,7 +28,7 @@ using Blitter.Bits;
 const int FaceSize = 256;
 
 // Empty faces -- contents will be replaced by Render.
-static Image Blank() => Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
+static Image Blank() => Bitmap.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
 var cubemap = Cubemap.Create(
     Blank(), Blank(), Blank(), Blank(), Blank(), Blank());
 

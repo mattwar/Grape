@@ -192,7 +192,7 @@ internal static class GLTF
             return cached;
 
         var bytes = gltfImage.Content.Content; // ReadOnlyMemory<byte>; PNG/JPG/etc.
-        var img = Image.Decode(bytes.Span, mipmaps: true);
+        var img = Bitmap.Decode(bytes.Span, mipmaps: true);
         imageCache[gltfImage] = img;
         return img;
     }

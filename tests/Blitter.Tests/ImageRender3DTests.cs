@@ -16,7 +16,7 @@ public class ImageRender3DTests
     [InlineData(PixelFormat.RGBA8888)]
     public void Render3D_FillsBackground_AcrossPixelFormats(PixelFormat format)
     {
-        using var image = Image.Create(16, 16, format);
+        using var image = Bitmap.Create(16, 16, format);
         var background = new Color(40, 80, 160);
 
         image.Render3D(background, _ => { });

@@ -306,7 +306,7 @@ public static class Cubemaps
 
     private static Bitmap CreateFace(int size, CubeFace face, Func<CubeFace, Vector3, Color> shade)
     {
-        var image = Image.Create(size, size, PixelFormat.ABGR8888);
+        var image = Bitmap.Create(size, size, PixelFormat.ABGR8888);
         float inv = 2f / size;
         // Rows are independent; SetPixel writes distinct byte ranges
         // per (x, y), so parallelising the outer loop is safe.

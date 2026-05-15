@@ -1002,7 +1002,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         if (_debugFontAtlas is { IsDisposed: false })
             return _debugFontAtlas;
 
-        var atlas = Image.Create(DebugAtlasWidth, DebugAtlasHeight, PixelFormat.ABGR8888);
+        var atlas = Bitmap.Create(DebugAtlasWidth, DebugAtlasHeight, PixelFormat.ABGR8888);
 
         // Drive a software renderer over the image's pixels and use SDL's
         // built-in debug-text routine to draw each ASCII glyph into its cell.

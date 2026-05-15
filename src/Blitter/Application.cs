@@ -18,11 +18,15 @@ public class Application : IDisposable
     {
         if (_current != null)
             throw new InvalidOperationException("An instance of Application already exists.");
-        // Initialize only the Events subsystem here. Other subsystems are
-        // brought up lazily by the types that need them (Window -> Video,
-        // Audio -> Audio, Gamepad -> Gamepad, etc). SDL's subsystem init is
-        // ref-counted, so calling InitSubSystem from many places is safe.
-        if (!SDL.Init(SDL.InitFlags.Events))
+        // Bring up Events + Video here, on the application thread. Video is
+        // Blitter's primary purpose, and SDL3 wants all video/window calls
+        // serialized on the thread that initialized the subsystem -- doing it
+        // here (rather than lazily on first Window) ensures surface allocs
+        // (Bitmap.Create / Decode / Load) issued before any Window3D still see
+        // a properly-initialized video subsystem, so later window swapchains
+        // size correctly. Audio / Gamepad stay lazy. SDL's subsystem init is
+        // ref-counted, so callers can still InitSubSystem(Video) freely.
+        if (!SDL.Init(SDL.InitFlags.Events | SDL.InitFlags.Video))
             throw new InvalidOperationException($"Failed to initialize SDL: {SDL.GetError()}");
         _current = this;
         this.Thread = Thread.CurrentThread;
@@ -30,10 +34,9 @@ public class Application : IDisposable
 
     /// <summary>
     /// The current running application. Accessing this property will start
-    /// the application if one is not already running. Subsystems beyond
-    /// the basic event loop are initialized lazily on first use of the
-    /// types that need them (creating a <see cref="Window"/> brings up
-    /// video, touching <see cref="Audio"/> brings up audio, and so on).
+    /// the application if one is not already running. The Events and Video
+    /// subsystems come up at construction; Audio and Gamepad are still
+    /// initialized lazily on first use of the types that need them.
     /// </summary>
     public static Application Current => _current ?? Start();
 

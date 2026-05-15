@@ -107,7 +107,7 @@ await window.RunAsync(rd =>
 
 static Image CreateCheckerboard(int width, int height, int cellSize, bool mipmaps)
 {
-    var image = Image.Create(width, height, PixelFormat.ABGR8888, mipmaps: mipmaps);
+    var image = Bitmap.Create(width, height, PixelFormat.ABGR8888, mipmaps: mipmaps);
     var dark  = new Color( 30,  30,  30);
     var light = new Color(230, 230, 230);
 

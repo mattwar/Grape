@@ -38,6 +38,10 @@ All notable changes to this project will be documented in this file.
   reflection vector at LOD `roughness * (levels - 1)`.
 
 ### Fixed
+- SDL video subsystem is now initialized in the `Application` ctor
+  rather than lazily on first `Window` creation. Surface allocations
+  (`Image.Create` / `Image.Load` / `Image.Decode`) issued before any
+  `Window3D` no longer leave the later window's swapchain mis-sized.
 - `Meshes.Sphere` / `Meshes.TexturedSphere` index winding was
   inverted, so `CullMode.Back` culled the near hemisphere and showed
   the far one. Manifested as PBR IBL reflections appearing rotated
@@ -49,6 +53,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - Bumped target framework to `net10.0`.
+- `Image.Create` / `Image.Load` / `Image.Decode` shortcuts removed.
+  Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
+  `Bitmap` is the concrete CPU-side image type. `Image` remains the
+  abstract base.
 - `Cubemaps.CreateIrradiance` and `Cubemaps.CreatePrefilteredSpecular`
   now run on the GPU (signatures take `CubeTexture` and return
   `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.

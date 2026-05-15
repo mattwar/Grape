@@ -61,7 +61,7 @@ SKColor[] hues =
 // an anti-aliased character centered on top. `Image.DrawCanvas`
 // gives us an SKCanvas pointing at the image's pixels -- everything
 // inside the lambda is plain SkiaSharp code.
-var atlasImage = Image.Create(AtlasW, AtlasH);
+var atlasImage = Bitmap.Create(AtlasW, AtlasH);
 atlasImage.DrawCanvas(canvas =>
 {
     using var typeface = SKTypeface.FromFamilyName("Segoe UI", SKFontStyle.Bold);

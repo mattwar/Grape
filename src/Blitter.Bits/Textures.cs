@@ -60,7 +60,7 @@ public static class Textures
 
     private static Image CreateSolid(Color color)
     {
-        var image = Image.Create(1, 1, PixelFormat.ABGR8888);
+        var image = Bitmap.Create(1, 1, PixelFormat.ABGR8888);
         image.SetPixel(0, 0, color);
         return image;
     }

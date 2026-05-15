@@ -135,7 +135,7 @@ await window.RunAsync(rd =>
 
 static Image MakeFace(Color fill)
 {
-    var image = Image.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
+    var image = Bitmap.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
     var border = Color.Black;
     for (int y = 0; y < FaceSize; y++)
     {

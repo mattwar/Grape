@@ -49,7 +49,7 @@ await window.RunAsync(rd =>
         transform);
 });static Image CreateCheckerboardImage(int width, int height, int cellSize)
 {
-    var image = Image.Create(width, height, PixelFormat.ABGR8888);
+    var image = Bitmap.Create(width, height, PixelFormat.ABGR8888);
     var dark = new Color(32, 32, 32);
     var light = new Color(220, 220, 220);
 

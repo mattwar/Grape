@@ -7,7 +7,7 @@ public class ImageBoundsTests
 {
     private static Bitmap MakeImage(int w, int h, Action<Bitmap> draw)
     {
-        var img = Image.Create(w, h);
+        var img = Bitmap.Create(w, h);
         draw(img);
         return img;
     }

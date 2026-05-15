@@ -62,7 +62,7 @@ public sealed class Bitmap : Image
     /// throughout Blitter; pass an explicit format only for specialized
     /// surfaces (paletted, YUV, 16-bit, float, etc.).
     /// </summary>
-    public static new Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
+    public static Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
     {
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
         if (imageId == 0)
@@ -246,7 +246,7 @@ public sealed class Bitmap : Image
     /// from the base image. Recommended for textures sampled at
     /// varying distances; unnecessary for full-resolution UI sprites.
     /// </param>
-    public static new Bitmap Load(string filePath, bool mipmaps = false)
+    public static Bitmap Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
@@ -258,7 +258,7 @@ public sealed class Bitmap : Image
     /// Decodes an image from an encoded byte span (PNG, JPG, WebP, ...)
     /// using SkiaSharp.
     /// </summary>
-    public static new Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
+    public static Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
     {
         // Always allocate ABGR8888 — the GPU fast-path sampling
         // format. CopyFromBitmap converts per pixel, so the bitmap's
