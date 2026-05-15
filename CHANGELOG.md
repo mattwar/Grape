@@ -5,25 +5,33 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- `EnvironmentBaker` (Blitter.Bits): GPU-driven IBL bakes for
-  irradiance, prefiltered specular, and the split-sum BRDF LUT.
-- `Cubemaps.SkyIrradiance` and `Cubemaps.SkyPrefiltered` now bake on
-  the GPU, cutting first-frame latency from ~2s to negligible.
+- `EnvironmentLight.Yaw`: rotates IBL cubemap sample directions around
+  the world Y axis without regenerating the maps. For Y-symmetric
+  gradient skies this effectively moves the baked sun in azimuth at
+  no extra cost.
+- `Cubemaps.SkyIrradiance` and `Cubemaps.SkyPrefiltered` now generate
+  on the GPU, cutting first-frame latency from ~2s to negligible.
+- `Cubemaps.SkySunless`, `SkySunlessIrradiance`,
+  `SkySunlessPrefiltered`, and `EnvironmentLights.SkySunless`: sun-less
+  variants for scenes where a directional light is the sun.
+- `Cubemaps.SkyFlat`, `SkyFlatIrradiance`, `SkyFlatPrefiltered`, and
+  `EnvironmentLights.SkyFlat`: uniform-tint IBL with no horizon band or
+  sun, for neutral material previews.
 - `Texture` abstract base type for any GPU-samplable texture. `Image`
   and `Cubemap` now both inherit from it, so multi-texture draw
   overloads can bind a mixed list of 2D images and cubemaps.
-- `Environment3D` and `Renderer3D.Environment`: scene-wide IBL state
+- `EnvironmentLight` and `Renderer3D.EnvironmentLight`: scene-wide IBL state
   bundling an irradiance cubemap, a prefiltered specular cubemap, and
   a BRDF LUT. The engine doesn't consume the value directly --
   materializers (e.g. `StandardMaterializer`) read it and bind the
   appropriate slots when drawing PBR materials.
-- `EnvironmentMaps.Sky` (Blitter.Bits): default IBL environment built
+- `EnvironmentLights.Sky` (Blitter.Bits): default IBL environment built
   from the procedural sky cubemap and `Textures.SpecularLut`.
 - `PbrShaders.LitPbr` now uses the Karis split-sum approximation for
   image-based lighting (diffuse from irradiance, specular from
   prefiltered + BRDF LUT). The previous flat ambient term is replaced
   by IBL; `Renderer3D.AmbientLight` now tints the IBL result.
-- `Cubemaps.BakePrefilteredSpecular(Cubemap, faceSize, levels, samples)`
+- `Cubemaps.CreatePrefilteredSpecular(CubeTexture, faceSize, levels, samples)`
   and `Cubemaps.SkyPrefiltered`: GGX-importance-sampled mipmapped
   specular environment cubemap for image-based lighting. Mip i = the
   environment integrated at roughness i/(levels-1); shaders sample by
@@ -40,6 +48,23 @@ All notable changes to this project will be documented in this file.
   having to pass it explicitly.
 
 ### Changed
+- Bumped target framework to `net10.0`.
+- `Cubemaps.CreateIrradiance` and `Cubemaps.CreatePrefilteredSpecular`
+  now run on the GPU (signatures take `CubeTexture` and return
+  `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.
+- `Textures.CreateSpecularLut` (new) replaces the equivalent helper on
+  the removed `EnvironmentBaker` type.
+- `Environment3D` moved from `Blitter` to `Blitter.Bits` and renamed
+  to `EnvironmentLight` (parallel to `DirectionalLight` / `PointLight`).
+  The `Renderer3D.EnvironmentLight` property is now a C# extension
+  property (also in `Blitter.Bits`) backed by a `ConditionalWeakTable`,
+  so the base project no longer carries the IBL-specific type. Call
+  sites: `renderer.EnvironmentLight = EnvironmentLights.Sky;`.
+- PBR IBL now uses Karis's analytic LUT approximation plus Fdez-Aguera
+  2019 multi-scattering compensation, fixing the bright spot at
+  `NdotV = 1` (the baked GGX importance-sampled LUT collapses to zero
+  at low-roughness grazing, which made IBL vanish at silhouettes and
+  concentrate into a dot at sphere centers).
 - Multi-texture `DrawMesh` / `DrawMeshRaw` overloads now take
   `ReadOnlySpan<Texture>` instead of `ReadOnlySpan<Image>`, allowing
   callers to bind a mixed sequence of 2D images and cubemaps. Each

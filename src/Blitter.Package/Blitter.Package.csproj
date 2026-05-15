@@ -121,24 +121,24 @@
     The paths are relative to this csproj's directory.
   -->
   <ItemGroup>
-    <None Include="..\Blitter\bin\$(Configuration)\net9.0\Blitter.dll"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter\bin\$(Configuration)\net9.0\Blitter.pdb"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter\bin\$(Configuration)\net9.0\Blitter.xml"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Bits\bin\$(Configuration)\net9.0\Blitter.Bits.dll"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Bits\bin\$(Configuration)\net9.0\Blitter.Bits.pdb"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Bits\bin\$(Configuration)\net9.0\Blitter.Bits.xml"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net9.0\Blitter.Blocks.dll"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net9.0\Blitter.Blocks.pdb"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
-    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net9.0\Blitter.Blocks.xml"
-          Pack="true" PackagePath="lib\net9.0\" Visible="false" />
+    <None Include="..\Blitter\bin\$(Configuration)\net10.0\Blitter.dll"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter\bin\$(Configuration)\net10.0\Blitter.pdb"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter\bin\$(Configuration)\net10.0\Blitter.xml"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Bits\bin\$(Configuration)\net10.0\Blitter.Bits.dll"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Bits\bin\$(Configuration)\net10.0\Blitter.Bits.pdb"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Bits\bin\$(Configuration)\net10.0\Blitter.Bits.xml"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net10.0\Blitter.Blocks.dll"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net10.0\Blitter.Blocks.pdb"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
+    <None Include="..\Blitter.Blocks\bin\$(Configuration)\net10.0\Blitter.Blocks.xml"
+          Pack="true" PackagePath="lib\net10.0\" Visible="false" />
   </ItemGroup>
 
 </Project>

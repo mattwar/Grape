@@ -212,15 +212,6 @@ public abstract class Renderer3D
     public DirectionalLight? DirectionalLight { get; set; }
 
     /// <summary>
-    /// Scene-wide image-based-lighting environment. The engine itself
-    /// doesn't read this -- it's exposed for materializers (e.g.
-    /// <c>StandardMaterializer</c>) that want a single per-renderer
-    /// place to source IBL inputs without threading them through every
-    /// draw call.
-    /// </summary>
-    public Environment3D? Environment { get; set; }
-
-    /// <summary>
     /// Mutable list of point lights that lit shaders accumulate per
     /// fragment. Add/remove freely between frames; the renderer
     /// snapshots and uploads the list at the start of each

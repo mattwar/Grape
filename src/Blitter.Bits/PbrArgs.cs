@@ -35,7 +35,12 @@ public struct PbrArgs : IUniformArgs<PbrArgs>
     /// <summary>x = metallic, y = roughness, z = occlusion strength, w = prefilter max mip (filled by renderer).</summary>
     public Vector4 MaterialFactors;
 
-    /// <summary>Linear emissive factor (RGB; w unused).</summary>
+    /// <summary>
+    /// Linear emissive factor (RGB). The <c>w</c> channel carries the
+    /// environment yaw (radians) for IBL cubemap rotation -- packed
+    /// here because SDL_GPU caps fragment cbuffers at 4 and the material
+    /// block already uses one.
+    /// </summary>
     public Vector4 EmissiveFactor;
 
     /// <summary>

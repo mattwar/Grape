@@ -78,14 +78,14 @@ public class StandardMaterializer : Materializer
         // back to a 1x1 white image when the material doesn't supply
         // one -- the shader's per-channel factor scales each sample, so
         // white reduces to "use the factor unchanged"), plus the three
-        // IBL textures (slots 4..6) sourced from Renderer3D.Environment.
-        // Inline-array buffer keeps the seven refs on the stack and we
-        // hand a Span into it to the renderer.
-        var env = renderer.Environment
+        // IBL textures (slots 4..6) sourced from the renderer's
+        // EnvironmentLight. Inline-array buffer keeps the seven refs
+        // on the stack and we hand a Span into it to the renderer.
+        var env = renderer.EnvironmentLight
             ?? throw new InvalidOperationException(
-                $"PBR draws require an {nameof(Environment3D)} for IBL inputs; " +
-                $"set {nameof(Renderer3D)}.{nameof(Renderer3D.Environment)} " +
-                $"(e.g. to {nameof(EnvironmentMaps)}.{nameof(EnvironmentMaps.Sky)}) before drawing.");
+                $"PBR draws require an {nameof(EnvironmentLight)} for IBL inputs; " +
+                $"set {nameof(Renderer3D)}.EnvironmentLight " +
+                $"(e.g. to {nameof(EnvironmentLights)}.{nameof(EnvironmentLights.Sky)}) before drawing.");
 
         var white = Textures.White;
         PbrTextureBuffer buffer = default;
@@ -111,7 +111,11 @@ public class StandardMaterializer : Materializer
                 pbr.Roughness,
                 pbr.OcclusionStrength,
                 Math.Max(0, env.Prefiltered.LevelCount - 1)),
-            EmissiveFactor = pbr.Emissive,
+            // Pack env yaw into the unused EmissiveFactor.w so the
+            // PBR fragment shader can rotate cubemap sample directions
+            // without spending another fragment cbuffer (SDL_GPU caps
+            // us at 4).
+            EmissiveFactor = new Vector4(pbr.Emissive.R / 255f, pbr.Emissive.G / 255f, pbr.Emissive.B / 255f, env.Yaw),
         };
         MeshDispatcher.For(mesh).DrawMultiTextured(
             renderer, mesh, buffer[..], PbrShaders.LitPbr, in args);

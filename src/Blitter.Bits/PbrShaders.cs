@@ -188,19 +188,51 @@ public static class PbrShaders
             float3 V = normalize(cameraPosition.xyz - input.WorldPos);
             float NdotV = saturate(dot(N, V));
 
-            // -- Image-based lighting (Karis split-sum)
-            //   - diffuse: irradiance(N) modulated by (1 - F_rough) * (1 - metallic)
-            //   - specular: prefiltered(R, roughness*maxMip) * (F * lut.r + lut.g)
+            // -- Image-based lighting (Karis split-sum with
+            // Fdez-Aguera 2019 multi-scattering compensation).
             float3 F0  = lerp(float3(0.04f, 0.04f, 0.04f), albedo, metallic);
             float3 Fr  = F_SchlickRoughness(NdotV, F0, roughness);
-            float3 kd  = (1.0f - Fr) * (1.0f - metallic);
-            float3 irr = irradianceTex.Sample(irradianceSmp, N).rgb;
+            // Environment yaw (radians) packed into emissiveFactor.w
+            // by the materializer. Rotates cubemap sample directions
+            // around Y without rebaking; horizon/zenith are symmetric
+            // around Y so only the sun's azimuth visibly moves.
+            float yaw = emissiveFactor.w;
+            float yawCos = cos(yaw);
+            float yawSin = sin(yaw);
+            float3 Nenv  = float3(yawCos * N.x + yawSin * N.z, N.y, -yawSin * N.x + yawCos * N.z);
+
+            float3 irr = irradianceTex.Sample(irradianceSmp, Nenv).rgb;
             float3 R   = reflect(-V, N);
+            float3 Renv = float3(yawCos * R.x + yawSin * R.z, R.y, -yawSin * R.x + yawCos * R.z);
             float  maxMip = matFactors.w;
-            float3 pref   = prefilteredTex.SampleLevel(prefilteredSmp, R, roughness * maxMip).rgb;
-            float2 brdf   = brdfLutTex.Sample(brdfLutSmp, float2(NdotV, roughness)).rg;
-            float3 iblDiffuse  = irr * albedo * kd;
-            float3 iblSpecular = pref * (Fr * brdf.x + brdf.y);
+            float3 pref   = prefilteredTex.SampleLevel(prefilteredSmp, Renv, roughness * maxMip).rgb;
+            // Karis 2014 analytic LUT approximation. The baked LUT
+            // texture produced by GGX importance sampling collapses
+            // to zero along the grazing edge (low-roughness samples
+            // all cluster at H=N, where the reflected direction is
+            // tangent and NdotL=0), which causes IBL to vanish at
+            // sphere silhouettes. This closed form gives correct
+            // grazing values with no sampling bias.
+            float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
+            float4 c1 = float4( 1.0f,  0.0425f,  1.040f, -0.040f);
+            float4 r4 = roughness * c0 + c1;
+            float a004 = min(r4.x * r4.x, exp2(-9.28f * NdotV)) * r4.x + r4.y;
+            float2 brdf = float2(-1.04f, 1.04f) * a004 + r4.zw;
+
+            // Fdez-Aguera 2019 multi-scattering compensation. Plain
+            // Karis split-sum loses energy at grazing (Smith G drops
+            // to zero), darkening rims and concentrating IBL into a
+            // bright spot at NdotV=1. The Ems term adds the missing
+            // energy back, redistributing it between specular and
+            // diffuse so a uniform environment yields a flat-shaded
+            // sphere instead of a bright dot on a dark ball.
+            float3 FssEss = Fr * brdf.x + brdf.y;
+            float  Ems    = 1.0f - (brdf.x + brdf.y);
+            float3 Favg   = F0 + (1.0f - F0) / 21.0f;
+            float3 FmsEms = Ems * FssEss * Favg / (1.0f - Favg * Ems);
+            float3 kdMs   = albedo * (1.0f - FssEss - FmsEms) * (1.0f - metallic);
+            float3 iblDiffuse  = irr * kdMs;
+            float3 iblSpecular = pref * FssEss + irr * FmsEms;
             // Tinted by the renderer's ambient color so authors can dim
             // or warm the IBL contribution per-scene without rebaking
             // cubemaps.

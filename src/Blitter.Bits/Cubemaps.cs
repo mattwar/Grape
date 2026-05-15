@@ -1,29 +1,36 @@
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace Blitter.Bits;
 
 /// <summary>
-/// Pre-baked procedural cubemaps.
+/// Pre-built procedural cubemaps.
 /// </summary>
 public static class Cubemaps
 {
     private static Cubemap? s_sky;
     private static CubeTexture? s_skyIrradiance;
     private static CubeTexture? s_skyPrefiltered;
+    private static Cubemap? s_skySunless;
+    private static CubeTexture? s_skySunlessIrradiance;
+    private static CubeTexture? s_skySunlessPrefiltered;
+    private static Cubemap? s_skyFlat;
+    private static CubeTexture? s_skyFlatIrradiance;
+    private static CubeTexture? s_skyFlatPrefiltered;
 
     /// <summary>
     /// Default procedural sky: 
     /// a blue zenith fading to pale horizon, warm ground below, with a sun disc in the upper-right. 
     /// Useful as a drop-in environment for demos when no specific environment map is supplied.
     /// </summary>
-    public static Cubemap Sky => s_sky ??= BakeSky();
+    public static Cubemap Sky => s_sky ??= CreateSky();
 
     /// <summary>
     /// Diffuse irradiance map derived from <see cref="Sky"/>: 
     /// the cosine-weighted hemisphere integral of the sky cubemap at every surface-normal direction. 
     /// Sample by surface normal to get the diffuse environment term used in image-based lighting.
     /// </summary>
-    public static CubeTexture SkyIrradiance => s_skyIrradiance ??= EnvironmentBaker.BakeIrradiance(Sky);
+    public static CubeTexture SkyIrradiance => s_skyIrradiance ??= CreateIrradiance(Sky);
 
     /// <summary>
     /// Prefiltered specular environment map derived from <see cref="Sky"/>.
@@ -32,10 +39,51 @@ public static class Cubemaps
     /// Sample by the reflection vector at <c>roughness * (levels - 1)</c>
     /// to get the specular environment term used in image-based lighting.
     /// </summary>
-    public static CubeTexture SkyPrefiltered => s_skyPrefiltered ??= EnvironmentBaker.BakePrefilteredSpecular(Sky);
+    public static CubeTexture SkyPrefiltered => s_skyPrefiltered ??= CreatePrefilteredSpecular(Sky);
 
     /// <summary>
-    /// Bakes a cubemap by evaluating <paramref name="shade"/> per
+    /// Like <see cref="Sky"/> but with the sun disc omitted. Use as
+    /// the source for IBL when you have a separate directional light
+    /// driving direct sun lighting -- avoids "two suns" reflections
+    /// (one from the directional light, one baked into the sky).
+    /// </summary>
+    public static Cubemap SkySunless => s_skySunless ??= CreateSky(sunAngularRadius: 0f);
+
+    /// <summary>
+    /// Diffuse irradiance map derived from <see cref="SkySunless"/>.
+    /// </summary>
+    public static CubeTexture SkySunlessIrradiance => s_skySunlessIrradiance ??= CreateIrradiance(SkySunless);
+
+    /// <summary>
+    /// Prefiltered specular map derived from <see cref="SkySunless"/>.
+    /// </summary>
+    public static CubeTexture SkySunlessPrefiltered => s_skySunlessPrefiltered ??= CreatePrefilteredSpecular(SkySunless);
+
+    /// <summary>
+    /// Uniform-tint sky: same color in every direction, no sun, no
+    /// horizon band, no ground. Use as a neutral ambient IBL source
+    /// for samples and material previews when any directional bright
+    /// feature would distract -- shiny spheres reflect a flat tone
+    /// instead of any distinguishable spot.
+    /// </summary>
+    public static Cubemap SkyFlat => s_skyFlat ??= CreateSky(
+        zenith: new Color(150, 170, 200),
+        horizon: new Color(150, 170, 200),
+        ground: new Color(150, 170, 200),
+        sunAngularRadius: 0f);
+
+    /// <summary>
+    /// Diffuse irradiance map derived from <see cref="SkyFlat"/>.
+    /// </summary>
+    public static CubeTexture SkyFlatIrradiance => s_skyFlatIrradiance ??= CreateIrradiance(SkyFlat);
+
+    /// <summary>
+    /// Prefiltered specular map derived from <see cref="SkyFlat"/>.
+    /// </summary>
+    public static CubeTexture SkyFlatPrefiltered => s_skyFlatPrefiltered ??= CreatePrefilteredSpecular(SkyFlat);
+
+    /// <summary>
+    /// Creates a cubemap by evaluating <paramref name="shade"/> per
     /// pixel with the outward direction through that pixel. Each
     /// face is <paramref name="faceSize"/>×<paramref name="faceSize"/>
     /// in <see cref="PixelFormat.ABGR8888"/>; HDR output is clipped
@@ -43,36 +91,36 @@ public static class Cubemaps
     /// </summary>
     /// <param name="faceSize">Pixel size of each cube face.</param>
     /// <param name="shade">Direction → color function. Direction is a unit vector pointing outward from the cube's centre.</param>
-    public static Cubemap Bake(int faceSize, Func<Vector3, Color> shade)
+    public static Cubemap Create(int faceSize, Func<Vector3, Color> shade)
     {
         ArgumentNullException.ThrowIfNull(shade);
-        return Bake(faceSize, (_, dir) => shade(dir));
+        return Create(faceSize, (_, dir) => shade(dir));
     }
 
     /// <summary>
-    /// Face-aware <see cref="Bake(int, Func{Vector3, Color})"/>: the
+    /// Face-aware <see cref="Create(int, Func{Vector3, Color})"/>: the
     /// shader also receives which face the pixel belongs to. Use this
     /// when a procedural pattern needs to vary per face (debug grids,
     /// per-face noise seeds) rather than purely by direction.
     /// </summary>
     /// <param name="faceSize">Pixel size of each cube face.</param>
     /// <param name="shade">(Face, direction) → color function. Direction is a unit vector pointing outward from the cube's centre.</param>
-    public static Cubemap Bake(int faceSize, Func<CubeFace, Vector3, Color> shade)
+    public static Cubemap Create(int faceSize, Func<CubeFace, Vector3, Color> shade)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(faceSize, 1);
         ArgumentNullException.ThrowIfNull(shade);
 
-        var posX = BakeFace(faceSize, CubeFace.PositiveX, shade);
-        var negX = BakeFace(faceSize, CubeFace.NegativeX, shade);
-        var posY = BakeFace(faceSize, CubeFace.PositiveY, shade);
-        var negY = BakeFace(faceSize, CubeFace.NegativeY, shade);
-        var posZ = BakeFace(faceSize, CubeFace.PositiveZ, shade);
-        var negZ = BakeFace(faceSize, CubeFace.NegativeZ, shade);
+        var posX = CreateFace(faceSize, CubeFace.PositiveX, shade);
+        var negX = CreateFace(faceSize, CubeFace.NegativeX, shade);
+        var posY = CreateFace(faceSize, CubeFace.PositiveY, shade);
+        var negY = CreateFace(faceSize, CubeFace.NegativeY, shade);
+        var posZ = CreateFace(faceSize, CubeFace.PositiveZ, shade);
+        var negZ = CreateFace(faceSize, CubeFace.NegativeZ, shade);
         return Cubemap.Create(posX, negX, posY, negY, posZ, negZ);
     }
 
     /// <summary>
-    /// Bakes a procedural sky cubemap. The sky is a zenith→horizon→
+    /// Creates a procedural sky cubemap. The sky is a zenith→horizon→
     /// ground three-stop gradient driven by <c>dir.Y</c>, with an
     /// optional sun disc.
     /// </summary>
@@ -83,7 +131,7 @@ public static class Cubemaps
     /// <param name="sunDirection">Unit vector pointing toward the sun. Defaults to a high-noon-ish direction in the upper-right.</param>
     /// <param name="sunColor">Sun disc color. Defaults to bright warm white.</param>
     /// <param name="sunAngularRadius">Sun disc half-angle in radians. ~0.0046 is the real sun; 0.04 reads as obviously sun-shaped at default face sizes. Pass 0 (or any non-positive value) to omit the sun entirely.</param>
-    public static Cubemap BakeSky(
+    public static Cubemap CreateSky(
         int faceSize = 256,
         Color? zenith = null,
         Color? horizon = null,
@@ -108,7 +156,7 @@ public static class Cubemaps
         // this the sun reads as a hard-edged bitmap circle.
         float cosSunInner = MathF.Cos(sunAngularRadius * 0.9f);
 
-        return Bake(faceSize, dir =>
+        return Create(faceSize, dir =>
         {
             float y = Math.Clamp(dir.Y, -1f, 1f);
 
@@ -145,243 +193,123 @@ public static class Cubemaps
     }
 
     /// <summary>
-    /// Bakes a diffuse irradiance cubemap from <paramref name="source"/>:
-    /// for every output direction N, integrates
+    /// Creates a diffuse irradiance cubemap from <paramref name="source"/>
+    /// on the GPU: for every output direction N, integrates
     /// <c>source(ω) · cos(θ) dω</c> over the hemisphere around N.
     /// Output is heavily blurred -- a small <paramref name="faceSize"/>
     /// (32 is the conventional default) is plenty.
     /// </summary>
-    /// <param name="source">Environment cubemap to integrate.</param>
-    /// <param name="faceSize">Pixel size of each output face. Defaults to 32; the integrand is low-frequency so larger doesn't help quality.</param>
-    /// <param name="samples">Monte-Carlo samples per output pixel. 256 gives a clean result on the default LDR sky; raise if banding shows.</param>
-    public static Cubemap BakeIrradiance(Cubemap source, int faceSize = 32, int samples = 256)
+    /// <param name="source">Source environment cube.</param>
+    /// <param name="faceSize">Edge length per face of the destination. 32 is plenty -- the integrand is very smooth.</param>
+    /// <param name="samples">Cosine-weighted hemisphere samples per pixel.</param>
+    public static GpuCubemap CreateIrradiance(
+        CubeTexture source,
+        int faceSize = 32,
+        int samples = 256)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentOutOfRangeException.ThrowIfLessThan(faceSize, 1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(samples, 1);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(faceSize);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(samples);
 
-        return Bake(faceSize, n => IntegrateIrradiance(source, n, samples));
+        var dest = GpuCubemap.Create(faceSize, levels: 1, renderTarget: true);
+        var device = GpuDevice.Default;
+        var mesh = IblShaders.FullscreenTri;
+        var shader = IblShaders.IrradianceShader;
+
+        foreach (var face in CubeFaceExtensions.All)
+        {
+            var forward = face.GetForward();
+            var up = face.GetUp();
+            // Right = up x forward gives the D3D/Vulkan cube-face image
+            // orientation: top of the face image is +up.
+            var right = Vector3.Normalize(Vector3.Cross(up, forward));
+
+            var args = new IblShaders.IrradianceArgs
+            {
+                Right = new Vector4(right, 0f),
+                UpAndSamples = new Vector4(up, samples),
+                Forward = new Vector4(forward, 0f),
+            };
+
+            using var renderer = new GpuCubemapFaceRenderer(
+                device, dest, face, mip: 0, useDepth: false);
+            renderer.AutoClear = false;
+            renderer.DrawMeshRaw(mesh, source, shader, in args);
+            renderer.Render();
+        }
+
+        return dest;
     }
 
     /// <summary>
-    /// Bakes a prefiltered specular environment cubemap from
-    /// <paramref name="source"/> for image-based lighting. Produces a
-    /// mipmapped cubemap where mip <c>i</c> is the GGX-distribution
-    /// importance-sampled integral of the environment at roughness
-    /// <c>i / (levels - 1)</c>. Mip 0 (roughness 0) is the unfiltered
-    /// environment downsampled to <paramref name="faceSize"/>; the
-    /// highest mip (roughness 1) is fully blurred. Shaders sample
+    /// Creates a prefiltered specular environment cubemap from
+    /// <paramref name="source"/> on the GPU for image-based lighting.
+    /// Produces a mipmapped cubemap where mip <c>i</c> is the
+    /// GGX-distribution importance-sampled integral of the environment
+    /// at roughness <c>i / (levels - 1)</c>. Mip 0 (roughness 0) is the
+    /// unfiltered environment downsampled to <paramref name="faceSize"/>;
+    /// the highest mip (roughness 1) is fully blurred. Shaders sample
     /// this by the reflection vector at LOD
     /// <c>roughness * (levels - 1)</c>.
     /// </summary>
-    /// <param name="source">Environment cubemap to integrate.</param>
-    /// <param name="faceSize">Pixel size of the base (mip 0) face. 128 is a good default; the chain auto-shrinks each level.</param>
-    /// <param name="levels">Number of mip levels to bake. Defaults to a chain that ends at an 8×8 base level.</param>
-    /// <param name="samples">Importance samples per pixel for rough mips. Higher reduces specular fireflies. 1024 is the common default.</param>
-    public static Cubemap BakePrefilteredSpecular(
-        Cubemap source,
+    /// <param name="source">Source environment cube (HDR sky, etc.).</param>
+    /// <param name="faceSize">Edge length per face of the destination.</param>
+    /// <param name="levels">Mip-level count; <c>null</c> picks the full chain.</param>
+    /// <param name="samples">GGX importance samples per pixel per face.</param>
+    public static GpuCubemap CreatePrefilteredSpecular(
+        CubeTexture source,
         int faceSize = 128,
         int? levels = null,
-        int samples = 1024)
+        int samples = 256)
     {
         ArgumentNullException.ThrowIfNull(source);
-        ArgumentOutOfRangeException.ThrowIfLessThan(faceSize, 1);
-        ArgumentOutOfRangeException.ThrowIfLessThan(samples, 1);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(faceSize);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(samples);
 
-        // Default chain ends near 8×8. Each level halves; the last mip
-        // is fully blurred so going smaller adds nothing visible.
-        int defaultLevels = Math.Max(1, BitOperations.Log2((uint)faceSize) - 2);
-        int levelCount = levels ?? defaultLevels;
-        ArgumentOutOfRangeException.ThrowIfLessThan(levelCount, 1);
+        // floor(log2(size)) + 1 -- full chain down to 1x1.
+        int levelCount = levels ?? Math.Max(1, (int)Math.Floor(Math.Log2(faceSize)) + 1);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(levelCount);
 
-        // [face][mip] Bitmap grid; assembled into 6 MipmappedImages
-        // and one Cubemap at the end.
-        var chains = new Bitmap[6][];
-        for (int f = 0; f < 6; f++)
-            chains[f] = new Bitmap[levelCount];
+        var dest = GpuCubemap.Create(faceSize, levels: levelCount, renderTarget: true);
+        var device = GpuDevice.Default;
+        var mesh = IblShaders.FullscreenTri;
+        var shader = IblShaders.PrefilterShader;
 
-        for (int mip = 0; mip < levelCount; mip++)
+        foreach (var face in CubeFaceExtensions.All)
         {
-            int mipSize = Math.Max(1, faceSize >> mip);
-            // Roughness 0 at mip 0, 1 at the last mip. Single-level
-            // chains degenerate to roughness 0 (an unfiltered copy).
-            float roughness = levelCount == 1 ? 0f : (float)mip / (levelCount - 1);
+            var forward = face.GetForward();
+            var up = face.GetUp();
+            var right = Vector3.Normalize(Vector3.Cross(up, forward));
 
-            for (int f = 0; f < 6; f++)
+            for (int mip = 0; mip < levelCount; mip++)
             {
-                var face = (CubeFace)f;
-                chains[f][mip] = BakeFace(mipSize, face,
-                    (_, n) => PrefilteredSpecular(source, n, roughness, samples));
+                float roughness = levelCount == 1
+                    ? 0f
+                    : mip / (float)(levelCount - 1);
+                var args = new IblShaders.PrefilterArgs
+                {
+                    RightAndRoughness = new Vector4(right, roughness),
+                    UpAndSamples = new Vector4(up, samples),
+                    Forward = new Vector4(forward, 0f),
+                };
+
+                using var renderer = new GpuCubemapFaceRenderer(
+                    device, dest, face, mip, useDepth: false);
+                renderer.AutoClear = false;
+                renderer.DrawMeshRaw(mesh, source, shader, in args);
+                renderer.Render();
             }
         }
 
-        var posXLevels = MipmappedImage.Create(chains[0]);
-        var negXLevels = MipmappedImage.Create(chains[1]);
-        var posYLevels = MipmappedImage.Create(chains[2]);
-        var negYLevels = MipmappedImage.Create(chains[3]);
-        var posZLevels = MipmappedImage.Create(chains[4]);
-        var negZLevels = MipmappedImage.Create(chains[5]);
-        return Cubemap.Create(posXLevels, negXLevels, posYLevels, negYLevels, posZLevels, negZLevels);
+        return dest;
     }
 
-    // Split-sum specular pre-integration assuming V == R == N: estimates
-    //   ∫ source(L) · GGX(H; roughness) · max(0, N·L) dω
-    // / ∫                                  max(0, N·L) dω
-    // with importance-sampled microfacet normals H. At roughness 0 the
-    // GGX lobe collapses to a delta function, so sample the environment
-    // directly to avoid degenerate accumulation.
-    private static Color PrefilteredSpecular(Cubemap source, Vector3 n, float roughness, int samples)
-    {
-        if (roughness <= 0f)
-            return SampleCubemap(source, n);
-
-        // Tangent frame around N; same stability trick as the
-        // irradiance integrator.
-        Vector3 up = MathF.Abs(n.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
-        Vector3 t = Vector3.Normalize(Vector3.Cross(up, n));
-        Vector3 b = Vector3.Cross(n, t);
-
-        float a = roughness * roughness;
-        float a2 = a * a;
-
-        Vector3 sum = Vector3.Zero;
-        float weight = 0f;
-        for (int i = 0; i < samples; i++)
-        {
-            var (u1, u2) = Hammersley(i, samples);
-            // GGX importance sample for the half-vector H.
-            float cosTheta = MathF.Sqrt((1f - u2) / (1f + (a2 - 1f) * u2));
-            float sinTheta = MathF.Sqrt(MathF.Max(0f, 1f - cosTheta * cosTheta));
-            float phi = MathF.Tau * u1;
-            Vector3 hLocal = new(sinTheta * MathF.Cos(phi), sinTheta * MathF.Sin(phi), cosTheta);
-            Vector3 h = t * hLocal.X + b * hLocal.Y + n * hLocal.Z;
-            // L = reflect(-V, H) with V = N.
-            Vector3 l = Vector3.Normalize(2f * Vector3.Dot(n, h) * h - n);
-
-            float nDotL = Vector3.Dot(n, l);
-            if (nDotL > 0f)
-            {
-                var c = SampleCubemap(source, l);
-                sum += new Vector3(c.R, c.G, c.B) * nDotL;
-                weight += nDotL;
-            }
-        }
-        if (weight <= 0f)
-            return SampleCubemap(source, n);
-
-        sum /= weight;
-        return new Color(
-            (byte)Math.Clamp(sum.X, 0f, 255f),
-            (byte)Math.Clamp(sum.Y, 0f, 255f),
-            (byte)Math.Clamp(sum.Z, 0f, 255f));
-    }
-
-    // Cosine-weighted Monte-Carlo estimate of the irradiance at
-    // surface-normal direction N. Cosine sampling cancels the cos(θ)
-    // weight in the integrand, so the estimator is just the average
-    // of the sampled environment colors.
-    private static Color IntegrateIrradiance(Cubemap source, Vector3 n, int samples)
-    {
-        // Tangent frame around N. Picking the world axis least
-        // aligned with N keeps the cross product numerically stable.
-        Vector3 up = MathF.Abs(n.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
-        Vector3 t = Vector3.Normalize(Vector3.Cross(up, n));
-        Vector3 b = Vector3.Cross(n, t);
-
-        Vector3 sum = Vector3.Zero;
-        for (int i = 0; i < samples; i++)
-        {
-            var (u1, u2) = Hammersley(i, samples);
-            // Cosine-weighted hemisphere sample in tangent space with
-            // Z aligned to N. cos(θ) = sqrt(1 - u2) gives the density
-            // proportional to cos(θ) we need.
-            float phi = MathF.Tau * u1;
-            float cosTheta = MathF.Sqrt(1f - u2);
-            float sinTheta = MathF.Sqrt(u2);
-            Vector3 local = new(sinTheta * MathF.Cos(phi), sinTheta * MathF.Sin(phi), cosTheta);
-            Vector3 dir = t * local.X + b * local.Y + n * local.Z;
-            var c = SampleCubemap(source, dir);
-            sum += new Vector3(c.R, c.G, c.B);
-        }
-        sum /= samples;
-        return new Color(
-            (byte)Math.Clamp(sum.X, 0f, 255f),
-            (byte)Math.Clamp(sum.Y, 0f, 255f),
-            (byte)Math.Clamp(sum.Z, 0f, 255f));
-    }
-
-    // Hammersley low-discrepancy sequence. The bit-reversed Van der
-    // Corput second coordinate gives an even sample distribution far
-    // better than random in low sample counts.
-    private static (float, float) Hammersley(int i, int n)
-    {
-        uint bits = (uint)i;
-        bits = (bits << 16) | (bits >> 16);
-        bits = ((bits & 0x55555555u) << 1) | ((bits & 0xAAAAAAAAu) >> 1);
-        bits = ((bits & 0x33333333u) << 2) | ((bits & 0xCCCCCCCCu) >> 2);
-        bits = ((bits & 0x0F0F0F0Fu) << 4) | ((bits & 0xF0F0F0F0u) >> 4);
-        bits = ((bits & 0x00FF00FFu) << 8) | ((bits & 0xFF00FF00u) >> 8);
-        float vdc = bits * 2.3283064365386963e-10f;
-        return ((float)i / n, vdc);
-    }
-
-    // Direction → face + (x, y) pixel coordinates on that face,
-    // inverse of FaceUVToDirection. Nearest-pixel sampling -- bilinear
-    // would help precision but the integrand averaging already smears
-    // hundreds of samples per output pixel.
-    private static Color SampleCubemap(Cubemap c, Vector3 dir)
-    {
-        float ax = MathF.Abs(dir.X), ay = MathF.Abs(dir.Y), az = MathF.Abs(dir.Z);
-        CubeFace face;
-        float u, v, maj;
-        if (ax >= ay && ax >= az)
-        {
-            maj = ax;
-            if (dir.X > 0f) { face = CubeFace.PositiveX; u = -dir.Z; v = -dir.Y; }
-            else            { face = CubeFace.NegativeX; u =  dir.Z; v = -dir.Y; }
-        }
-        else if (ay >= az)
-        {
-            maj = ay;
-            if (dir.Y > 0f) { face = CubeFace.PositiveY; u =  dir.X; v =  dir.Z; }
-            else            { face = CubeFace.NegativeY; u =  dir.X; v = -dir.Z; }
-        }
-        else
-        {
-            maj = az;
-            if (dir.Z > 0f) { face = CubeFace.PositiveZ; u =  dir.X; v = -dir.Y; }
-            else            { face = CubeFace.NegativeZ; u = -dir.X; v = -dir.Y; }
-        }
-        // dir is unit-length, so at least one component is >= 1/√3 and
-        // maj is always > 0; no zero-division guard needed.
-        u /= maj;
-        v /= maj;
-        int size = c.Size;
-        int x = Math.Clamp((int)((u + 1f) * 0.5f * size), 0, size - 1);
-        int y = Math.Clamp((int)((v + 1f) * 0.5f * size), 0, size - 1);
-        return AsBitmap(c.GetFace(face)).GetPixel(x, y);
-    }
-
-    // CPU sampling needs raw pixels. Unwrap a mip chain to its base
-    // level; anything else (e.g. a future GPU-only image) can't be
-    // sampled on the CPU.
-    private static Bitmap AsBitmap(Image image) => image switch
-    {
-        Bitmap bitmap => bitmap,
-        MipmappedImage mipmapped => AsBitmap(mipmapped.Base),
-        _ => throw new NotSupportedException(
-            $"Cubemap face image of type {image.GetType().Name} cannot be sampled on the CPU."),
-    };
-
-    private static Bitmap BakeFace(int size, CubeFace face, Func<CubeFace, Vector3, Color> shade)
+    private static Bitmap CreateFace(int size, CubeFace face, Func<CubeFace, Vector3, Color> shade)
     {
         var image = Image.Create(size, size, PixelFormat.ABGR8888);
         float inv = 2f / size;
         // Rows are independent; SetPixel writes distinct byte ranges
-        // per (x, y), so parallelising the outer loop is safe. This is
-        // the hot path for `BakePrefilteredSpecular` -- one cube level
-        // at default 128² with 1024 samples is millions of integrand
-        // evaluations.
+        // per (x, y), so parallelising the outer loop is safe.
         System.Threading.Tasks.Parallel.For(0, size, y =>
         {
             // Image v in [-1, 1]; matches D3D / Vulkan convention
@@ -417,4 +345,231 @@ public static class Cubemaps
         float t = Math.Clamp((x - edge0) / (edge1 - edge0), 0f, 1f);
         return t * t * (3f - 2f * t);
     }
+}
+
+// GPU shader infrastructure for the IBL cubemap integrators above.
+// Kept file-scoped: only Cubemaps.CreateIrradiance and
+// Cubemaps.CreatePrefilteredSpecular consume these resources.
+file static class IblShaders
+{
+    public static Mesh<Vertex3D> FullscreenTri => s_fullscreenTri.Value;
+    public static Shader<Vertex3D, PrefilterArgs> PrefilterShader => s_prefilterShader.Value;
+    public static Shader<Vertex3D, IrradianceArgs> IrradianceShader => s_irradianceShader.Value;
+
+    // Three Vector4 cbuffer slots, 48 bytes total. Packs scalar params
+    // into the .w of vectors that have a spare component.
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PrefilterArgs
+    {
+        public Vector4 RightAndRoughness;   // xyz = face right,   w = roughness
+        public Vector4 UpAndSamples;        // xyz = face up,      w = sample count
+        public Vector4 Forward;             // xyz = face forward, w = unused
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct IrradianceArgs
+    {
+        public Vector4 Right;               // xyz = face right,   w = unused
+        public Vector4 UpAndSamples;        // xyz = face up,      w = sample count
+        public Vector4 Forward;             // xyz = face forward, w = unused
+    }
+
+    // Single fullscreen triangle in clip space; vertex shader passes
+    // positions through and the fragment uses the interpolated xy as
+    // NDC to reconstruct the per-pixel view direction.
+    private static readonly Lazy<Mesh<Vertex3D>> s_fullscreenTri = new(() =>
+        Mesh.Create<Vertex3D>(new ReadOnlySpan<Vertex3D>(new[]
+        {
+            new Vertex3D(-1f, -1f, 0f),
+            new Vertex3D( 3f, -1f, 0f),
+            new Vertex3D(-1f,  3f, 0f),
+        })));
+
+    private static readonly Lazy<Shader<Vertex3D, PrefilterArgs>> s_prefilterShader = new(() =>
+        new Shader<Vertex3D, PrefilterArgs>(
+            new VertexShader(VertexHlsl),
+            new FragmentShader(PrefilterFragmentHlsl),
+            Vertex3D.ShaderVertexLayout,
+            new ShaderArgsLayout(
+                new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4),
+                new ShaderArgElement(ShaderArgStage.Fragment, 1, ShaderArgKind.Float4),
+                new ShaderArgElement(ShaderArgStage.Fragment, 2, ShaderArgKind.Float4)),
+            ShaderTextureLayout.SingleTextureCube));
+
+    private static readonly Lazy<Shader<Vertex3D, IrradianceArgs>> s_irradianceShader = new(() =>
+        new Shader<Vertex3D, IrradianceArgs>(
+            new VertexShader(VertexHlsl),
+            new FragmentShader(IrradianceFragmentHlsl),
+            Vertex3D.ShaderVertexLayout,
+            new ShaderArgsLayout(
+                new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4),
+                new ShaderArgElement(ShaderArgStage.Fragment, 1, ShaderArgKind.Float4),
+                new ShaderArgElement(ShaderArgStage.Fragment, 2, ShaderArgKind.Float4)),
+            ShaderTextureLayout.SingleTextureCube));
+
+    private const string VertexHlsl = """
+        struct Input  { float3 Position : TEXCOORD0; };
+        struct Output { float2 Ndc : TEXCOORD0; float4 Position : SV_Position; };
+
+        Output main(Input input)
+        {
+            Output o;
+            o.Ndc = input.Position.xy;
+            o.Position = float4(input.Position, 1.0f);
+            return o;
+        }
+        """;
+
+    private const string PrefilterFragmentHlsl = """
+        cbuffer RightR  : register(b0, space3) { float4 RightR;  }; // xyz=right,   w=roughness
+        cbuffer UpN     : register(b1, space3) { float4 UpN;     }; // xyz=up,      w=sampleCount
+        cbuffer Forward : register(b2, space3) { float4 Forward; }; // xyz=forward, w=unused
+
+        TextureCube<float4> srcTex : register(t0, space2);
+        SamplerState        srcSmp : register(s0, space2);
+
+        struct Input { float2 Ndc : TEXCOORD0; };
+
+        static const float PI = 3.14159265f;
+
+        // Van der Corput radical inverse in base 2 via bit reversal.
+        float RadicalInverseVdC(uint bits)
+        {
+            bits = (bits << 16u) | (bits >> 16u);
+            bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+            bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+            bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+            bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+            return float(bits) * 2.3283064365386963e-10f;
+        }
+
+        float2 Hammersley(uint i, uint n)
+        {
+            return float2(float(i) / float(n), RadicalInverseVdC(i));
+        }
+
+        // GGX importance-sampled half-vector around N, in world space.
+        float3 ImportanceSampleGGX(float2 xi, float3 N, float a2)
+        {
+            float phi      = 2.0f * PI * xi.x;
+            float cosTheta = sqrt((1.0f - xi.y) / (1.0f + (a2 - 1.0f) * xi.y));
+            float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+
+            float3 hLocal = float3(cos(phi) * sinTheta,
+                                   sin(phi) * sinTheta,
+                                   cosTheta);
+
+            // Tangent frame around N -- pick the world axis least
+            // aligned with N for numerical stability.
+            float3 worldUp = abs(N.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
+            float3 T = normalize(cross(worldUp, N));
+            float3 B = cross(N, T);
+            return normalize(T * hLocal.x + B * hLocal.y + N * hLocal.z);
+        }
+
+        float4 main(Input input) : SV_Target0
+        {
+            float roughness   = RightR.w;
+            uint  sampleCount = (uint)UpN.w;
+
+            // Split-sum simplification: assume V == R == N. The per-pixel
+            // N is reconstructed from the face orientation and the
+            // interpolated NDC.
+            float3 N = normalize(Forward.xyz
+                               + input.Ndc.x * RightR.xyz
+                               + input.Ndc.y * UpN.xyz);
+            float3 V = N;
+
+            // Roughness 0 degenerates to a delta lobe -- sample the
+            // source directly to avoid noise.
+            if (roughness < 1e-4f)
+                return float4(srcTex.SampleLevel(srcSmp, N, 0).rgb, 1.0f);
+
+            float a  = roughness * roughness;
+            float a2 = a * a;
+
+            float3 sum    = float3(0, 0, 0);
+            float  weight = 0.0f;
+            for (uint i = 0; i < sampleCount; i++)
+            {
+                float2 xi = Hammersley(i, sampleCount);
+                float3 H  = ImportanceSampleGGX(xi, N, a2);
+                float3 L  = normalize(2.0f * dot(V, H) * H - V);
+
+                float NdotL = saturate(dot(N, L));
+                if (NdotL > 0.0f)
+                {
+                    sum    += srcTex.SampleLevel(srcSmp, L, 0).rgb * NdotL;
+                    weight += NdotL;
+                }
+            }
+
+            sum /= max(weight, 1e-5f);
+            return float4(sum, 1.0f);
+        }
+        """;
+
+    private const string IrradianceFragmentHlsl = """
+        cbuffer Right   : register(b0, space3) { float4 Right;   }; // xyz=right,   w=unused
+        cbuffer UpN     : register(b1, space3) { float4 UpN;     }; // xyz=up,      w=sampleCount
+        cbuffer Forward : register(b2, space3) { float4 Forward; }; // xyz=forward, w=unused
+
+        TextureCube<float4> srcTex : register(t0, space2);
+        SamplerState        srcSmp : register(s0, space2);
+
+        struct Input { float2 Ndc : TEXCOORD0; };
+
+        static const float PI = 3.14159265f;
+
+        float RadicalInverseVdC(uint bits)
+        {
+            bits = (bits << 16u) | (bits >> 16u);
+            bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+            bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+            bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+            bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+            return float(bits) * 2.3283064365386963e-10f;
+        }
+
+        float2 Hammersley(uint i, uint n)
+        {
+            return float2(float(i) / float(n), RadicalInverseVdC(i));
+        }
+
+        float4 main(Input input) : SV_Target0
+        {
+            uint sampleCount = (uint)UpN.w;
+
+            // Per-pixel outward direction = N.
+            float3 N = normalize(Forward.xyz
+                               + input.Ndc.x * Right.xyz
+                               + input.Ndc.y * UpN.xyz);
+
+            // Tangent frame around N for cosine-weighted hemisphere
+            // sampling.
+            float3 worldUp = abs(N.y) < 0.999f ? float3(0, 1, 0) : float3(1, 0, 0);
+            float3 T = normalize(cross(worldUp, N));
+            float3 B = cross(N, T);
+
+            // Cosine-weighted sampling cancels the cos(theta) factor in
+            // the irradiance integrand, so the estimator is just the
+            // average of sampled environment colors.
+            float3 sum = float3(0, 0, 0);
+            for (uint i = 0; i < sampleCount; i++)
+            {
+                float2 xi = Hammersley(i, sampleCount);
+                float  phi      = 2.0f * PI * xi.x;
+                float  cosTheta = sqrt(1.0f - xi.y);
+                float  sinTheta = sqrt(xi.y);
+                float3 local    = float3(cos(phi) * sinTheta,
+                                         sin(phi) * sinTheta,
+                                         cosTheta);
+                float3 dir = normalize(T * local.x + B * local.y + N * local.z);
+                sum += srcTex.SampleLevel(srcSmp, dir, 0).rgb;
+            }
+
+            sum /= float(sampleCount);
+            return float4(sum, 1.0f);
+        }
+        """;
 }

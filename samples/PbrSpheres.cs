@@ -78,18 +78,13 @@ var camera = new PerspectiveCamera();
 
 window.Renderer.Camera = camera;
 
-// add lighting environment for the shader to reflect
-window.Renderer.Environment = EnvironmentMaps.Sky;
+// add environment lighting environment for the spheres to reflect
+window.Renderer.EnvironmentLight = EnvironmentLights.SkySunless;
 
-// Cool ambient tint multiplied onto the IBL contribution; this
-// lets the scene cool down the bright sky without rebaking the
-// cubemaps. Black would disable IBL entirely.
+// set the ambient light to a bright color so we can see the environment reflections
 window.Renderer.AmbientLight = new Color(180, 200, 230);
 
-// Single bright directional light. As the camera orbits, the
-// highlight on each sphere walks across its surface -- the wider
-// and softer it is on the right side of the grid, the higher
-// that sphere's roughness.
+// Add directional light to create a clear primary highlight on each sphere.
 window.Renderer.DirectionalLight = new DirectionalLight(
     Vector3.Normalize(new Vector3(-0.4f, 0.7f, 0.6f)),
     Color.White);
@@ -112,9 +107,9 @@ await window.RunAsync(rd =>
     // Orbit radius tuned so a 5x5 grid of unit-diameter spheres fills
     // most of a 16:9 viewport.
     camera.Position = center + new Vector3(
-        MathF.Sin(t * 0.25f) * 5.5f,
+        MathF.Sin(t * 0.25f) * 7.5f,
         gridHeight * 0.15f,
-        MathF.Cos(t * 0.25f) * 5.5f);
+        MathF.Cos(t * 0.25f) * 7.5f);
     camera.Target = center;
 
     using (rd.PushState())
