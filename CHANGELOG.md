@@ -26,7 +26,7 @@ All notable changes to this project will be documented in this file.
   `SkyLights.Flat`: uniform-tint IBL with no horizon band or
   sun, for neutral material previews.
 - `Texture` abstract base type for any GPU-samplable texture. `Image`
-  and `Cubemap` now both inherit from it, so multi-texture draw
+  and `CubeTexture` now both inherit from it, so multi-texture draw
   overloads can bind a mixed list of 2D images and cubemaps.
 - `SkyLight` and `Renderer3D.SkyLight`: scene-wide IBL state
   bundling a diffuse environment cubemap, a specular environment
