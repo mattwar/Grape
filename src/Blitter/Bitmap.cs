@@ -192,15 +192,15 @@ public sealed class Bitmap : Image
     /// is synchronous: when it returns, the image's pixels reflect
     /// the final GPU output.
     /// </summary>
-    /// <param name="backgroundColor">The background painted behind the draws.</param>
+    /// <param name="backgroundColor">
+    /// The background painted behind the draws. Opaque colors clear
+    /// the buffer; translucent colors (alpha &lt; 255) are composed
+    /// over the image's existing pixels using SrcOver, so the prior
+    /// contents show through. Translucent backgrounds are supported
+    /// on ABGR8888 (default) and the 8-bit-per-channel RGBA variants;
+    /// not supported on RGBA64Float.
+    /// </param>
     /// <param name="renderAction">Callback that issues draws on the renderer.</param>
-    /// <remarks>
-    /// Translucent alpha values are currently treated as opaque on
-    /// the 3D path (the alpha channel is honored in the cleared
-    /// buffer but does not blend over prior pixels). Blending a
-    /// translucent background over the wallpaper will be supported
-    /// once the GPU renderer gains a full-surface tint pass.
-    /// </remarks>
     public void Render3D(Color backgroundColor, Action<Renderer3D> renderAction)
         => Render3DCore(backgroundColor, renderAction);
 

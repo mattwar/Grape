@@ -38,6 +38,11 @@ All notable changes to this project will be documented in this file.
   reflection vector at LOD `roughness * (levels - 1)`.
 
 ### Fixed
+- `Bitmap.Render3D(Color, ...)` now blends translucent background
+  colors (alpha &lt; 255) over the image's existing pixels using
+  SrcOver, instead of clearing to the literal RGBA. Opaque colors
+  still take the GPU clear fast path. Supported on ABGR8888 and the
+  8-bit-per-channel RGBA variants; throws on RGBA64Float.
 - SDL video subsystem is now initialized in the `Application` ctor
   rather than lazily on first `Window` creation. Surface allocations
   (`Image.Create` / `Image.Load` / `Image.Decode`) issued before any

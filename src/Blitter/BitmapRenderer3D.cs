@@ -36,6 +36,11 @@ internal sealed class BitmapRenderer3D : GpuRenderer
     // into the user's image.
     private byte[]? _scratch;
     private bool _uploadWallpaper;
+    // When non-null, the wallpaper is composited with this color
+    // (SrcOver) on the CPU before upload. Only the translucent case
+    // uses this path -- opaque colors take the GPU clear path, and
+    // null backgroundColor just preserves the wallpaper as-is.
+    private Color? _tint;
 
     internal BitmapRenderer3D(GpuDevice device, Bitmap image)
         : base(device)
@@ -106,30 +111,43 @@ internal sealed class BitmapRenderer3D : GpuRenderer
 
     /// <summary>
     /// Configures the renderer for either a clear-then-draw frame
-    /// (<paramref name="backgroundColor"/> non-null) or an additive
+    /// (<paramref name="backgroundColor"/> opaque), an additive
     /// frame that preserves the image's existing pixels as wallpaper
-    /// (<paramref name="backgroundColor"/> null). Must be called
-    /// before <see cref="Renderer3D.Render"/>.
+    /// (<paramref name="backgroundColor"/> null), or a translucent
+    /// background blended over the wallpaper using SrcOver
+    /// (<paramref name="backgroundColor"/> with alpha &lt; 255).
+    /// Must be called before <see cref="Renderer3D.Render"/>.
     /// </summary>
-    /// <remarks>
-    /// Translucent alpha values are not blended over the wallpaper on
-    /// this path -- the buffer is cleared to the literal RGBA you
-    /// provide. Blending a translucent background will be supported
-    /// once the GPU renderer gains a full-surface tint pass.
-    /// </remarks>
     internal void Configure(Color? backgroundColor)
     {
-        // TODO: Honor translucent backgroundColor by blending it over
-        // the wallpaper. Needs a full-surface tint pass: keep
-        // _uploadWallpaper = true, use LoadOp.Load, then draw a
-        // screen-filling quad with the tint color through the normal
-        // alpha-blended pipeline before the user's draws. Until that
-        // exists, alpha < 255 here just clears to the literal RGBA.
         if (backgroundColor is { } c)
         {
-            BackgroundColor = c;
-            AutoClear = true;
-            _uploadWallpaper = false;
+            if (c.A == 255)
+            {
+                // Fully opaque: GPU clear, no wallpaper upload.
+                BackgroundColor = c;
+                AutoClear = true;
+                _uploadWallpaper = false;
+                _tint = null;
+            }
+            else
+            {
+                // Translucent (or alpha 0): preserve the image's
+                // existing pixels as wallpaper, then SrcOver the tint
+                // over them on the CPU before upload. alpha==0 is a
+                // no-op blend but takes the same path; that's fine.
+                if (!_directCopy && _gpuBpp != 4 ||
+                    _directCopy && _colorTargetFormat == SDL.GPUTextureFormat.R16G16B16A16Float)
+                {
+                    throw new NotSupportedException(
+                        $"Translucent background colors are not supported on " +
+                        $"{_image.PixelFormat} images. Use ABGR8888 (or one of the " +
+                        $"8-bit-per-channel RGBA variants) for translucent rendering.");
+                }
+                AutoClear = false;
+                _uploadWallpaper = true;
+                _tint = c;
+            }
         }
         else
         {
@@ -138,6 +156,7 @@ internal sealed class BitmapRenderer3D : GpuRenderer
             // first so "what's in the texture" is the wallpaper.
             AutoClear = false;
             _uploadWallpaper = true;
+            _tint = null;
         }
     }
 
@@ -154,18 +173,35 @@ internal sealed class BitmapRenderer3D : GpuRenderer
         _wallpaperBuffer ??= (GpuUploadBuffer)GpuUploadBuffer.Create(Device, byteCount);
 
         ReadOnlySpan<byte> source;
-        if (_directCopy)
+        if (_directCopy && _tint is null)
         {
-            // Fast path: image bytes already in R,G,B,A order.
+            // Fast path: image bytes already in R,G,B,A order and no
+            // tint to compose, so we can upload straight from the
+            // surface.
             var pixels = _image.GetPixels();
             source = pixels.Length == (int)byteCount ? pixels : pixels[..(int)byteCount];
         }
         else
         {
-            // Slow path: per-pixel convert the image's current contents
-            // into the GPU target's R,G,B,A byte layout.
+            // Stage into scratch (slow-path conversion, or direct-copy
+            // with a translucent tint we need to compose on top).
             var scratch = EnsureScratch((int)byteCount);
-            FillScratchFromImage(scratch);
+            if (_directCopy)
+            {
+                // Direct-copy + tint: copy the surface bytes verbatim,
+                // then blend in place.
+                var pixels = _image.GetPixels();
+                var dst = scratch.AsSpan(0, (int)byteCount);
+                pixels[..(int)byteCount].CopyTo(dst);
+            }
+            else
+            {
+                FillScratchFromImage(scratch);
+            }
+
+            if (_tint is { } tint)
+                BlendTintIntoScratch(scratch.AsSpan(0, (int)byteCount), tint);
+
             source = scratch;
         }
 
@@ -260,6 +296,34 @@ internal sealed class BitmapRenderer3D : GpuRenderer
         if (_scratch is null || _scratch.Length < size)
             _scratch = new byte[size];
         return _scratch;
+    }
+
+    // SrcOver a constant tint color over the R,G,B,A scratch buffer.
+    // out_rgb = tint.rgb * ta + src.rgb * (1 - ta);  ta = tint.a/255.
+    // out_a   = tint.a   + src.a * (1 - ta).
+    // All-integer fixed-point: keeping the math in bytes matches the
+    // GPU's R8G8B8A8Unorm storage and avoids per-pixel float work.
+    private static void BlendTintIntoScratch(Span<byte> rgba, Color tint)
+    {
+        int ta = tint.A;
+        if (ta == 0)
+            return;
+        int tr = tint.R * ta;
+        int tg = tint.G * ta;
+        int tb = tint.B * ta;
+        int inv = 255 - ta;
+        for (int i = 0; i + 3 < rgba.Length; i += 4)
+        {
+            int sr = rgba[i];
+            int sg = rgba[i + 1];
+            int sb = rgba[i + 2];
+            int sa = rgba[i + 3];
+            // +127 for round-to-nearest on /255 (Bias rounding).
+            rgba[i]     = (byte)((tr + sr * inv + 127) / 255);
+            rgba[i + 1] = (byte)((tg + sg * inv + 127) / 255);
+            rgba[i + 2] = (byte)((tb + sb * inv + 127) / 255);
+            rgba[i + 3] = (byte)(ta + (sa * inv + 127) / 255);
+        }
     }
 
     private void FillScratchFromImage(byte[] scratch)
