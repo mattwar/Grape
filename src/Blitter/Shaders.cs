@@ -802,7 +802,7 @@ public static class Shaders
     /// already be in normalized device coordinates.
     /// </summary>
     public static Shader<TextureVertex3D> PositionTexture { get; } =
-        new(PositionTextureVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout);
+        new(PositionTextureVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Draws each vertex at its position transformed by a per-draw 4x4
@@ -810,7 +810,7 @@ public static class Shaders
     /// vertex texture coordinate.
     /// </summary>
     public static Shader<TextureVertex3D, TransformArgs> PositionTextureWithTransform { get; } =
-        new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout);
+        new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout, ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Lit color shader: per-pixel Lambertian shading from the renderer's
@@ -848,7 +848,7 @@ public static class Shaders
     /// both white = unlit-looking flat white surface lit only by ambient.
     /// </remarks>
     public static Shader<LitTextureVertex3D, LitArgs> LitTexture { get; } =
-        new(LitTextureVert, LitTextureFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout);
+        new(LitTextureVert, LitTextureFrag, LitTextureVertex3D.ShaderVertexLayout, LightingArgsLayout, ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Skybox shader: samples the bound <see cref="Cubemap"/> by the
@@ -908,7 +908,8 @@ public static class Shaders
         new(PositionTextureInstancedVert, PositionTextureTintedFrag,
             TextureVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
-            TransformLayout);
+            TransformLayout,
+            ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Instanced variant of <see cref="LitTexture"/>: the mesh is drawn
@@ -931,5 +932,6 @@ public static class Shaders
         new(LitTextureInstancedVert, LitTextureFrag,
             LitTextureVertex3D.ShaderVertexLayout,
             TransformAndColorVertexLayout,
-            LightingArgsLayout);
+            LightingArgsLayout,
+            ShaderTextureLayout.SingleTexture2D);
 }
