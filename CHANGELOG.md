@@ -5,8 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- `SkyLights.None`: zero-energy IBL environment (black irradiance and
-  prefiltered cubes). Used as the default fallback when
+- `SkyLights.None`: zero-energy IBL environment (black diffuse and
+  specular cubes). Used as the default fallback when
   `Renderer3D.SkyLight` is unset, so PBR draws now work out-of-the-box
   -- materials are lit by direct lighting only, with no environment
   contribution. Assign a concrete sky (`SkyLights.Sun` / `Sunless` /
@@ -17,32 +17,32 @@ All notable changes to this project will be documented in this file.
   the world Y axis without regenerating the maps. For Y-symmetric
   gradient skies this effectively moves the baked sun in azimuth at
   no extra cost.
-- `Cubemaps.SkyIrradiance` and `Cubemaps.SkyPrefiltered` now generate
+- `Cubemaps.SkyDiffuse` and `Cubemaps.SkySpecular` now generate
   on the GPU, cutting first-frame latency from ~2s to negligible.
-- `Cubemaps.SkySunless`, `SkySunlessIrradiance`,
-  `SkySunlessPrefiltered`, and `SkyLights.Sunless`: sun-less
+- `Cubemaps.SkySunless`, `SkySunlessDiffuse`,
+  `SkySunlessSpecular`, and `SkyLights.Sunless`: sun-less
   variants for scenes where a directional light is the sun.
-- `Cubemaps.SkyFlat`, `SkyFlatIrradiance`, `SkyFlatPrefiltered`, and
+- `Cubemaps.SkyFlat`, `SkyFlatDiffuse`, `SkyFlatSpecular`, and
   `SkyLights.Flat`: uniform-tint IBL with no horizon band or
   sun, for neutral material previews.
 - `Texture` abstract base type for any GPU-samplable texture. `Image`
   and `Cubemap` now both inherit from it, so multi-texture draw
   overloads can bind a mixed list of 2D images and cubemaps.
 - `SkyLight` and `Renderer3D.SkyLight`: scene-wide IBL state
-  bundling an irradiance cubemap, a prefiltered specular cubemap, and
-  a BRDF LUT. The engine doesn't consume the value directly --
-  materializers (e.g. `StandardMaterializer`) read it and bind the
-  appropriate slots when drawing PBR materials.
+  bundling a diffuse environment cubemap, a specular environment
+  cubemap, and a BRDF LUT. The engine doesn't consume the value
+  directly -- materializers (e.g. `StandardMaterializer`) read it and
+  bind the appropriate slots when drawing PBR materials.
 - `SkyLights.Sun` (Blitter.Bits): default IBL environment built
   from the procedural sky cubemap and `Textures.SpecularLut`.
 - `PbrShaders.LitPbr` now uses the Karis split-sum approximation for
-  image-based lighting (diffuse from irradiance, specular from
-  prefiltered + BRDF LUT). The previous flat ambient term is replaced
-  by IBL; `Renderer3D.AmbientLight` now tints the IBL result.
-- `Cubemaps.CreatePrefilteredSpecular(CubeTexture, faceSize, levels, samples)`
-  and `Cubemaps.SkyPrefiltered`: GGX-importance-sampled mipmapped
+  image-based lighting (diffuse environment cube + specular
+  environment cube + BRDF LUT). The previous flat ambient term is
+  replaced by IBL; `Renderer3D.AmbientLight` now tints the IBL result.
+- `Cubemaps.CreateSpecular(CubeTexture, faceSize, levels, samples)`
+  and `Cubemaps.SkySpecular`: GGX-importance-sampled mipmapped
   specular environment cubemap for image-based lighting. Mip i = the
-  environment integrated at roughness i/(levels-1); shaders sample by
+  environment integrated at roughness i/(levels-1); shaders read by
   reflection vector at LOD `roughness * (levels - 1)`.
 
 ### Fixed
@@ -75,7 +75,14 @@ All notable changes to this project will be documented in this file.
   Call `Bitmap.Create` / `Bitmap.Load` / `Bitmap.Decode` directly;
   `Bitmap` is the concrete CPU-side image type. `Image` remains the
   abstract base.
-- `Cubemaps.CreateIrradiance` and `Cubemaps.CreatePrefilteredSpecular`
+- `Cubemaps.CreateIrradiance` / `CreatePrefilteredSpecular` renamed to
+  `Cubemaps.CreateDiffuse` / `CreateSpecular`. `SkyLight.Irradiance` /
+  `Prefiltered` renamed to `SkyLight.Diffuse` / `Specular`. Sky cube
+  properties similarly (`SkyIrradiance` -> `SkyDiffuse`, etc.). Same
+  outputs and behavior; the new names describe what each cubemap is
+  used for (diffuse vs specular shading) rather than the algorithm
+  that produced it.
+- `Cubemaps.CreateDiffuse` and `Cubemaps.CreateSpecular`
   now run on the GPU (signatures take `CubeTexture` and return
   `GpuCubemap`); the previous CPU Monte-Carlo integrators are gone.
 - `Textures.CreateSpecularLut` (new) replaces the equivalent helper on

@@ -32,7 +32,7 @@ public struct PbrArgs : IUniformArgs<PbrArgs>
     /// <summary>Linear base color factor (RGBA). Multiplied with the base color sample.</summary>
     public Vector4 BaseColorFactor;
 
-    /// <summary>x = metallic, y = roughness, z = occlusion strength, w = prefilter max mip (filled by renderer).</summary>
+    /// <summary>x = metallic, y = roughness, z = occlusion strength, w = specular max mip (filled by renderer).</summary>
     public Vector4 MaterialFactors;
 
     /// <summary>

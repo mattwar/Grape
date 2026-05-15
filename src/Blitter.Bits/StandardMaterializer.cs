@@ -92,8 +92,8 @@ public class StandardMaterializer : Materializer
         buffer[1] = pbr.MetallicRoughnessTexture ?? white;
         buffer[2] = pbr.OcclusionTexture ?? white;
         buffer[3] = pbr.EmissiveTexture ?? white;
-        buffer[4] = sky.Irradiance;
-        buffer[5] = sky.Prefiltered;
+        buffer[4] = sky.Diffuse;
+        buffer[5] = sky.Specular;
         buffer[6] = sky.SpecularLut;
 
         var args = new PbrArgs
@@ -101,7 +101,7 @@ public class StandardMaterializer : Materializer
             Model = transform,
             ViewProjection = Matrix4x4.Identity,
             BaseColorFactor = pbr.BaseColor,
-            // .W carries the prefiltered cubemap's max mip index so the
+            // .W carries the specular cubemap's max mip index so the
             // shader can scale roughness to a valid LOD without hard-
             // coding the chain depth. Filled here rather than on
             // PbrMaterial so authors don't have to track it.
@@ -109,7 +109,7 @@ public class StandardMaterializer : Materializer
                 pbr.Metallic,
                 pbr.Roughness,
                 pbr.OcclusionStrength,
-                Math.Max(0, sky.Prefiltered.LevelCount - 1)),
+                Math.Max(0, sky.Specular.LevelCount - 1)),
             // Pack env yaw into the unused EmissiveFactor.w so the
             // PBR fragment shader can rotate cubemap sample directions
             // without spending another fragment cbuffer (SDL_GPU caps

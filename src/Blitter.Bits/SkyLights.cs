@@ -14,14 +14,14 @@ public static class SkyLights
 
     /// <summary>
     /// Default sky environment: procedural day-sky cubemap baked into
-    /// irradiance and roughness-prefiltered specular cubes, combined
+    /// diffuse and roughness-mipmapped specular cubes, combined
     /// with the split-sum BRDF LUT. Lazily built on first access and
     /// cached for the process lifetime.
     /// </summary>
     public static SkyLight Sun => s_sky ??= new()
     {
-        Irradiance = Cubemaps.SkyIrradiance,
-        Prefiltered = Cubemaps.SkyPrefiltered,
+        Diffuse = Cubemaps.SkyDiffuse,
+        Specular = Cubemaps.SkySpecular,
         SpecularLut = Textures.SpecularLut,
     };
 
@@ -32,8 +32,8 @@ public static class SkyLights
     /// </summary>
     public static SkyLight Sunless => s_skySunless ??= new()
     {
-        Irradiance = Cubemaps.SkySunlessIrradiance,
-        Prefiltered = Cubemaps.SkySunlessPrefiltered,
+        Diffuse = Cubemaps.SkySunlessDiffuse,
+        Specular = Cubemaps.SkySunlessSpecular,
         SpecularLut = Textures.SpecularLut,
     };
 
@@ -44,13 +44,13 @@ public static class SkyLights
     /// </summary>
     public static SkyLight Flat => s_skyFlat ??= new()
     {
-        Irradiance = Cubemaps.SkyFlatIrradiance,
-        Prefiltered = Cubemaps.SkyFlatPrefiltered,
+        Diffuse = Cubemaps.SkyFlatDiffuse,
+        Specular = Cubemaps.SkyFlatSpecular,
         SpecularLut = Textures.SpecularLut,
     };
 
     /// <summary>
-    /// Zero-energy environment: black irradiance and prefiltered
+    /// Zero-energy environment: black diffuse and specular
     /// cubes, so the IBL term multiplies out to zero and PBR
     /// materials are lit purely by direct lighting (ambient +
     /// directional + point). Used as the default when
@@ -59,8 +59,8 @@ public static class SkyLights
     /// </summary>
     public static SkyLight None => s_none ??= new()
     {
-        Irradiance = Cubemaps.Black,
-        Prefiltered = Cubemaps.Black,
+        Diffuse = Cubemaps.Black,
+        Specular = Cubemaps.Black,
         SpecularLut = Textures.White,
     };
 }

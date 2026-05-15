@@ -2,15 +2,15 @@
 
 // Run this file directly with .NET 10 or later:
 //
-//     dotnet run samples/IrradianceCubemap.cs
+//     dotnet run samples/DiffuseCubemap.cs
 //
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Side-by-side: the procedural sky (left) and the irradiance map
-// baked from it (right). Same orbiting camera in both panes -- the
-// irradiance map should look like a smoothly-blurred version of the
+// Side-by-side: the procedural sky (left) and the diffuse environment
+// map baked from it (right). Same orbiting camera in both panes -- the
+// diffuse map should look like a smoothly-blurred version of the
 // sky, with no sun and no horizon detail (the cosine-weighted
 // hemisphere integral smears everything into broad color zones).
 
@@ -32,13 +32,13 @@ var skyboxIndices = new uint[]
 var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
 // Accessing `Cubemaps.Sky` first ensures the sky is baked before the
-// irradiance bake reads from it. Both then cache for the process.
+// diffuse bake reads from it. Both then cache for the process.
 var sky = Cubemaps.Sky;
-var irradiance = Cubemaps.SkyIrradiance;
+var diffuse = Cubemaps.SkyDiffuse;
 
 var window = new Window3D
 {
-    Title = "Cubemaps.SkyIrradiance: sky (left) vs irradiance (right)",
+    Title = "Cubemaps.SkyDiffuse: sky (left) vs diffuse (right)",
     BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape,
@@ -72,6 +72,6 @@ await window.RunAsync(rd =>
     {
         rd.Viewport = new Rect(paneW, 0, paneW, h);
         rd.CullMode = CullMode.None;
-        rd.DrawMeshRaw(skyboxMesh, irradiance, Shaders.Skybox, skyboxVp);
+        rd.DrawMeshRaw(skyboxMesh, diffuse, Shaders.Skybox, skyboxVp);
     }
 });

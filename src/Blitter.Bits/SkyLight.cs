@@ -10,14 +10,18 @@ namespace Blitter.Bits;
 public sealed record SkyLight
 {
     /// <summary>
-    /// A cubemap that stores incoming diffuse light from every direction.
+    /// A cubemap of incoming light from every direction. 
+    /// Used to shade matte surfaces -- the soft, ambient tint a non-shiny surface
+    /// picks up from its surroundings.
     /// </summary>
-    public required CubeTexture Irradiance { get; init; }
+    public required CubeTexture Diffuse { get; init; }
 
     /// <summary>
-    /// A cubemap that stores the environment as a mirror sees it, with each mip pre-blurred for a different surface roughness.
+    /// A cubemap of the environment as seen by a mirror.
+    /// Used to shade shiny surfaces -- sharp reflections for polished materials,
+    /// blurred reflections for rough ones.
     /// </summary>
-    public required CubeTexture Prefiltered { get; init; }
+    public required CubeTexture Specular { get; init; }
 
     /// <summary>
     /// A texture that stores how strongly a surface reflects light, indexed by view angle and roughness.

@@ -53,8 +53,8 @@ public static class PbrShaders
     // Cook-Torrance microfacet BRDF: GGX (Trowbridge-Reitz) NDF, Smith-GGX
     // geometry term (height-correlated), Schlick Fresnel. Diffuse is
     // Lambert weighted by (1 - F) * (1 - metallic). Image-based
-    // lighting (IBL) uses Karis split-sum: a diffuse irradiance cube
-    // sampled by N, plus a roughness-LOD-encoded prefiltered specular
+    // lighting (IBL) uses Karis split-sum: a diffuse environment cube
+    // sampled by N, plus a roughness-LOD-encoded specular environment
     // cube sampled by R combined with the split-sum BRDF 2D LUT.
     //
     // Sampled textures occupy t0..t6 in space2 (4 user PBR + 3 IBL),
@@ -76,10 +76,10 @@ public static class PbrShaders
         SamplerState      occSmp       : register(s2, space2);
         Texture2D<float4> emissiveTex  : register(t3, space2);
         SamplerState      emissiveSmp  : register(s3, space2);
-        TextureCube<float4> irradianceTex  : register(t4, space2);
-        SamplerState        irradianceSmp  : register(s4, space2);
-        TextureCube<float4> prefilteredTex : register(t5, space2);
-        SamplerState        prefilteredSmp : register(s5, space2);
+        TextureCube<float4> diffuseTex     : register(t4, space2);
+        SamplerState        diffuseSmp     : register(s4, space2);
+        TextureCube<float4> specularTex    : register(t5, space2);
+        SamplerState        specularSmp    : register(s5, space2);
         Texture2D<float4>   brdfLutTex     : register(t6, space2);
         SamplerState        brdfLutSmp     : register(s6, space2);
         StructuredBuffer<PointLight> pointLights : register(t7, space2);
@@ -87,7 +87,7 @@ public static class PbrShaders
         cbuffer Material : register(b0, space3)
         {
             float4 baseColorFactor;     // rgba
-            float4 matFactors;          // x metallic, y roughness, z occlusion, w prefilterMaxMip
+            float4 matFactors;          // x metallic, y roughness, z occlusion, w specularMaxMip
             float4 emissiveFactor;      // rgb, w _
             float4 cameraPosition;      // xyz world-space camera, w _
         };
@@ -201,11 +201,11 @@ public static class PbrShaders
             float yawSin = sin(yaw);
             float3 Nenv  = float3(yawCos * N.x + yawSin * N.z, N.y, -yawSin * N.x + yawCos * N.z);
 
-            float3 irr = irradianceTex.Sample(irradianceSmp, Nenv).rgb;
+            float3 irr = diffuseTex.Sample(diffuseSmp, Nenv).rgb;
             float3 R   = reflect(-V, N);
             float3 Renv = float3(yawCos * R.x + yawSin * R.z, R.y, -yawSin * R.x + yawCos * R.z);
             float  maxMip = matFactors.w;
-            float3 pref   = prefilteredTex.SampleLevel(prefilteredSmp, Renv, roughness * maxMip).rgb;
+            float3 pref   = specularTex.SampleLevel(specularSmp, Renv, roughness * maxMip).rgb;
             // Karis 2014 analytic LUT approximation. The baked LUT
             // texture produced by GGX importance sampling collapses
             // to zero along the grazing edge (low-roughness samples
@@ -292,8 +292,8 @@ public static class PbrShaders
         new ShaderTextureSlot("metallicRoughness", ShaderTextureDimension.Texture2D),
         new ShaderTextureSlot("occlusion",         ShaderTextureDimension.Texture2D),
         new ShaderTextureSlot("emissive",          ShaderTextureDimension.Texture2D),
-        new ShaderTextureSlot("irradiance",        ShaderTextureDimension.TextureCube),
-        new ShaderTextureSlot("prefiltered",       ShaderTextureDimension.TextureCube),
+        new ShaderTextureSlot("diffuse",           ShaderTextureDimension.TextureCube),
+        new ShaderTextureSlot("specular",          ShaderTextureDimension.TextureCube),
         new ShaderTextureSlot("specularLut",       ShaderTextureDimension.Texture2D));
 
     /// <summary>

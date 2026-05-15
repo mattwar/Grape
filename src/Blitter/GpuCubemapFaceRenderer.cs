@@ -2,8 +2,8 @@ namespace Blitter;
 
 /// <summary>
 /// A 3D renderer that draws into a single (face, mip) of a
-/// <see cref="GpuCubemap"/>. Used by GPU cubemap bakers (irradiance,
-/// prefiltered specular) that issue one fullscreen pass per face/mip.
+/// <see cref="GpuCubemap"/>. Used by GPU cubemap bakers (diffuse,
+/// specular IBL) that issue one fullscreen pass per face/mip.
 /// </summary>
 internal sealed class GpuCubemapFaceRenderer : GpuRenderer
 {

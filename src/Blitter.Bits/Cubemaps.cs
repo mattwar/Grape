@@ -9,14 +9,14 @@ namespace Blitter.Bits;
 public static class Cubemaps
 {
     private static Cubemap? s_sky;
-    private static CubeTexture? s_skyIrradiance;
-    private static CubeTexture? s_skyPrefiltered;
+    private static CubeTexture? s_skyDiffuse;
+    private static CubeTexture? s_skySpecular;
     private static Cubemap? s_skySunless;
-    private static CubeTexture? s_skySunlessIrradiance;
-    private static CubeTexture? s_skySunlessPrefiltered;
+    private static CubeTexture? s_skySunlessDiffuse;
+    private static CubeTexture? s_skySunlessSpecular;
     private static Cubemap? s_skyFlat;
-    private static CubeTexture? s_skyFlatIrradiance;
-    private static CubeTexture? s_skyFlatPrefiltered;
+    private static CubeTexture? s_skyFlatDiffuse;
+    private static CubeTexture? s_skyFlatSpecular;
     private static Cubemap? s_black;
 
     /// <summary>
@@ -27,20 +27,20 @@ public static class Cubemaps
     public static Cubemap Sky => s_sky ??= CreateSky();
 
     /// <summary>
-    /// Diffuse irradiance map derived from <see cref="Sky"/>: 
-    /// the cosine-weighted hemisphere integral of the sky cubemap at every surface-normal direction. 
-    /// Sample by surface normal to get the diffuse environment term used in image-based lighting.
+    /// Diffuse environment map derived from <see cref="Sky"/>: a heavily
+    /// blurred version of the sky that captures the soft, ambient tint
+    /// a matte surface picks up from its surroundings. Plug into
+    /// <see cref="SkyLight.Diffuse"/>.
     /// </summary>
-    public static CubeTexture SkyIrradiance => s_skyIrradiance ??= CreateIrradiance(Sky);
+    public static CubeTexture SkyDiffuse => s_skyDiffuse ??= CreateDiffuse(Sky);
 
     /// <summary>
-    /// Prefiltered specular environment map derived from <see cref="Sky"/>.
-    /// A mipmapped cubemap where mip <c>i</c> is the GGX-integrated
-    /// reflection of the sky at roughness <c>i / (levels - 1)</c>.
-    /// Sample by the reflection vector at <c>roughness * (levels - 1)</c>
-    /// to get the specular environment term used in image-based lighting.
+    /// Specular environment map derived from <see cref="Sky"/>: a
+    /// mipmapped cubemap where mip 0 is the sky as a mirror sees it
+    /// and each higher mip is pre-blurred for a rougher surface. Plug
+    /// into <see cref="SkyLight.Specular"/>.
     /// </summary>
-    public static CubeTexture SkyPrefiltered => s_skyPrefiltered ??= CreatePrefilteredSpecular(Sky);
+    public static CubeTexture SkySpecular => s_skySpecular ??= CreateSpecular(Sky);
 
     /// <summary>
     /// Like <see cref="Sky"/> but with the sun disc omitted. Use as
@@ -51,14 +51,14 @@ public static class Cubemaps
     public static Cubemap SkySunless => s_skySunless ??= CreateSky(sunAngularRadius: 0f);
 
     /// <summary>
-    /// Diffuse irradiance map derived from <see cref="SkySunless"/>.
+    /// Diffuse environment map derived from <see cref="SkySunless"/>.
     /// </summary>
-    public static CubeTexture SkySunlessIrradiance => s_skySunlessIrradiance ??= CreateIrradiance(SkySunless);
+    public static CubeTexture SkySunlessDiffuse => s_skySunlessDiffuse ??= CreateDiffuse(SkySunless);
 
     /// <summary>
-    /// Prefiltered specular map derived from <see cref="SkySunless"/>.
+    /// Specular environment map derived from <see cref="SkySunless"/>.
     /// </summary>
-    public static CubeTexture SkySunlessPrefiltered => s_skySunlessPrefiltered ??= CreatePrefilteredSpecular(SkySunless);
+    public static CubeTexture SkySunlessSpecular => s_skySunlessSpecular ??= CreateSpecular(SkySunless);
 
     /// <summary>
     /// Uniform-tint sky: same color in every direction, no sun, no
@@ -74,20 +74,21 @@ public static class Cubemaps
         sunAngularRadius: 0f);
 
     /// <summary>
-    /// Diffuse irradiance map derived from <see cref="SkyFlat"/>.
+    /// Diffuse environment map derived from <see cref="SkyFlat"/>.
     /// </summary>
-    public static CubeTexture SkyFlatIrradiance => s_skyFlatIrradiance ??= CreateIrradiance(SkyFlat);
+    public static CubeTexture SkyFlatDiffuse => s_skyFlatDiffuse ??= CreateDiffuse(SkyFlat);
 
     /// <summary>
-    /// Prefiltered specular map derived from <see cref="SkyFlat"/>.
+    /// Specular environment map derived from <see cref="SkyFlat"/>.
     /// </summary>
-    public static CubeTexture SkyFlatPrefiltered => s_skyFlatPrefiltered ??= CreatePrefilteredSpecular(SkyFlat);
+    public static CubeTexture SkyFlatSpecular => s_skyFlatSpecular ??= CreateSpecular(SkyFlat);
 
     /// <summary>
     /// 1x1 black cubemap. Use as a zero-energy IBL source: feeding it
-    /// to the irradiance + prefiltered slots makes the environment
-    /// term multiply out to zero, so PBR materials fall back to pure
-    /// direct lighting (ambient + directional + point) with no sky
+    /// to the diffuse + specular slots of a <see cref="SkyLight"/>
+    /// makes the environment term multiply out to zero, so PBR
+    /// materials fall back to pure direct lighting (ambient +
+    /// directional + point) with no sky
     /// contribution.
     /// </summary>
     public static Cubemap Black => s_black ??= Cubemap.Create(
@@ -137,7 +138,7 @@ public static class Cubemaps
     /// ground three-stop gradient driven by <c>dir.Y</c>, with an
     /// optional sun disc.
     /// </summary>
-    /// <param name="faceSize">Pixel size of each cube face. 256 is plenty for a skybox; smaller for irradiance source.</param>
+    /// <param name="faceSize">Pixel size of each cube face. 256 is plenty for a skybox; smaller for diffuse-IBL source.</param>
     /// <param name="zenith">Color at <c>dir = (0, 1, 0)</c>.</param>
     /// <param name="horizon">Color at <c>dir.Y = 0</c>.</param>
     /// <param name="ground">Color at <c>dir = (0, -1, 0)</c>.</param>
@@ -206,7 +207,7 @@ public static class Cubemaps
     }
 
     /// <summary>
-    /// Creates a diffuse irradiance cubemap from <paramref name="source"/>
+    /// Creates a diffuse environment cubemap from <paramref name="source"/>
     /// on the GPU: for every output direction N, integrates
     /// <c>source(ω) · cos(θ) dω</c> over the hemisphere around N.
     /// Output is heavily blurred -- a small <paramref name="faceSize"/>
@@ -215,7 +216,7 @@ public static class Cubemaps
     /// <param name="source">Source environment cube.</param>
     /// <param name="faceSize">Edge length per face of the destination. 32 is plenty -- the integrand is very smooth.</param>
     /// <param name="samples">Cosine-weighted hemisphere samples per pixel.</param>
-    public static GpuCubemap CreateIrradiance(
+    public static GpuCubemap CreateDiffuse(
         CubeTexture source,
         int faceSize = 32,
         int samples = 256)
@@ -227,7 +228,7 @@ public static class Cubemaps
         var dest = GpuCubemap.Create(faceSize, levels: 1, renderTarget: true);
         var device = GpuDevice.Default;
         var mesh = IblShaders.FullscreenTri;
-        var shader = IblShaders.IrradianceShader;
+        var shader = IblShaders.DiffuseShader;
 
         foreach (var face in CubeFaceExtensions.All)
         {
@@ -237,7 +238,7 @@ public static class Cubemaps
             // orientation: top of the face image is +up.
             var right = Vector3.Normalize(Vector3.Cross(up, forward));
 
-            var args = new IblShaders.IrradianceArgs
+            var args = new IblShaders.DiffuseArgs
             {
                 Right = new Vector4(right, 0f),
                 UpAndSamples = new Vector4(up, samples),
@@ -255,13 +256,13 @@ public static class Cubemaps
     }
 
     /// <summary>
-    /// Creates a prefiltered specular environment cubemap from
+    /// Creates a specular environment cubemap from
     /// <paramref name="source"/> on the GPU for image-based lighting.
     /// Produces a mipmapped cubemap where mip <c>i</c> is the
     /// GGX-distribution importance-sampled integral of the environment
     /// at roughness <c>i / (levels - 1)</c>. Mip 0 (roughness 0) is the
     /// unfiltered environment downsampled to <paramref name="faceSize"/>;
-    /// the highest mip (roughness 1) is fully blurred. Shaders sample
+    /// the highest mip (roughness 1) is fully blurred. Shaders read
     /// this by the reflection vector at LOD
     /// <c>roughness * (levels - 1)</c>.
     /// </summary>
@@ -269,7 +270,7 @@ public static class Cubemaps
     /// <param name="faceSize">Edge length per face of the destination.</param>
     /// <param name="levels">Mip-level count; <c>null</c> picks the full chain.</param>
     /// <param name="samples">GGX importance samples per pixel per face.</param>
-    public static GpuCubemap CreatePrefilteredSpecular(
+    public static GpuCubemap CreateSpecular(
         CubeTexture source,
         int faceSize = 128,
         int? levels = null,
@@ -286,7 +287,7 @@ public static class Cubemaps
         var dest = GpuCubemap.Create(faceSize, levels: levelCount, renderTarget: true);
         var device = GpuDevice.Default;
         var mesh = IblShaders.FullscreenTri;
-        var shader = IblShaders.PrefilterShader;
+        var shader = IblShaders.SpecularShader;
 
         foreach (var face in CubeFaceExtensions.All)
         {
@@ -299,7 +300,7 @@ public static class Cubemaps
                 float roughness = levelCount == 1
                     ? 0f
                     : mip / (float)(levelCount - 1);
-                var args = new IblShaders.PrefilterArgs
+                var args = new IblShaders.SpecularArgs
                 {
                     RightAndRoughness = new Vector4(right, roughness),
                     UpAndSamples = new Vector4(up, samples),
@@ -361,18 +362,18 @@ public static class Cubemaps
 }
 
 // GPU shader infrastructure for the IBL cubemap integrators above.
-// Kept file-scoped: only Cubemaps.CreateIrradiance and
-// Cubemaps.CreatePrefilteredSpecular consume these resources.
+// Kept file-scoped: only Cubemaps.CreateDiffuse and
+// Cubemaps.CreateSpecular consume these resources.
 file static class IblShaders
 {
     public static Mesh<Vertex3D> FullscreenTri => s_fullscreenTri.Value;
-    public static Shader<Vertex3D, PrefilterArgs> PrefilterShader => s_prefilterShader.Value;
-    public static Shader<Vertex3D, IrradianceArgs> IrradianceShader => s_irradianceShader.Value;
+    public static Shader<Vertex3D, SpecularArgs> SpecularShader => s_specularShader.Value;
+    public static Shader<Vertex3D, DiffuseArgs> DiffuseShader => s_diffuseShader.Value;
 
     // Three Vector4 cbuffer slots, 48 bytes total. Packs scalar params
     // into the .w of vectors that have a spare component.
     [StructLayout(LayoutKind.Sequential)]
-    public struct PrefilterArgs
+    public struct SpecularArgs
     {
         public Vector4 RightAndRoughness;   // xyz = face right,   w = roughness
         public Vector4 UpAndSamples;        // xyz = face up,      w = sample count
@@ -380,7 +381,7 @@ file static class IblShaders
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    public struct IrradianceArgs
+    public struct DiffuseArgs
     {
         public Vector4 Right;               // xyz = face right,   w = unused
         public Vector4 UpAndSamples;        // xyz = face up,      w = sample count
@@ -398,10 +399,10 @@ file static class IblShaders
             new Vertex3D(-1f,  3f, 0f),
         })));
 
-    private static readonly Lazy<Shader<Vertex3D, PrefilterArgs>> s_prefilterShader = new(() =>
-        new Shader<Vertex3D, PrefilterArgs>(
+    private static readonly Lazy<Shader<Vertex3D, SpecularArgs>> s_specularShader = new(() =>
+        new Shader<Vertex3D, SpecularArgs>(
             new VertexShader(VertexHlsl),
-            new FragmentShader(PrefilterFragmentHlsl),
+            new FragmentShader(SpecularFragmentHlsl),
             Vertex3D.ShaderVertexLayout,
             new ShaderArgsLayout(
                 new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4),
@@ -409,10 +410,10 @@ file static class IblShaders
                 new ShaderArgElement(ShaderArgStage.Fragment, 2, ShaderArgKind.Float4)),
             ShaderTextureLayout.SingleTextureCube));
 
-    private static readonly Lazy<Shader<Vertex3D, IrradianceArgs>> s_irradianceShader = new(() =>
-        new Shader<Vertex3D, IrradianceArgs>(
+    private static readonly Lazy<Shader<Vertex3D, DiffuseArgs>> s_diffuseShader = new(() =>
+        new Shader<Vertex3D, DiffuseArgs>(
             new VertexShader(VertexHlsl),
-            new FragmentShader(IrradianceFragmentHlsl),
+            new FragmentShader(DiffuseFragmentHlsl),
             Vertex3D.ShaderVertexLayout,
             new ShaderArgsLayout(
                 new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4),
@@ -433,7 +434,7 @@ file static class IblShaders
         }
         """;
 
-    private const string PrefilterFragmentHlsl = """
+    private const string SpecularFragmentHlsl = """
         cbuffer RightR  : register(b0, space3) { float4 RightR;  }; // xyz=right,   w=roughness
         cbuffer UpN     : register(b1, space3) { float4 UpN;     }; // xyz=up,      w=sampleCount
         cbuffer Forward : register(b2, space3) { float4 Forward; }; // xyz=forward, w=unused
@@ -522,7 +523,7 @@ file static class IblShaders
         }
         """;
 
-    private const string IrradianceFragmentHlsl = """
+    private const string DiffuseFragmentHlsl = """
         cbuffer Right   : register(b0, space3) { float4 Right;   }; // xyz=right,   w=unused
         cbuffer UpN     : register(b1, space3) { float4 UpN;     }; // xyz=up,      w=sampleCount
         cbuffer Forward : register(b2, space3) { float4 Forward; }; // xyz=forward, w=unused
