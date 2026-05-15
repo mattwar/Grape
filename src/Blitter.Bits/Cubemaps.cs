@@ -17,6 +17,7 @@ public static class Cubemaps
     private static Cubemap? s_skyFlat;
     private static CubeTexture? s_skyFlatIrradiance;
     private static CubeTexture? s_skyFlatPrefiltered;
+    private static Cubemap? s_black;
 
     /// <summary>
     /// Default procedural sky: 
@@ -81,6 +82,18 @@ public static class Cubemaps
     /// Prefiltered specular map derived from <see cref="SkyFlat"/>.
     /// </summary>
     public static CubeTexture SkyFlatPrefiltered => s_skyFlatPrefiltered ??= CreatePrefilteredSpecular(SkyFlat);
+
+    /// <summary>
+    /// 1x1 black cubemap. Use as a zero-energy IBL source: feeding it
+    /// to the irradiance + prefiltered slots makes the environment
+    /// term multiply out to zero, so PBR materials fall back to pure
+    /// direct lighting (ambient + directional + point) with no sky
+    /// contribution.
+    /// </summary>
+    public static Cubemap Black => s_black ??= Cubemap.Create(
+        Textures.Black, Textures.Black,
+        Textures.Black, Textures.Black,
+        Textures.Black, Textures.Black);
 
     /// <summary>
     /// Creates a cubemap by evaluating <paramref name="shade"/> per

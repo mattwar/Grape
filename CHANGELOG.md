@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- `SkyLights.None`: zero-energy IBL environment (black irradiance and
+  prefiltered cubes). Used as the default fallback when
+  `Renderer3D.SkyLight` is unset, so PBR draws now work out-of-the-box
+  -- materials are lit by direct lighting only, with no environment
+  contribution. Assign a concrete sky (`SkyLights.Sun` / `Sunless` /
+  `Flat`) to opt in to IBL.
+- `Cubemaps.Black`: 1x1 black cubemap; the building block for
+  `SkyLights.None`.
 - `SkyLight.Yaw`: rotates IBL cubemap sample directions around
   the world Y axis without regenerating the maps. For Y-symmetric
   gradient skies this effectively moves the baked sun in azimuth at

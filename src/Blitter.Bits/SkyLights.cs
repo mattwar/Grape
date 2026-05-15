@@ -10,6 +10,7 @@ public static class SkyLights
     private static SkyLight? s_sky;
     private static SkyLight? s_skySunless;
     private static SkyLight? s_skyFlat;
+    private static SkyLight? s_none;
 
     /// <summary>
     /// Default sky environment: procedural day-sky cubemap baked into
@@ -46,5 +47,20 @@ public static class SkyLights
         Irradiance = Cubemaps.SkyFlatIrradiance,
         Prefiltered = Cubemaps.SkyFlatPrefiltered,
         SpecularLut = Textures.SpecularLut,
+    };
+
+    /// <summary>
+    /// Zero-energy environment: black irradiance and prefiltered
+    /// cubes, so the IBL term multiplies out to zero and PBR
+    /// materials are lit purely by direct lighting (ambient +
+    /// directional + point). Used as the default when
+    /// <c>Renderer3D.SkyLight</c> is unset so the first PBR draw
+    /// renders without forcing the caller to pick a sky.
+    /// </summary>
+    public static SkyLight None => s_none ??= new()
+    {
+        Irradiance = Cubemaps.Black,
+        Prefiltered = Cubemaps.Black,
+        SpecularLut = Textures.White,
     };
 }

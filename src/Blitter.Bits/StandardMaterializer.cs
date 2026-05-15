@@ -81,11 +81,10 @@ public class StandardMaterializer : Materializer
         // IBL textures (slots 4..6) sourced from the renderer's
         // SkyLight. Inline-array buffer keeps the seven refs
         // on the stack and we hand a Span into it to the renderer.
-        var env = renderer.SkyLight
-            ?? throw new InvalidOperationException(
-                $"PBR draws require a {nameof(SkyLight)} for IBL inputs; " +
-                $"set {nameof(Renderer3D)}.SkyLight " +
-                $"(e.g. to {nameof(SkyLights)}.{nameof(SkyLights.Sun)}) before drawing.");
+        // When the renderer has no SkyLight assigned we fall back to
+        // SkyLights.None (black IBL cubes), so the IBL term multiplies
+        // to zero and the material is lit purely by direct lighting.
+        var env = renderer.SkyLight ?? SkyLights.None;
 
         var white = Textures.White;
         PbrTextureBuffer buffer = default;
