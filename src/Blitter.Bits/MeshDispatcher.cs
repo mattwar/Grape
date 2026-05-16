@@ -13,14 +13,14 @@ namespace Blitter.Bits;
 internal interface IMeshDrawAdapter
 {
     /// <summary>
-    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Image, Shader{TVertex,TArgs}, in TArgs)"/>
+    /// Calls <see cref="Renderer3D.DrawMesh{TVertex,TArgs}(Mesh{TVertex}, Texture2D, Shader{TVertex,TArgs}, in TArgs)"/>
     /// after casting <paramref name="mesh"/> and <paramref name="shader"/> to
     /// the adapter's vertex/args types.
     /// </summary>
     void DrawTextured<TArgs>(
         Renderer3D renderer,
         Mesh mesh,
-        Image texture,
+        Texture2D texture,
         Shader shader,
         in TArgs args)
         where TArgs : unmanaged, IUniformArgs<TArgs>;
@@ -50,7 +50,7 @@ internal interface IMeshDrawAdapter
     void DrawTexturedInstanced<TArgs, TInstance>(
         Renderer3D renderer,
         Mesh mesh,
-        Image texture,
+        Texture2D texture,
         Shader shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -64,7 +64,7 @@ internal sealed class MeshDrawAdapter<TVertex> : IMeshDrawAdapter
     public void DrawTextured<TArgs>(
         Renderer3D renderer,
         Mesh mesh,
-        Image texture,
+        Texture2D texture,
         Shader shader,
         in TArgs args)
         where TArgs : unmanaged, IUniformArgs<TArgs>
@@ -90,7 +90,7 @@ internal sealed class MeshDrawAdapter<TVertex> : IMeshDrawAdapter
     public void DrawTexturedInstanced<TArgs, TInstance>(
         Renderer3D renderer,
         Mesh mesh,
-        Image texture,
+        Texture2D texture,
         Shader shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)

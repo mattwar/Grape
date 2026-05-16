@@ -27,7 +27,7 @@ public sealed class LitTextureMaterial : Material
     /// Optional 2D image sampled across the mesh's UVs. 
     /// Null is treated as "no texture".
     /// </summary>
-    public Image? DiffuseTexture { get; init; }
+    public Texture2D? DiffuseTexture { get; init; }
 
     /// <summary>
     /// A featureless white material. Useful as a default.

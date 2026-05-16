@@ -3,11 +3,8 @@
 // Run this file directly with .NET 10 or later:
 //
 //     dotnet run samples/RenderToImage.cs
-//
-// Renders a 3D scene into a CPU-resident Image and saves it as a BMP
-// file -- no window required. Demonstrates the screenshot-shaped use
-// case for Image.Render3D: a synchronous "give me a bitmap of this
-// scene" call.
+
+// Renders a 3D scene into a CPU-resident Texture2D and saves it as a .bmp file, no window required.
 
 using System.Numerics;
 using Blitter;
@@ -21,16 +18,27 @@ var triangle = Mesh.Create([
 
 using var image = Bitmap.Create(800, 600);
 
-image.Render3D(new Color(0, 0, 32), rd =>
+image.Render3D(
+    new Color(0, 0, 32), 
+    rd =>
+    {
+        var aspect = (float)image.Height / image.Width;
+        var transform = Matrix4x4
+            .CreateRotationZ(0.4f)
+            .Scale(0.8f)
+            .Scale(aspect, 1f, 1f);
+
+        rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
+    });
+
+// save in mulitple formats
+SaveImage(image, "rendered-image.bmp");
+SaveImage(image, "rendered-image.png");
+SaveImage(image, "rendered-image.jpg");
+
+static void SaveImage(Bitmap bitmap, string filename)
 {
-    var aspect = 600f / 800f;
-    var transform = Matrix4x4.CreateRotationZ(0.4f)
-        .Scale(0.8f)
-        .Scale(aspect, 1f, 1f);
-
-    rd.DrawMesh(triangle, Shaders.PositionColorWithTransform, transform);
-});
-
-var path = Path.Combine(AppContext.BaseDirectory, "RenderToImage.bmp");
-image.Save(path);
-Console.WriteLine($"Saved: {path}");
+    var path = Path.Combine(AppContext.BaseDirectory, filename);
+    bitmap.Save(path);
+    Console.WriteLine($"Saved: {path}");
+}

@@ -8,27 +8,15 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates a pure-fragment-shader effect: a classic demoscene plasma.
-//
-// All the visual interest happens in the fragment stage. The vertex stage
-// just passes through a fullscreen quad already specified in clip space,
-// and the fragment computes per-pixel color from a sum of sinusoids of
-// the UV coordinate plus time, then maps the result through a small
-// palette. No mesh, lighting, or geometry tricks involved -- this is the
-// "what can a fragment shader do on its own" advertisement.
+// Demonstrates a pure-fragment-shader: a classic demo plasma effect.
 
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Blitter;
 using Blitter.Bits;
 
 // Build a fullscreen quad for the shader to shade.
 var quad = Meshes.TexturedRectangle(new Vector2(2f, 2f));
 
-// Plasma: sum a few sinusoids of the UV coordinate, scaled and offset by
-// time, then map the sum through a 3-channel cosine-based palette. The
-// "moves diagonally across the screen" feel comes from offsetting each
-// term by a different multiple of t.
 var plasmaShader = new Shader<TextureVertex3D, PlasmaArgs>(
     vertex: 
         """
@@ -52,8 +40,7 @@ var plasmaShader = new Shader<TextureVertex3D, PlasmaArgs>(
         float4 main(Input input) : SV_Target0
         {
             float t = frame.x;
-            // Centre and aspect-correct the coordinate so the pattern reads
-            // round on non-square windows.
+            // Center and aspect-correct the coordinate so the pattern reads round on non-square windows.
             float2 p = input.TexCoord * 2.0f - 1.0f;
             p.x *= frame.y;
 
@@ -66,8 +53,7 @@ var plasmaShader = new Shader<TextureVertex3D, PlasmaArgs>(
             v *= 0.25f; // back into roughly -1..1
 
             // Cosine palette by Inigo Quilez: cheap, vibrant, parameterised
-            // entirely by three vec3s. These constants give a magenta -> cyan
-            // -> yellow rainbow.
+            // entirely by three vec3s. These constants give a magenta -> cyan -> yellow rainbow.
             float3 a = float3(0.50f, 0.50f, 0.50f);
             float3 b = float3(0.50f, 0.50f, 0.50f);
             float3 c = float3(1.00f, 1.00f, 1.00f);
@@ -82,15 +68,13 @@ var plasmaShader = new Shader<TextureVertex3D, PlasmaArgs>(
         new ShaderArgElement(ShaderArgStage.Fragment, 0, ShaderArgKind.Float4))
     );
 
-// ----- Window + render loop. No camera needed: the vertex stage emits
-// clip-space positions directly.
-
 var window = new Window3D
 {
     Title = "Custom shader: plasma",
     BackgroundColor = Color.Black,
     FullScreen = true,
-    CloseKey = Key.Escape,
+    CloseKey = Key.Escape, // window close on ESC
+    RelativeMouseMode = true // hide mouse
 };
 
 await window.RunAsync(rd =>
@@ -99,9 +83,6 @@ await window.RunAsync(rd =>
 
     using (rd.PushState())
     {
-        // The quad covers the whole screen and ignores depth, so disable
-        // back-face culling to avoid surprises if the viewer ever flips
-        // a winding convention.
         rd.CullMode = CullMode.None;
 
         rd.DrawMesh(quad, plasmaShader, new PlasmaArgs
@@ -109,13 +90,8 @@ await window.RunAsync(rd =>
             Frame = new Vector4(t, rd.AspectRatio, 0f, 0f),
         });
     }
-});// ----- Per-draw args struct ------------------------------------------------
-//
-// Single fragment-stage slot carrying time + aspect ratio. No
-// IUniformArgs accessors -- this shader doesn't need any
-// renderer-injected state.
+});
 
-[StructLayout(LayoutKind.Sequential)]
 public struct PlasmaArgs : IUniformArgs<PlasmaArgs>
 {
     public Vector4 Frame; // x=time, y=aspect, z/w reserved

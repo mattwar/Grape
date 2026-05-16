@@ -7,13 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
-// Two cameras rendering the same scene side-by-side, demonstrating
-// Renderer3D.Viewport. Each pane uses PushState() so its viewport
-// scope ends cleanly and the next pane's setting is independent.
+// Two cameras rendering the same scene side-by-side, demonstrating Renderer3D.Viewport.
 
 using System.Numerics;
 using Blitter;
@@ -92,15 +87,9 @@ await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
     var (width, height) = window.Size;
-
-    // Each pane is half the window's width. The aspect ratio passed to
-    // the camera also halves so the scene isn't horizontally squished.
     var paneWidth = width / 2f;
     var paneAspect = paneWidth / height;
 
-    // PushState() snapshots Viewport (and the rest of the renderer
-    // state) so when this scope ends Viewport reverts to its previous
-    // value. The next pane sets its own viewport independently.
     using (rd.PushState())
     {
         rd.Viewport = new Rect(0, 0, paneWidth, height);

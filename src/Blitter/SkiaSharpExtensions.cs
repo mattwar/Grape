@@ -535,7 +535,7 @@ public static class SkiaSharpExtensions
         };
 
         /// <summary>
-        /// Creates a new <see cref="Image"/> the same size as the bitmap
+        /// Creates a new <see cref="Texture2D"/> the same size as the bitmap
         /// and copies its pixels into it.
         /// </summary>
         public Bitmap ToImage(Blitter.PixelFormat? format = null)

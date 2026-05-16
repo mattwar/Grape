@@ -28,8 +28,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // resource and (b) skip the bind step downstream so a single bad
     // texture doesn't tear down the entire frame mid-pass and turn the
     // window black. Logged once per offender via Console.Error.
-    private readonly HashSet<Image> _failedTextureUploads = new();
-    private readonly HashSet<CubeTexture> _failedCubemapUploads = new();
+    private readonly HashSet<Texture2D> _failedTextureUploads = new();
+    private readonly HashSet<TextureCube> _failedCubemapUploads = new();
     private readonly Dictionary<PipelineKey, GpuPipeline> _pipelines = new();
     private readonly Dictionary<StageShader, GpuShader> _stageShaders = new();
     private readonly List<DrawCommand> _commands = new();
@@ -518,12 +518,12 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// The mesh and shader must both use <see cref="TextureVertex3D"/> and
     /// the mesh's vertex layout must match the shader's expected vertex layout.
     /// The image's pixels are uploaded once to a GPU texture and cached;
-    /// passing the same <see cref="Image"/> instance on later frames reuses
+    /// passing the same <see cref="Texture2D"/> instance on later frames reuses
     /// the upload.
     /// </remarks>
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -542,7 +542,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
@@ -558,13 +558,13 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Cubemap variant of <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Image, Shader{TVertex})"/>.
+    /// Cubemap variant of <see cref="DrawMesh{TVertex}(Mesh{TVertex}, Texture2D, Shader{TVertex})"/>.
     /// The shader's fragment-stage texture binding (slot 0) must be a
     /// <c>TextureCube</c> rather than a <c>Texture2D</c>.
     /// </summary>
     public override void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        CubeTexture cubemap,
+        TextureCube cubemap,
         Shader<TVertex> shader)
     {
         ArgumentNullException.ThrowIfNull(mesh);
@@ -579,11 +579,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
     }
 
     /// <summary>
-    /// Cubemap variant of <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Image, Shader{TVertex,TArgs}, in TArgs)"/>.
+    /// Cubemap variant of <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Texture2D, Shader{TVertex,TArgs}, in TArgs)"/>.
     /// </summary>
     public override void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        CubeTexture cubemap,
+        TextureCube cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
     {
@@ -603,7 +603,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// </summary>
     internal void DrawTexturedMeshCore<TVertex>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex> shader,
         GpuSampler? sampler)
         where TVertex : unmanaged
@@ -621,7 +621,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     internal void DrawTexturedMeshCore<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs> shader,
         GpuSampler? sampler,
         in TArgs args)
@@ -693,8 +693,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
             var actual = tex switch
             {
-                CubeTexture => ShaderTextureDimension.TextureCube,
-                Image       => ShaderTextureDimension.Texture2D,
+                TextureCube => ShaderTextureDimension.TextureCube,
+                Texture2D       => ShaderTextureDimension.Texture2D,
                 _ => throw new ArgumentException(
                     $"Unsupported Texture subtype at index {i}: {tex.GetType().Name}.",
                     nameof(textures)),
@@ -764,7 +764,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     /// <inheritdoc/>
     public override void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -791,7 +791,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private void QueueInstanced<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        Image? texture,
+        Texture2D? texture,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -881,13 +881,16 @@ internal class GpuRenderer : Renderer3D, IDisposable
     private const int DebugGlyphPixels = 8;
     private const int DebugAtlasCols = 16;
     private const int DebugAtlasRows = 8;
-    private const int DebugAtlasWidth = DebugGlyphPixels * DebugAtlasCols;   // 128
-    private const int DebugAtlasHeight = DebugGlyphPixels * DebugAtlasRows;  // 64
+    // Oversample glyphs in the atlas so the linear sampler upscales
+    // from a higher-resolution source and the result looks crisper.
+    private const int DebugAtlasScale = 2;
+    private const int DebugAtlasWidth = DebugGlyphPixels * DebugAtlasCols * DebugAtlasScale;   // 256
+    private const int DebugAtlasHeight = DebugGlyphPixels * DebugAtlasRows * DebugAtlasScale;  // 128
 
     /// <summary>
     /// Renders ASCII debug text using SDL's built-in 8x8 bitmap font, on a
     /// strip of textured quads. The font atlas is built once on first use
-    /// (one quad per character, sampled from a shared 128×64 image).
+    /// (one quad per character, sampled from a shared oversampled image).
     /// </summary>
     /// <param name="text">The text to render. Non-ASCII characters render
     /// as the glyph at code 0.</param>
@@ -933,6 +936,11 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
         const float u = 1f / DebugAtlasCols;  // uv width per glyph
         const float v = 1f / DebugAtlasRows;  // uv height per glyph
+        // Half-texel inset: keeps the linear sampler from reaching into
+        // the neighboring glyph cell at the boundary, which would smear
+        // faint slivers of adjacent characters along each glyph's edges.
+        const float halfTexelU = 0.5f / DebugAtlasWidth;
+        const float halfTexelV = 0.5f / DebugAtlasHeight;
 
         for (int i = 0; i < text.Length; i++)
         {
@@ -941,8 +949,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
             int col = c % DebugAtlasCols;
             int row = c / DebugAtlasCols;
 
-            float u0 = col * u, u1 = u0 + u;
-            float v0 = row * v, v1 = v0 + v;
+            float u0 = col * u + halfTexelU, u1 = (col + 1) * u - halfTexelU;
+            float v0 = row * v + halfTexelV, v1 = (row + 1) * v - halfTexelV;
 
             float x0 = i;
             float x1 = i + 1;
@@ -1020,6 +1028,10 @@ internal class GpuRenderer : Renderer3D, IDisposable
             SDL.SetRenderDrawColor(rendererId, 0, 0, 0, 0);
             SDL.RenderClear(rendererId);
             SDL.SetRenderDrawColor(rendererId, 255, 255, 255, 255);
+            // Render each 8x8 glyph at DebugAtlasScale-times its native
+            // size so the linear sampler interpolates from a higher-
+            // resolution source.
+            SDL.SetRenderScale(rendererId, DebugAtlasScale, DebugAtlasScale);
 
             for (int code = 0; code < 128; code++)
             {
@@ -1225,7 +1237,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                             var entry = multiTextures[i];
                             switch (entry)
                             {
-                                case Image multiImage:
+                                case Texture2D multiImage:
                                     if (_failedTextureUploads.Contains(multiImage)) break;
                                     try { EnsureTextureUploaded(copyPass!, multiImage); }
                                     catch (Exception ex)
@@ -1238,7 +1250,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                                             $"Affected draws will be skipped for the rest of this session.");
                                     }
                                     break;
-                                case CubeTexture multiCube:
+                                case TextureCube multiCube:
                                     if (_failedCubemapUploads.Contains(multiCube)) break;
                                     try { EnsureCubemapUploaded(copyPass!, multiCube); }
                                     catch (Exception ex)
@@ -1472,7 +1484,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
                             switch (entry)
                             {
-                                case Image img:
+                                case Texture2D img:
                                 {
                                     var gpuTex = LookupTexture(img)
                                         ?? throw new InvalidOperationException(
@@ -1480,7 +1492,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
                                     binds[i] = new GpuTextureSamplerBinding(gpuTex, sampler2D);
                                     break;
                                 }
-                                case CubeTexture cube:
+                                case TextureCube cube:
                                 {
                                     var gpuTex = LookupCubemap(cube)
                                         ?? throw new InvalidOperationException(
@@ -1591,7 +1603,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         return resources;
     }
 
-    private GpuTexture? LookupTexture(Image image)
+    private GpuTexture? LookupTexture(Texture2D image)
     {
         // GpuBitmap owns its texture directly; bypass the upload cache.
         if (image is GpuBitmap gpu)
@@ -1660,7 +1672,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
     }
 
-    private void EnsureTextureUploaded(GpuCopyPass copyPass, Image image)
+    private void EnsureTextureUploaded(GpuCopyPass copyPass, Texture2D image)
     {
         // GpuBitmap already lives on the GPU; nothing to upload.
         if (image is GpuBitmap)
@@ -1766,7 +1778,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
             _pendingMipmapGeneration.Add(gpuTexture);
 
         _textureResources.Add(new TextureCacheEntry(
-            new WeakReference<Image>(image), gpuTexture, _frameNumber)
+            new WeakReference<Texture2D>(image), gpuTexture, _frameNumber)
         {
             Width = width,
             Height = height,
@@ -1776,7 +1788,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         });
     }
 
-    private GpuTexture? LookupCubemap(CubeTexture cubemap)
+    private GpuTexture? LookupCubemap(TextureCube cubemap)
     {
         // GpuCubemap owns its texture directly; bypass the upload cache.
         if (cubemap is GpuCubemap gpu)
@@ -1801,7 +1813,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
     // versions -- this keeps the API simple at the cost of always
     // re-uploading all 6 faces when any one changes (acceptable: cubemap
     // contents rarely change at runtime; this isn't a per-frame stream).
-    private void EnsureCubemapUploaded(GpuCopyPass copyPass, CubeTexture CubeTexture)
+    private void EnsureCubemapUploaded(GpuCopyPass copyPass, TextureCube CubeTexture)
     {
         // GpuCubemap already lives on the GPU; nothing to upload.
         if (CubeTexture is GpuCubemap)
@@ -2555,8 +2567,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
     {
         public Mesh Mesh { get; private protected set; } = null!;
         public Shader Pipeline { get; private protected set; } = null!;
-        public Image? Texture { get; private protected set; }
-        public CubeTexture? Cubemap { get; private protected set; }
+        public Texture2D? Texture { get; private protected set; }
+        public TextureCube? Cubemap { get; private protected set; }
         // Multi-texture path. When non-null, the bind site reads the
         // first TextureCount entries and ignores Texture/Cubemap. The
         // backing array is rented from ArrayPool<Texture>.Shared and is
@@ -2611,7 +2623,7 @@ internal class GpuRenderer : Renderer3D, IDisposable
         }
 
         /// <summary>
-        /// Rents an <see cref="Image"/> array from the shared pool, copies
+        /// Rents an <see cref="Texture2D"/> array from the shared pool, copies
         /// the supplied textures into it, and stores it on the command.
         /// Balanced by <see cref="ReturnRentedTextures"/> in
         /// <see cref="Release"/>.
@@ -2662,8 +2674,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh, 
             Shader shader,
-            Image? texture,
-            CubeTexture? cubemap,
+            Texture2D? texture,
+            TextureCube? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2744,8 +2756,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh, 
             Shader shader,            
-            Image? texture,
-            CubeTexture? cubemap,
+            Texture2D? texture,
+            TextureCube? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -2875,8 +2887,8 @@ internal class GpuRenderer : Renderer3D, IDisposable
         public void Init(
             Mesh mesh, 
             Shader shader,
-            Image? texture,
-            CubeTexture? cubemap,
+            Texture2D? texture,
+            TextureCube? cubemap,
             GpuSampler? sampler,
             DepthMode depthMode,
             BlendMode blendMode,
@@ -3063,14 +3075,14 @@ internal class GpuRenderer : Renderer3D, IDisposable
 
     private sealed class TextureCacheEntry
     {
-        public TextureCacheEntry(WeakReference<Image> image, GpuTexture texture, long lastUsedFrame)
+        public TextureCacheEntry(WeakReference<Texture2D> image, GpuTexture texture, long lastUsedFrame)
         {
             Image = image;
             Texture = texture;
             LastUsedFrame = lastUsedFrame;
         }
 
-        public WeakReference<Image> Image { get; }
+        public WeakReference<Texture2D> Image { get; }
         public GpuTexture Texture { get; set; }
         public long LastUsedFrame { get; set; }
         public int LastUploadedVersion { get; set; }

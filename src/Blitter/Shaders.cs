@@ -133,6 +133,25 @@ public static class Shaders
         }
         """;
 
+    // Pairs with PositionTextureWithTransformVertHlsl: samples the texture
+    // and multiplies by a per-draw fragment-stage tint uniform. Used for
+    // text and other cases where the same atlas needs to be drawn in
+    // different colors without rebaking it.
+    private const string PositionTextureUniformTintedFragHlsl = """
+        Texture2D<float4> Texture : register(t0, space2);
+        SamplerState      Sampler : register(s0, space2);
+
+        cbuffer ColorBlock : register(b0, space3)
+        {
+            float4 Tint : packoffset(c0);
+        };
+
+        float4 main(float2 TexCoord : TEXCOORD0) : SV_Target0
+        {
+            return Texture.Sample(Sampler, TexCoord) * Tint;
+        }
+        """;
+
     // Skybox vertex shader. Takes a unit cube vertex in object space
     // and:
     //   1. Passes the raw position through as the cubemap sample
@@ -714,6 +733,9 @@ public static class Shaders
     private static readonly FragmentShader PositionTextureTintedFrag =
         new(PositionTextureTintedFragHlsl);
 
+    private static readonly FragmentShader PositionTextureUniformTintedFrag =
+        new(PositionTextureUniformTintedFragHlsl);
+
     /// <summary>
     /// A single-element <see cref="ShaderArgsLayout"/> describing a 4x4
     /// matrix at vertex slot 0 -- the convention shared by every built-in
@@ -811,6 +833,14 @@ public static class Shaders
     /// </summary>
     public static Shader<TextureVertex3D, TransformArgs> PositionTextureWithTransform { get; } =
         new(PositionTextureWithTransformVert, PositionTextureFrag, TextureVertex3D.ShaderVertexLayout, TransformLayout, ShaderTextureLayout.SingleTexture2D);
+
+    /// <summary>
+    /// Like <see cref="PositionTextureWithTransform"/>, but multiplies the
+    /// sampled texel by a per-draw fragment-stage tint. Pair with
+    /// <see cref="TransformAndFColorArgs"/>.
+    /// </summary>
+    public static Shader<TextureVertex3D, TransformAndFColorArgs> PositionTextureWithTransformAndColor { get; } =
+        new(PositionTextureWithTransformVert, PositionTextureUniformTintedFrag, TextureVertex3D.ShaderVertexLayout, TransformAndColorLayout, ShaderTextureLayout.SingleTexture2D);
 
     /// <summary>
     /// Lit color shader: per-pixel Lambertian shading from the renderer's

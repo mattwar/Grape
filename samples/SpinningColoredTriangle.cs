@@ -7,9 +7,6 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
 using Blitter;

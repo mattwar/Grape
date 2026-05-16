@@ -9,14 +9,14 @@ namespace Blitter.Bits;
 public static class Cubemaps
 {
     private static Cubemap? s_sky;
-    private static CubeTexture? s_skyDiffuse;
-    private static CubeTexture? s_skySpecular;
+    private static TextureCube? s_skyDiffuse;
+    private static TextureCube? s_skySpecular;
     private static Cubemap? s_skySunless;
-    private static CubeTexture? s_skySunlessDiffuse;
-    private static CubeTexture? s_skySunlessSpecular;
+    private static TextureCube? s_skySunlessDiffuse;
+    private static TextureCube? s_skySunlessSpecular;
     private static Cubemap? s_skyFlat;
-    private static CubeTexture? s_skyFlatDiffuse;
-    private static CubeTexture? s_skyFlatSpecular;
+    private static TextureCube? s_skyFlatDiffuse;
+    private static TextureCube? s_skyFlatSpecular;
     private static Cubemap? s_black;
 
     /// <summary>
@@ -32,7 +32,7 @@ public static class Cubemaps
     /// a matte surface picks up from its surroundings. Plug into
     /// <see cref="SkyLight.Diffuse"/>.
     /// </summary>
-    public static CubeTexture SkyDiffuse => s_skyDiffuse ??= CreateDiffuse(Sky);
+    public static TextureCube SkyDiffuse => s_skyDiffuse ??= CreateDiffuse(Sky);
 
     /// <summary>
     /// Specular environment map derived from <see cref="Sky"/>: a
@@ -40,7 +40,7 @@ public static class Cubemaps
     /// and each higher mip is pre-blurred for a rougher surface. Plug
     /// into <see cref="SkyLight.Specular"/>.
     /// </summary>
-    public static CubeTexture SkySpecular => s_skySpecular ??= CreateSpecular(Sky);
+    public static TextureCube SkySpecular => s_skySpecular ??= CreateSpecular(Sky);
 
     /// <summary>
     /// Like <see cref="Sky"/> but with the sun disc omitted. Use as
@@ -53,12 +53,12 @@ public static class Cubemaps
     /// <summary>
     /// Diffuse environment map derived from <see cref="SkySunless"/>.
     /// </summary>
-    public static CubeTexture SkySunlessDiffuse => s_skySunlessDiffuse ??= CreateDiffuse(SkySunless);
+    public static TextureCube SkySunlessDiffuse => s_skySunlessDiffuse ??= CreateDiffuse(SkySunless);
 
     /// <summary>
     /// Specular environment map derived from <see cref="SkySunless"/>.
     /// </summary>
-    public static CubeTexture SkySunlessSpecular => s_skySunlessSpecular ??= CreateSpecular(SkySunless);
+    public static TextureCube SkySunlessSpecular => s_skySunlessSpecular ??= CreateSpecular(SkySunless);
 
     /// <summary>
     /// Uniform-tint sky: same color in every direction, no sun, no
@@ -76,12 +76,12 @@ public static class Cubemaps
     /// <summary>
     /// Diffuse environment map derived from <see cref="SkyFlat"/>.
     /// </summary>
-    public static CubeTexture SkyFlatDiffuse => s_skyFlatDiffuse ??= CreateDiffuse(SkyFlat);
+    public static TextureCube SkyFlatDiffuse => s_skyFlatDiffuse ??= CreateDiffuse(SkyFlat);
 
     /// <summary>
     /// Specular environment map derived from <see cref="SkyFlat"/>.
     /// </summary>
-    public static CubeTexture SkyFlatSpecular => s_skyFlatSpecular ??= CreateSpecular(SkyFlat);
+    public static TextureCube SkyFlatSpecular => s_skyFlatSpecular ??= CreateSpecular(SkyFlat);
 
     /// <summary>
     /// 1x1 black cubemap. Use as a zero-energy IBL source: feeding it
@@ -217,7 +217,7 @@ public static class Cubemaps
     /// <param name="faceSize">Edge length per face of the destination. 32 is plenty -- the integrand is very smooth.</param>
     /// <param name="samples">Cosine-weighted hemisphere samples per pixel.</param>
     public static GpuCubemap CreateDiffuse(
-        CubeTexture source,
+        TextureCube source,
         int faceSize = 32,
         int samples = 256)
     {
@@ -271,7 +271,7 @@ public static class Cubemaps
     /// <param name="levels">Mip-level count; <c>null</c> picks the full chain.</param>
     /// <param name="samples">GGX importance samples per pixel per face.</param>
     public static GpuCubemap CreateSpecular(
-        CubeTexture source,
+        TextureCube source,
         int faceSize = 128,
         int? levels = null,
         int samples = 256)

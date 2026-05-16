@@ -8,13 +8,8 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
-// A moving rectangular "porthole" over a 3D scene, demonstrating
-// Renderer3D.ClipRect. Unlike Viewport, ClipRect doesn't scale or
-// reposition the scene -- it just masks which pixels of the render
-// target the draw is allowed to write.
+// A moving rectangular "porthole" over a 3D scene, demonstrating Renderer3D.ClipRect.
 
 using System.Numerics;
 using Blitter;
@@ -63,19 +58,14 @@ await window.RunAsync(rd =>
     var spin = Matrix4x4.CreateRotationY(t).RotateX(t * 0.7f);
     var transform = spin * viewProjection;
 
-    // A "ghost" pass with no clip draws the whole tetra at low intensity
-    // so it's obvious where the spinning shape is even when masked away.
-    // Technically achieved by drawing in wireframe so no surface fill
-    // competes with the clipped solid pass below.
+    // A wireframe draw showing us where the tetrahedron actually is
     using (rd.PushState())
     {
         rd.Wireframe = true;
-        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.DrawMesh(tetra, transform);
     }
 
-    // The "porthole" slides horizontally across the window. ClipRect is
-    // applied per-draw (snapshotted at queue time) so we set it before
-    // the solid pass and the GPU scissors away anything outside.
+    // a porthole showing a portion of the filled tetrahedron
     var portholeW = width / 3f;
     var portholeH = height * 0.7f;
     var travel = (width + portholeW) * (0.5f + 0.5f * MathF.Sin(t * 0.6f)) - portholeW;
@@ -84,6 +74,6 @@ await window.RunAsync(rd =>
     using (rd.PushState())
     {
         rd.ClipRect = porthole;
-        rd.DrawMesh(tetra, Shaders.PositionColorWithTransform, transform);
+        rd.DrawMesh(tetra, transform);
     }
 });

@@ -8,19 +8,8 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// DebugDraw is a global ad-hoc overlay: any code, anywhere, can call
-// DebugDraw.DrawLine/DrawBox/DrawSphere/DrawAxes and the primitives
-// appear on top of the scene -- as long as some renderer has opted in
-// by setting `DebugDrawEnabled = true`. Calls are no-ops when no
-// renderer is consuming, so leaving them in release code is cheap.
-//
-// This sample draws a single textured cube as the "real" scene, then
-// uses DebugDraw from the render handler to overlay:
-//
-//   * world-space axes at the origin
-//   * a wireframe sphere orbiting the cube
-//   * a tight wireframe box around the cube (its bounds gizmo)
-//   * a moving line tracing the orbit path
+
+// Demonstrates DebugDraw: a simple API for drawing a debug overlay
 
 using System.Numerics;
 using Blitter;
@@ -48,21 +37,17 @@ window.Renderer.DirectionalLight = new DirectionalLight(
     Vector3.Normalize(new Vector3(-0.4f, -1f, -0.6f)),
     Color.White);
 
-// Opt this renderer in as the DebugDraw consumer. Without this,
-// every DebugDraw.* call below is a no-op.
+// Enable DebugDraw to draw to this window
 window.Renderer.DebugDrawEnabled = true;
-
-// F3 toggles the overlay on/off at runtime.
-window.KeyDown += (_, e) =>
-{
-    if (e.Key == Key.F3 && !e.IsRepeat)
-        window.Renderer.DebugDrawEnabled = !window.Renderer.DebugDrawEnabled;
-};
 
 await window.RunAsync(rd =>
 {
     var t = rd.ElapsedSecondsSinceStart;
 
+    // toggle the debug drawing
+    if (window.Input.WasJustPressed(Key.Space))
+        window.Renderer.DebugDrawEnabled = !window.Renderer.DebugDrawEnabled;
+ 
     // The "real" scene: one lit cube.
     rd.DrawMesh(cube, Shaders.LitColor, new LitArgs(Matrix4x4.CreateRotationY(t * 0.5f)));
 
@@ -93,6 +78,6 @@ await window.RunAsync(rd =>
     // formatting work is skipped entirely -- no allocation, no boxing.
     var fps = 1.0 / Math.Max(rd.ElapsedSinceLastRender.TotalSeconds, 1e-6);
     DebugDraw.DrawText($"fps {fps,5:F1}", 12, 12);
-    DebugDraw.DrawText($"orbit ({orbit.X,6:F2}, {orbit.Y,6:F2}, {orbit.Z,6:F2})", 12, 32);
-    DebugDraw.DrawText("F3 toggles DebugDraw", 12, 52);
+    DebugDraw.DrawText($"orbit ({orbit.X,6:F2}, {orbit.Y,6:F2}, {orbit.Z,6:F2})", 12, 40);
+    DebugDraw.DrawText("Press SPACE to toggle DebugDraw", 12, 68);
 });

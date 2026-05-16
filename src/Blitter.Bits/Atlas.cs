@@ -11,7 +11,7 @@ public sealed class Atlas : IDisposable
     private bool _disposed;
 
     /// <summary>The backing image. All region rectangles index into this image's pixel space.</summary>
-    public Image Image { get; }
+    public Texture2D Image { get; }
 
     /// <summary>Number of regions in the atlas.</summary>
     public int Count => _regions.Length;
@@ -35,7 +35,7 @@ public sealed class Atlas : IDisposable
     /// <summary>
     /// Constructs an <see cref="Atlas"/> from an image and a set of regions.
     /// </summary>
-    public Atlas(Image image, ReadOnlySpan<Rect> regions, bool ownsImage = true)
+    public Atlas(Texture2D image, ReadOnlySpan<Rect> regions, bool ownsImage = true)
         : this(image, regions, names: null, ownsImage)
     {
     }
@@ -44,7 +44,7 @@ public sealed class Atlas : IDisposable
     /// Constructs an <see cref="Atlas"/> from an image, a set of regions, and an optional name-to-index map.   
     /// </summary>
     public Atlas(
-        Image image,
+        Texture2D image,
         ReadOnlySpan<Rect> regions,
         IReadOnlyDictionary<string, int>? names,
         bool ownsImage = true)
@@ -70,7 +70,7 @@ public sealed class Atlas : IDisposable
     /// <summary>
     /// Creates an <see cref="Atlas"/> by splitting an <see cref="Image"/> into a uniform grid of regions.
     /// </summary>
-    public static Atlas Grid(Image image, int columns, int rows, bool ownsImage = true)
+    public static Atlas Grid(Texture2D image, int columns, int rows, bool ownsImage = true)
     {
         ArgumentNullException.ThrowIfNull(image);
         if (columns <= 0) throw new ArgumentOutOfRangeException(nameof(columns));
@@ -83,7 +83,7 @@ public sealed class Atlas : IDisposable
     /// Creates an <see cref="Atlas"/> by splitting an <see cref="Image"/> into a uniform grid of regions.
     /// </summary>
     public static Atlas Grid(
-        Image image,
+        Texture2D image,
         int columns,
         int rows,
         int cellWidth,

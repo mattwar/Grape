@@ -7,15 +7,11 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
+
 // A spinning cube built from an indexed mesh: 8 unique vertices reused
 // across 12 triangles via 36 indices. Without indices the same geometry
 // would need 36 vertices -- one full copy of position + color for every
 // triangle corner, even though every vertex is shared by three faces.
-//
-// CullMode.Back is on. Because the cube is a closed solid, every back
-// face is hidden behind a front face anyway, so culling them is pure
-// savings: the GPU drops half the triangles before rasterisation.
 
 using System.Numerics;
 using Blitter;
@@ -32,7 +28,6 @@ using Blitter.Bits;
 //      |/         |/
 //      v4---------v5
 //
-// Axes: +X right, +Y up, +Z out of the screen toward the camera.
 var vertices = new ColorVertex3D[]
 {
     new(new Vertex3D(-1f, -1f, -1f), new Color(40,  40, 200)),  // 0: back-bottom-left
@@ -81,36 +76,25 @@ var camera = new PerspectiveCamera
 
 await window.RunAsync(rd =>
 {
-    // Camera lives on the renderer; DrawMesh composes
-    // model * camera.GetViewProjection(rd.AspectRatio) for us, so the
-    // user-side draw call only carries the model matrix.
     rd.Camera = camera;
 
     var t = rd.ElapsedSecondsSinceStart;
 
-    var model = Matrix4x4.CreateRotationY(t * 0.7f)
-        .RotateX(t * 0.4f);
-
-    // Closed solid -> back faces are always hidden by front faces, so
-    // culling them costs nothing visually and saves the rasteriser
-    // half the triangles.
+    // rotate the cube over time
+    var transform = Matrix4x4.CreateRotationY(t * 0.7f).RotateX(t * 0.4f);
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
-        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, model);
+        rd.DrawMesh(cube, Shaders.PositionColorWithTransform, transform);
     }
 
-    // Caption sits in front of everything regardless of depth.
-    // DrawDebugText still takes a raw clip-space transform, so build
-    // the view-projection once for it.
     var viewProjection = camera.GetViewProjection(rd);
     using (rd.PushState())
     {
         rd.DepthMode = DepthMode.Overlay;
         rd.CullMode = CullMode.None;
 
-        DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)",
-            yOffset: -1.6f, viewProjection);
+        DrawLabel(rd, "8 vertices, 36 indices (vs 36 vertices unindexed)", yOffset: -1.6f, viewProjection);
     }
 });
 

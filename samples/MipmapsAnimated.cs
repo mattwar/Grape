@@ -7,31 +7,9 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Side-by-side comparison of texture sampling without and with
+
+// A side-by-side comparison of texture sampling with and without
 // mipmaps, isolated from anisotropic filtering.
-//
-// The classic "receding floor" demo doesn't isolate mipmaps with
-// modern defaults: anisotropic filtering walks the elongated
-// screen-pixel footprint along the floor and averages many
-// bilinear taps -- killing moire even with no mip chain.
-//
-// Here a single textured quad faces the camera (perpendicular to
-// the view direction) and oscillates toward and away from it.
-// Anisotropy can't help because the screen-pixel footprint stays
-// square. The only thing that fixes minification aliasing is a
-// real mip chain.
-//
-// LEFT pane:  Image without mipmaps. As the quad recedes, the
-//             bilinear sampler picks essentially-arbitrary texels
-//             per screen pixel -> wandering moire patterns,
-//             shimmering, "swimming" content.
-//
-// RIGHT pane: Same texture content, `mipmaps: true`. The renderer
-//             generates a full mip chain and the sampler picks
-//             the level matching the screen-pixel footprint at
-//             each instant -> stays a clean uniform gray as the
-//             quad shrinks.
 
 using System.Numerics;
 using Blitter;
@@ -92,20 +70,19 @@ await window.RunAsync(rd =>
         rd.DrawMesh(quad, withMips, Shaders.PositionTextureWithTransform, transform * viewProjection);
         DrawLabel(rd, "Mipmaps", paneAspect);
     }
-});static void DrawLabel(Renderer3D rd, string text, float paneAspect)
+});
+
+static void DrawLabel(Renderer3D rd, string text, float paneAspect)
 {
-    // Debug text is drawn in NDC: each character is 1x1 unit. Center
-    // horizontally near the bottom of the pane. The X scale is divided
-    // by the pane aspect so characters stay square in a half-screen
-    // viewport rather than being stretched horizontally.
     const float Scale = 0.08f;
     var widthInNdc = text.Length * Scale / paneAspect;
-    var transform = Matrix4x4.CreateScale(Scale / paneAspect, Scale, 1f)
+    var transform = Matrix4x4
+        .CreateScale(Scale / paneAspect, Scale, 1f)
         .Translate(-widthInNdc / 2f, -0.85f, 0f);
     rd.DrawDebugText(text, transform);
 }
 
-static Image CreateCheckerboard(int width, int height, int cellSize, bool mipmaps)
+static Texture2D CreateCheckerboard(int width, int height, int cellSize, bool mipmaps)
 {
     var image = Bitmap.Create(width, height, PixelFormat.ABGR8888, mipmaps: mipmaps);
     var dark  = new Color( 30,  30,  30);

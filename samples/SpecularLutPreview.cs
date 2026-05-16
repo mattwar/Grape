@@ -7,9 +7,9 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Visual sanity check for `Textures.SpecularLut` -- the 256x256
-// precomputed split-sum BRDF integration texture used by PBR
+
+// Visual sanity check for `Textures.SpecularLut` -- 
+// the 256x256 precomputed split-sum BRDF integration texture used by PBR
 // specular image-based lighting. Should match the canonical PBR
 // LUT image: bright red curling from the bottom-left, green pooled
 // in the lower-left, smooth gradients everywhere.

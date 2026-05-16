@@ -190,10 +190,15 @@ public abstract class Renderer2D
     public abstract bool DrawDebugText(int x, int y, string text, float scale = 0f);
 
     /// <summary>Draws a portion of <paramref name="image"/> to a destination rectangle.</summary>
-    public abstract bool DrawImage(Image image, Rect source, Rect destination);
+    public abstract bool DrawImage(Texture2D image, Rect source, Rect destination);
+
+    /// <summary>Draws a portion of <paramref name="image"/> to a destination rectangle,
+    /// multiplied by <paramref name="tint"/> (per-channel). Use <see cref="Color.White"/>
+    /// for untinted output.</summary>
+    public abstract bool DrawImage(Texture2D image, Rect source, Rect destination, Color tint);
 
     /// <summary>Draws the entire <paramref name="image"/> to a destination rectangle.</summary>
-    public bool DrawImage(Image image, Rect destination)
+    public bool DrawImage(Texture2D image, Rect destination)
     {
         ArgumentNullException.ThrowIfNull(image);
         var (w, h) = image.Size;
@@ -201,7 +206,7 @@ public abstract class Renderer2D
     }
 
     /// <summary>Draws the entire <paramref name="image"/> at a position with optional uniform scale.</summary>
-    public bool DrawImage(Image image, float x, float y, float scale = 1.0f)
+    public bool DrawImage(Texture2D image, float x, float y, float scale = 1.0f)
     {
         ArgumentNullException.ThrowIfNull(image);
         var (w, h) = image.Size;
@@ -211,10 +216,10 @@ public abstract class Renderer2D
     }
 
     /// <summary>Draws a portion of <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
-    public abstract bool DrawImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None);
+    public abstract bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None);
 
     /// <summary>Draws the entire <paramref name="image"/> rotated about <paramref name="center"/>.</summary>
-    public bool DrawImageRotated(Image image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
+    public bool DrawImageRotated(Texture2D image, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         ArgumentNullException.ThrowIfNull(image);
         var (w, h) = image.Size;
@@ -222,7 +227,7 @@ public abstract class Renderer2D
     }
 
     /// <summary>Draws the entire <paramref name="image"/> at a position rotated about a center.</summary>
-    public bool DrawImageRotated(Image image, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, FlipMode flip = FlipMode.None)
+    public bool DrawImageRotated(Texture2D image, float x, float y, float angle, float centerX, float centerY, float scale = 1.0f, FlipMode flip = FlipMode.None)
     {
         ArgumentNullException.ThrowIfNull(image);
         var (w, h) = image.Size;
@@ -242,7 +247,7 @@ public abstract class Renderer2D
     /// Draws an indexed triangle list, optionally sampling from
     /// <paramref name="image"/>.
     /// </summary>
-    public abstract bool DrawGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Image? image = null);
+    public abstract bool DrawGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Texture2D? image = null);
 
     /// <summary>Draws a line between two points.</summary>
     public abstract bool DrawLine(float x1, float y1, float x2, float y2);

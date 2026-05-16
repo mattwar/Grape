@@ -7,7 +7,7 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
+
 // Builds on OrbitingTetrahedra to demonstrate DepthMode.Overlay: a third
 // "indicator" tetrahedron orbits the same axis as the other two, but is
 // drawn with DepthMode.Overlay inside a PushState() scope so it always
@@ -18,21 +18,6 @@
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
-
-static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
-{
-    var v0 = new Vertex3D( 1f,  1f,  1f);
-    var v1 = new Vertex3D( 1f, -1f, -1f);
-    var v2 = new Vertex3D(-1f,  1f, -1f);
-    var v3 = new Vertex3D(-1f, -1f,  1f);
-
-    return Mesh.Create([
-        new ColorVertex3D(v1, c1), new ColorVertex3D(v2, c2), new ColorVertex3D(v3, c3),
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v3, c3), new ColorVertex3D(v2, c2),
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v1, c1), new ColorVertex3D(v3, c3),
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v2, c2), new ColorVertex3D(v1, c1),
-    ]);
-}
 
 var tetraA = MakeTetrahedron(
     new Color(255, 64, 64),
@@ -109,5 +94,20 @@ await window.RunAsync(rd =>
     {
         rd.DepthMode = DepthMode.Overlay;
         rd.DrawMesh(indicator, Shaders.PositionColorWithTransform, indicatorModel * viewProjection);
-    } // DepthMode automatically restored to Default here.
+    }
 });
+
+static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
+{
+    var v0 = new Vertex3D( 1f,  1f,  1f);
+    var v1 = new Vertex3D( 1f, -1f, -1f);
+    var v2 = new Vertex3D(-1f,  1f, -1f);
+    var v3 = new Vertex3D(-1f, -1f,  1f);
+
+    return Mesh.Create([
+        new ColorVertex3D(v1, c1), new ColorVertex3D(v2, c2), new ColorVertex3D(v3, c3),
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v3, c3), new ColorVertex3D(v2, c2),
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v1, c1), new ColorVertex3D(v3, c3),
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v2, c2), new ColorVertex3D(v1, c1),
+    ]);
+}

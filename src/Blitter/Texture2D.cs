@@ -4,9 +4,9 @@ namespace Blitter;
 /// Base type for any 2D image asset the renderer can sample as a
 /// texture. Concrete subtypes include <see cref="Bitmap"/>
 /// (CPU-backed surface with full pixel access) and
-/// <see cref="MipmappedImage"/> (an explicit mip chain of images).
+/// <see cref="Mipmap"/> (an explicit mip chain of images).
 /// </summary>
-public abstract class Image : Texture, IDisposable
+public abstract class Texture2D : Texture, IDisposable
 {
     /// <summary>Width of the (base level of the) image in pixels.</summary>
     public abstract int Width { get; }

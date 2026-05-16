@@ -38,14 +38,14 @@ public static class Renderer3DExtensions
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Texture2D texture)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         renderer.DrawMesh(mesh, texture, Shaders.PositionTexture);
     }
 
     /// <summary>Draws a position &amp; texture mesh with the given texture and position transform.</summary>
-    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Image texture, TransformArgs transform)
+    public static void DrawMesh(this Renderer3D renderer, Mesh<TextureVertex3D> mesh, Texture2D texture, TransformArgs transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         renderer.DrawMesh(mesh, texture, Shaders.PositionTextureWithTransform, in transform);

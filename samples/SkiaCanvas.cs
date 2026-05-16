@@ -7,15 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Demonstrates Renderer2D.DrawCanvas: hand the renderer a destination
-// rect and a callback, draw with SkiaSharp's full vector / text /
-// gradient / blur API, and the result composites onto the framebuffer
-// alongside ordinary Renderer2D draws.
-//
-// The Skia scratch (SKBitmap + SKCanvas + backing Image) is pooled
-// per-renderer, sized to the destination, and reused across frames --
-// nothing is allocated per frame here.
+
+// Demonstrates drawing with SkiaSharp.SKCanvas to a `Blitter.Window2D'.
 
 using Blitter;
 using SkiaSharp;
@@ -32,15 +25,11 @@ await window.RunAsync(rd =>
     var (width, height) = window.Size;
     var seconds = rd.ElapsedSecondsSinceStart;
 
-    // 1) Native Renderer2D draw underneath: a checkerboard of squares
-    //    so the Skia overlays clearly composite on top of existing
-    //    framebuffer content (and so the transparent regions of those
-    //    overlays can be seen).
     DrawCheckerboard(rd, width, height, cell: 40);
 
-    // Layout: top half split into two panels with a margin between
-    // them; the bottom strip below holds the gauges. Everything is
-    // computed from the live window size so resizing rearranges the
+    // top half split into two panels with a margin between them
+    // the bottom strip below holds the gauges. 
+    // Everything is computed from the live window size so resizing rearranges the
     // scene instead of clipping it.
     const int margin = 40;
     const int gap = 40;
@@ -51,31 +40,30 @@ await window.RunAsync(rd =>
     int rightWidth = width - margin * 2 - gap - leftWidth;
     if (rightWidth < 120) rightWidth = 120;
 
-    // 2) Top-left panel: anti-aliased vector path, stroked with a
-    //    radial gradient. The path animates so the AA quality is
-    //    obvious in motion.
+    // Top-left panel: 
+    //   anti-aliased vector path, stroked with a radial gradient. 
+    //   The path animates so the AA quality is obvious in motion.
     var leftRect = new Rect(margin, margin, leftWidth, topHeight);
     rd.DrawCanvas(leftRect, canvas =>
     {
         DrawWaveRibbon(canvas, leftRect.Width, leftRect.Height, seconds);
     });
 
-    // 3) Top-right panel: vector text with a soft drop shadow on a
-    //    translucent rounded-rect background. Background is supplied
-    //    as the DrawCanvas background color so the canvas starts
-    //    pre-filled (one less Skia call in the user's callback).
+    // Top-right panel: 
+    //   Vector text with a soft drop shadow on a translucent rounded-rect background. 
+    //   Background is supplied as the DrawCanvas background color so the canvas starts
+    //   pre-filled (one less Skia call in the user's callback).
     var rightRect = new Rect(margin + leftWidth + gap, margin, rightWidth, topHeight);
     rd.DrawCanvas(rightRect, new Color(0, 0, 0, 140), canvas =>
     {
         DrawHeadline(canvas, rightRect.Width, rightRect.Height);
     });
 
-    // 4) Bottom strip: a row of pie-slice gauges, each its own
-    //    DrawCanvas call. Each call reuses the same per-renderer
-    //    scratch (resized when the slot's dimensions change), so the
-    //    last one in the row is the size the scratch settles at for
-    //    the next frame's first call. For uniform sizes this is a
-    //    no-op resize.
+    // Bottom strip: 
+    //   a row of pie-slice gauges, each its own DrawCanvas call. 
+    //   Each call reuses the same per-renderer scratch (resized when the slot's dimensions change), 
+    //   so the last one in the row is the size the scratch settles at for the next frame's first call.
+    //   For uniform sizes this is a no-op resize.
     int bottomTop = margin + topHeight + gap;
     int bottomAvailable = height - bottomTop - margin;
     if (bottomAvailable < 60) bottomAvailable = 60;
@@ -94,7 +82,7 @@ await window.RunAsync(rd =>
         float phase = seconds + i * 0.35f;
         rd.DrawCanvas(rect, canvas => DrawGauge(canvas, rect.Width, rect.Height, phase, i));
     }
-});// --- Renderer2D draws (no Skia) -------------------------------------
+});
 
 static void DrawCheckerboard(Renderer2D rd, int width, int height, int cell)
 {
@@ -109,8 +97,6 @@ static void DrawCheckerboard(Renderer2D rd, int width, int height, int cell)
         }
     }
 }
-
-// --- Skia draws (inside DrawCanvas callbacks) -----------------------
 
 static void DrawWaveRibbon(SKCanvas canvas, float width, float height, float t)
 {

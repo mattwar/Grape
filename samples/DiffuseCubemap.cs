@@ -7,12 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Side-by-side: the procedural sky (left) and the diffuse environment
-// map baked from it (right). Same orbiting camera in both panes -- the
-// diffuse map should look like a smoothly-blurred version of the
-// sky, with no sun and no horizon detail (the cosine-weighted
-// hemisphere integral smears everything into broad color zones).
+
+// Shows side-by-side the basic procedural sky box and its diffused counterpart.
 
 using System.Numerics;
 using Blitter;
@@ -31,8 +27,6 @@ var skyboxIndices = new uint[]
 };
 var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
-// Accessing `Cubemaps.Sky` first ensures the sky is baked before the
-// diffuse bake reads from it. Both then cache for the process.
 var sky = Cubemaps.Sky;
 var diffuse = Cubemaps.SkyDiffuse;
 

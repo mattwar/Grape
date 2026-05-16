@@ -7,10 +7,7 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
-//
+
 // Instanced version of TriangleSwarm: 24 copies of one triangle drawn
 // in a single DrawMesh call. Each instance contributes its own
 // per-instance transform; the per-call uniform supplies the camera VP
@@ -31,7 +28,7 @@ var triangle = ImmutableArray.Create(
     new ColorVertex3D(new Vertex3D(-0.10f, -0.08f, 0f), Color.Blue));
 var mesh = Mesh.Create(triangle.AsSpan());
 
-// Reusable instance buffer -- updated in place each frame to avoid
+// Reusable instance buffer, updated in place each frame to avoid
 // allocating a fresh array.
 var instances = new TransformAndColorInstance[Count];
 
@@ -69,8 +66,5 @@ await window.RunAsync(rd =>
         instances[i] = new TransformAndColorInstance(transform, Color.White);
     }
 
-    // Per-call uniform: identity view-projection -- the per-instance
-    // transforms above already place each triangle directly in clip
-    // space.
     rd.DrawMeshRaw(mesh, Shaders.PositionColorInstanced, Matrix4x4.Identity, instances);
 });

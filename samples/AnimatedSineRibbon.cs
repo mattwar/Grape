@@ -7,15 +7,13 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
 using Blitter;
 
 // Animated horizontal ribbon whose vertical position follows a travelling
 // sine wave. The mesh is regenerated and re-uploaded every frame.
+
 const int Segments = 128;
 const float Width = 1.6f;        // total horizontal span in NDC
 const float Thickness = 0.04f;   // ribbon thickness in NDC
@@ -25,9 +23,8 @@ const float Speed = 2f;          // travel speed
 
 // Two triangles per segment, six vertices each.
 var vertices = new ColorVertex3D[Segments * 6];
-// Reusable mesh -- we mutate the vertex array in-place each frame and
-// call mesh.Update(...) so the renderer re-uploads only the changed
-// contents (Mesh's Version bump triggers that).
+
+// Reusable mesh
 var mesh = Mesh.Create<ColorVertex3D>(vertices);
 
 var window = new Window3D
@@ -72,8 +69,7 @@ await window.RunAsync(rd =>
 
     mesh.Update(vertices);
 
-    // Squash to height/width so the ribbon keeps its aspect when the
-    // window is wider than tall.
+    // Squash to height/width so the ribbon keeps its aspect when the window is wider than tall.
     var transform = Matrix4x4.CreateScale(1f / rd.AspectRatio, 1f, 1f);
 
     rd.DrawMesh(mesh, transform);

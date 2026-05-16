@@ -8,30 +8,22 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates Blitter.Bits.Font: a Skia-baked monospace bitmap font
-// rendered into a 3D scene as world-space labels. Each Font instance
-// owns one atlas image with the chosen color baked in, so several
-// colors mean several Font instances. Glyph quads are built per
-// DrawText call as a fresh textured-quad mesh.
+// Demonstrates Blitter.Bits.Font: render text in any font.
 
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
 
-// CSS-style fallback list: takes the first family installed on the host
-// OS. Consolas is on Windows, Menlo on macOS, DejaVu Sans Mono on most
-// Linux distros. If none of these are present, Font falls back to Skia's
-// generic "monospace" alias automatically.
+// similar fonts for different platforms
 string[] mono = ["Consolas", "Menlo", "DejaVu Sans Mono"];
 
-// Two fonts: a large white headline and a smaller cyan readout.
-// ghostFont extends the default printable-ASCII charset with the card-suit
-// codepoints (Unicode U+2660..U+2667), so the orbiting ghost lines can mix
-// letters and symbols. Codepoints not in a font's charset render blank.
-using var titleFont   = new Font(mono, 64, new Color(240, 240, 255), bold: true);
-using var readoutFont = new Font(mono, 32, new Color(120, 220, 255));
-using var ghostFont   = new Font(mono, 32, new Color(140, 255, 110, 180),
-                                 charset: FontCharsets.AsciiPrintable + "♥♦♣♠");
+using var titleFont   = new Font(mono, 64, bold: true);
+using var readoutFont = new Font(mono, 32);
+using var ghostFont   = new Font(mono, 32, charset: FontCharsets.AsciiPrintable + "♥♦♣♠");
+
+var titleColor   = new Color(240, 240, 255);
+var readoutColor = new Color(120, 220, 255);
+var ghostColors  = new []{Color.Red, Color.Yellow, Color.Blue};
 
 var window = new Window3D
 {
@@ -61,7 +53,7 @@ await window.RunAsync(rd =>
             .Scale(scale)
             .Translate(0f, 0.45f + bob, 0f)
             .Scale(aspect, 1f, 1f);
-        titleFont.DrawText(rd, title, transform);
+        titleFont.DrawText(rd, title, titleColor, transform);
     }
 
     // Live readout under the title.
@@ -72,25 +64,23 @@ await window.RunAsync(rd =>
             .Scale(scale)
             .Translate(0f, 0.25f, 0f)
             .Scale(aspect, 1f, 1f);
-        readoutFont.DrawText(rd, live, transform);
+        readoutFont.DrawText(rd, live, readoutColor, transform);
     }
 
-    // Three ghost lines orbiting in the lower half. Each spins around
-    // its own Y axis so you can see the text is real 3D geometry, not
-    // a flat overlay -- the glyphs go edge-on and disappear, then
-    // re-emerge mirrored.
+    // Three ghost lines orbiting in the lower half. 
+    // Each spins around its own Y axis so you can see the text is real 3D geometry.
     for (int i = 0; i < 3; i++)
     {
         string s = i switch
         {
             0 => "♥ MONOSPACE GLYPHS ♥",
-            1 => "♦ BAKED COLOR PER FONT ♦",
-            _ => "♠ MESH CACHED PER STRING ♠",
+            1 => "♦ DRAW IN ANY COLOR ♦",
+            _ => "♠ CACHED MESHES PER STRING ♠",
         };
         float phase = t * 0.6f + i * MathF.Tau / 3f;
         float x = 0.55f * MathF.Cos(phase);
         float y = -0.25f + 0.1f * MathF.Sin(phase * 1.7f);
-        float scale = 0.04f;
+        float scale = 0.08f;
         float spin = t * 1.4f + i * MathF.Tau / 3f;
         var transform = Matrix4x4.CreateTranslation(-s.Length / 2f, -0.5f, 0f)
             .RotateY(spin)
@@ -98,6 +88,6 @@ await window.RunAsync(rd =>
             .Scale(scale)
             .Translate(x, y, 0f)
             .Scale(aspect, 1f, 1f);
-        ghostFont.DrawText(rd, s, transform);
+        ghostFont.DrawText(rd, s, ghostColors[i], transform);
     }
 });

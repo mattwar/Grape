@@ -7,12 +7,6 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
-//
-// Asset paths below resolve relative to this source file, so the
-// sample works regardless of the shell's current directory.
 
 using Blitter;
 using Blitter.Bits;
@@ -46,13 +40,13 @@ var sound = Sound.LoadWAV(Asset.GetPathRelativeToCaller("szwoopy.wav"));
 
 await window.RunAsync(rd =>
 {
-    // Per-frame input: edges for arrow-key tap response. Holding an
-    // arrow key only fires once per press, matching the original
-    // KeyDown event behavior.
+    // Per-frame input:
+    //     turn left/right as long as key is down keep turning
+    //     speed up/down only on key down transitions
     var input = window.Input;
-    if (input.WasJustPressed(Key.Left))
+    if (input.IsDown(Key.Left))
         rocket.Heading = (rocket.Heading + 350f) % 360f;
-    if (input.WasJustPressed(Key.Right))
+    if (input.IsDown(Key.Right))
         rocket.Heading = (rocket.Heading + 10f) % 360f;
     if (input.WasJustPressed(Key.Up))
         rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
@@ -87,7 +81,7 @@ await window.RunAsync(rd =>
             bounce = true;
         }
 
-        // make the rocket point in the direction it's moving
+        // make the rocket image point in the direction it's moving
         rocket.Rotation = rocket.Heading;
 
         if (bounce)

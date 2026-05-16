@@ -7,7 +7,7 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
+
 // Renders one of two classic graphics test models -- the Stanford
 // Bunny (~70K triangles) or the Utah Teapot (~6K triangles) -- loaded
 // from a Wavefront OBJ file. Switch the file constant below to flip
@@ -70,8 +70,7 @@ await window.RunAsync(rd =>
 
     rd.AmbientLight = new Color(40, 40, 60);
 
-    // Slow-orbiting key light so the silhouette and faceting both get
-    // their turn to be visible.
+    // Slow-orbiting key light so the silhouette and faceting both get their turn to be visible.
     var t = rd.ElapsedSecondsSinceStart;
     rd.DirectionalLight = new DirectionalLight(
         Vector3.Normalize(MathG.Orbit(t, speed: 0.4f) + Vector3.UnitY * 0.6f),

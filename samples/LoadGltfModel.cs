@@ -7,15 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Demonstrates loading a 3D model from a glTF 2.0 file (`.glb` /
-// `.gltf`) via Model.Load(). Real-world workflow: export from Blender,
-// download a Khronos sample asset, grab something off Sketchfab --
-// then load with one call.
-//
-// To keep this sample self-contained we build a tiny textured cube
-// at runtime using SharpGLTF and save it to a temp `.glb`. In normal
-// use you'd just point Model.Load at your own file.
+
+// Demonstrates loading a 3D model from a glTF 2.0 file 
 
 using System.Numerics;
 using Blitter;
@@ -25,34 +18,8 @@ using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
 using SharpGLTF.Scenes;
 
-// --- Build a procedural textured-cube glb using SharpGLTF---------------------
-
-var tempDir = Directory.CreateTempSubdirectory("Blitter-gltfsample");
-var texPath = Path.Combine(tempDir.FullName, "checker.png");
-WriteCheckerboardPng(texPath, size: 128, cells: 8);
-
-var material = new MaterialBuilder("Checker")
-    .WithMetallicRoughnessShader()
-    .WithBaseColor(texPath);
-
-// Cube via 6 quads with matching UVs so the checker tiles per face.
-var mesh = new MeshBuilder<VertexPositionNormal, VertexTexture1>("cube");
-AddQuad(mesh, material, new Vector3( 1, 0, 0), Vector3.UnitX);
-AddQuad(mesh, material, new Vector3(-1, 0, 0), -Vector3.UnitX);
-AddQuad(mesh, material, new Vector3( 0, 1, 0), Vector3.UnitY);
-AddQuad(mesh, material, new Vector3( 0,-1, 0), -Vector3.UnitY);
-AddQuad(mesh, material, new Vector3( 0, 0, 1), Vector3.UnitZ);
-AddQuad(mesh, material, new Vector3( 0, 0,-1), -Vector3.UnitZ);
-
-var scene = new SceneBuilder();
-scene.AddRigidMesh(mesh, Matrix4x4.Identity);
-var glbPath = Path.Combine(tempDir.FullName, "cube.glb");
-scene.ToGltf2().SaveGLB(glbPath);
-
-// --- Load + render ----------------------------------------------------
-
-var model = Model.Load(glbPath);
-
+var model = LoadModel();
+   
 var window = new Window3D
 {
     Title = "Loaded glTF: textured cube",
@@ -86,15 +53,42 @@ await window.RunAsync(rd =>
     }
 });
 
-try
-{
-    }
-finally
-{
-    try { tempDir.Delete(recursive: true); } catch { /* leave temp files if cleanup fails */ }
-}
 
-// --- helpers ---------------------------------------------------------
+static Model LoadModel()
+{
+    // To keep the sample self-contained, create model using SharpGLTF primitives & save to disk first.
+    // Normally, you'd just load the model from an existing .gltf or .glb file
+
+    var tempDir = Directory.CreateTempSubdirectory("Blitter-gltfsample");
+    var texPath = Path.Combine(tempDir.FullName, "checker.png");
+    WriteCheckerboardPng(texPath, size: 128, cells: 8);
+
+    var material = new MaterialBuilder("Checker")
+        .WithMetallicRoughnessShader()
+        .WithBaseColor(texPath);
+
+    // Cube via 6 quads with matching UVs so the checker tiles per face.
+    var mesh = new MeshBuilder<VertexPositionNormal, VertexTexture1>("cube");
+    AddQuad(mesh, material, new Vector3( 1, 0, 0), Vector3.UnitX);
+    AddQuad(mesh, material, new Vector3(-1, 0, 0), -Vector3.UnitX);
+    AddQuad(mesh, material, new Vector3( 0, 1, 0), Vector3.UnitY);
+    AddQuad(mesh, material, new Vector3( 0,-1, 0), -Vector3.UnitY);
+    AddQuad(mesh, material, new Vector3( 0, 0, 1), Vector3.UnitZ);
+    AddQuad(mesh, material, new Vector3( 0, 0,-1), -Vector3.UnitZ);
+
+    var scene = new SceneBuilder();
+    scene.AddRigidMesh(mesh, Matrix4x4.Identity);
+    var glbPath = Path.Combine(tempDir.FullName, "cube.glb");
+    scene.ToGltf2().SaveGLB(glbPath);
+
+    // load Blitter Model from the file
+    var model = Model.Load(glbPath);
+
+    // tear down temp files
+    try { tempDir.Delete(recursive: true); } catch { /* leave temp files if cleanup fails */ }
+
+    return model;
+}
 
 static void AddQuad(
     MeshBuilder<VertexPositionNormal, VertexTexture1> mesh,

@@ -14,7 +14,7 @@ public sealed class PbrMaterial : Material
     /// <summary>
     /// Optional base color (albedo) texture. Null is treated as white.
     /// </summary>
-    public Image? BaseColorTexture { get; init; }
+    public Texture2D? BaseColorTexture { get; init; }
 
     /// <summary>
     /// Metalness, 0 = dielectric (plastic / wood / fabric), 1 = metal.
@@ -38,7 +38,7 @@ public sealed class PbrMaterial : Material
     /// <summary>
     /// Optional metallic-roughness texture. Null is treated as white.
     /// </summary>
-    public Image? MetallicRoughnessTexture { get; init; }
+    public Texture2D? MetallicRoughnessTexture { get; init; }
 
     /// <summary>
     /// Self-illumination color added on top of the lit result. Default
@@ -50,7 +50,7 @@ public sealed class PbrMaterial : Material
     /// Optional emissive texture. Null is treated as white so the
     /// emissive factor passes through unchanged.
     /// </summary>
-    public Image? EmissiveTexture { get; init; }
+    public Texture2D? EmissiveTexture { get; init; }
 
     /// <summary>
     /// Strength of ambient occlusion, 0 = none, 1 = full. Scales the
@@ -62,7 +62,7 @@ public sealed class PbrMaterial : Material
     /// Optional ambient-occlusion texture. Null is treated as white
     /// (no occlusion).
     /// </summary>
-    public Image? OcclusionTexture { get; init; }
+    public Texture2D? OcclusionTexture { get; init; }
 
     /// <summary>
     /// Featureless white dielectric, fully rough. Useful as a default.

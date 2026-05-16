@@ -289,7 +289,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         return new BitmapSurface(this, id);
     }
 
-    private BitmapSurface CreateTexture(Image image)
+    private BitmapSurface CreateTexture(Texture2D image)
     {
         ThrowIfDisposed();
         if (image is not Bitmap bitmap)
@@ -300,7 +300,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         return new BitmapSurface(this, id);
     }
 
-    private readonly ConditionalWeakTable<Image, ImageTextureEntry> _imageTextureCache = new();
+    private readonly ConditionalWeakTable<Texture2D, ImageTextureEntry> _imageTextureCache = new();
 
     private sealed class ImageTextureEntry
     {
@@ -308,7 +308,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         public int Version { get; set; }
     }
 
-    private bool TryGetOrCreateTexture(Image image, [NotNullWhen(true)] out BitmapSurface? texture)
+    private bool TryGetOrCreateTexture(Texture2D image, [NotNullWhen(true)] out BitmapSurface? texture)
     {
         if (!_imageTextureCache.TryGetValue(image, out var entry))
         {
@@ -401,7 +401,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool DrawImage(Image image, Rect source, Rect destination)
+    public override bool DrawImage(Texture2D image, Rect source, Rect destination)
     {
         if (IsDisposed)
             return false;
@@ -411,7 +411,27 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         return SDL.RenderTexture(_rendererId, texture.Id, source, destination);
     }
 
-    public override bool DrawImageRotated(Image image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
+    public override bool DrawImage(Texture2D image, Rect source, Rect destination, Color tint)
+    {
+        if (IsDisposed)
+            return false;
+        if (!TryGetOrCreateTexture(image, out var texture))
+            return false;
+        EnsureCleared();
+        // SDL texture color/alpha-mod is persistent state; save and
+        // restore so this draw doesn't bleed into subsequent untinted
+        // ones using the same texture.
+        var savedColor = texture.ColorMod;
+        var savedAlpha = texture.AlphaMod;
+        texture.ColorMod = (tint.R, tint.G, tint.B);
+        texture.AlphaMod = tint.A;
+        var ok = SDL.RenderTexture(_rendererId, texture.Id, source, destination);
+        texture.ColorMod = savedColor;
+        texture.AlphaMod = savedAlpha;
+        return ok;
+    }
+
+    public override bool DrawImageRotated(Texture2D image, Rect source, Rect destination, float angle, Vector2 center, FlipMode flip = FlipMode.None)
     {
         if (IsDisposed)
             return false;
@@ -439,7 +459,7 @@ internal abstract class BitmapRenderer2D : Renderer2D, IDisposable
         }
     }
 
-    public override bool DrawGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Image? image = null)
+    public override bool DrawGeometry(ReadOnlySpan<Vertex2D> vertices, ReadOnlySpan<int> indices, Texture2D? image = null)
     {
         var texture = image == null ? null
             : TryGetOrCreateTexture(image!, out var txt) ? txt

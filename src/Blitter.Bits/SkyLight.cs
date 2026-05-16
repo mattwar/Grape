@@ -14,19 +14,19 @@ public sealed record SkyLight
     /// Used to shade matte surfaces -- the soft, ambient tint a non-shiny surface
     /// picks up from its surroundings.
     /// </summary>
-    public required CubeTexture Diffuse { get; init; }
+    public required TextureCube Diffuse { get; init; }
 
     /// <summary>
     /// A cubemap of the environment as seen by a mirror.
     /// Used to shade shiny surfaces -- sharp reflections for polished materials,
     /// blurred reflections for rough ones.
     /// </summary>
-    public required CubeTexture Specular { get; init; }
+    public required TextureCube Specular { get; init; }
 
     /// <summary>
     /// A texture that stores how strongly a surface reflects light, indexed by view angle and roughness.
     /// </summary>
-    public required Image SpecularLut { get; init; }
+    public required Texture2D SpecularLut { get; init; }
 
     /// <summary>
     /// Rotation of the environment around the world Y axis, in radians.
