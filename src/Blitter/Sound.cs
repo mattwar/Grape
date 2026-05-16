@@ -2,6 +2,10 @@ using System.Buffers.Binary;
 
 using Blitter.Devices;
 
+using NLayer;
+
+using NVorbis;
+
 namespace Blitter;
 
 /// <summary>
@@ -21,9 +25,56 @@ public sealed class Sound
     }
 
     /// <summary>
-    /// Loads a WAV file from the specified path.
+    /// Loads a sound from disk. Format is determined by the file extension:
+    /// <c>.wav</c>, <c>.ogg</c>, <c>.mp3</c>.
     /// </summary>
-    public static Sound LoadWAV(string path)
+    public static Sound Load(string path)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".wav" => LoadWav(path),
+            ".ogg" or ".oga" => LoadOgg(File.OpenRead(path), closeStream: true),
+            ".mp3" => LoadMp3(File.OpenRead(path), closeStream: true),
+            _ => throw new NotSupportedException($"Unsupported audio file extension: '{ext}'."),
+        };
+    }
+
+    /// <summary>
+    /// Loads a sound from a stream. Format is determined by sniffing the
+    /// first few bytes (WAV / OGG / MP3). The stream is not closed.
+    /// </summary>
+    public static Sound Load(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        return Decode(stream);
+    }
+
+    private static Sound Decode(Stream stream)
+    {
+        // Sniff magic bytes. WAV = "RIFF", OGG = "OggS", MP3 = "ID3" or 0xFF 0xFB/0xFA/0xF3/0xF2 frame sync.
+        Span<byte> magic = stackalloc byte[4];
+        if (!stream.CanSeek)
+            throw new NotSupportedException("Decode requires a seekable stream; wrap non-seekable input in a MemoryStream first.");
+        long origin = stream.Position;
+        int read = stream.Read(magic);
+        stream.Position = origin;
+        if (read < 4)
+            throw new InvalidDataException("Stream too short to identify audio format.");
+
+        if (magic[0] == 'R' && magic[1] == 'I' && magic[2] == 'F' && magic[3] == 'F')
+            return LoadWavFromStream(stream);
+        if (magic[0] == 'O' && magic[1] == 'g' && magic[2] == 'g' && magic[3] == 'S')
+            return LoadOgg(stream, closeStream: false);
+        if ((magic[0] == 'I' && magic[1] == 'D' && magic[2] == '3') ||
+            (magic[0] == 0xFF && (magic[1] & 0xE0) == 0xE0))
+            return LoadMp3(stream, closeStream: false);
+
+        throw new InvalidDataException("Unrecognized audio format (expected WAV, OGG, or MP3).");
+    }
+
+    private static Sound LoadWav(string path)
     {
         if (!SDL.LoadWAV(path, out var spec, out var audioBuffer, out var audioLength))
             throw new InvalidOperationException($"SDL_LoadWAV Error: {SDL.GetError()}");
@@ -35,9 +86,70 @@ public sealed class Sound
             {
                 Buffer.MemoryCopy(sourceBytesPtr, targetBytePtr, audioLength, audioLength);
             }
-            var data = new ReadOnlyMemory<byte>(bytes);
-            return new Sound(AudioSpec.From(spec), data);
+            return new Sound(AudioSpec.From(spec), new ReadOnlyMemory<byte>(bytes));
         }
+    }
+
+    private static Sound LoadWavFromStream(Stream stream)
+    {
+        // SDL_LoadWAV only takes a path, so buffer to a temp file. Cheap for
+        // short SFX; callers wanting zero-copy WAV from streams can swap in
+        // a managed RIFF parser later.
+        var temp = Path.Combine(Path.GetTempPath(), $"blitter-{Guid.NewGuid():N}.wav");
+        try
+        {
+            using (var fs = File.Create(temp))
+                stream.CopyTo(fs);
+            return LoadWav(temp);
+        }
+        finally
+        {
+            try { File.Delete(temp); } catch { }
+        }
+    }
+
+    private static Sound LoadOgg(Stream stream, bool closeStream)
+    {
+        using var reader = new VorbisReader(stream, closeStream);
+        return ReadAllFloatSamples(reader.Channels, reader.SampleRate, reader.ReadSamples);
+    }
+
+    private static Sound LoadMp3(Stream stream, bool closeStream)
+    {
+        using var mpeg = new MpegFile(stream);
+        try
+        {
+            return ReadAllFloatSamples(mpeg.Channels, mpeg.SampleRate, mpeg.ReadSamples);
+        }
+        finally
+        {
+            if (closeStream)
+                stream.Dispose();
+        }
+    }
+
+    private static Sound ReadAllFloatSamples(int channels, int sampleRate, Func<float[], int, int, int> readSamples)
+    {
+        // Stream the decoder in fixed-size chunks; grow a managed buffer
+        // until ReadSamples reports EOF (return value < requested).
+        const int chunkFloats = 16384;
+        var floats = new float[chunkFloats];
+        var samples = new List<float>(chunkFloats * 4);
+        int got;
+        while ((got = readSamples(floats, 0, chunkFloats)) > 0)
+        {
+            samples.AddRange(new ReadOnlySpan<float>(floats, 0, got));
+            if (got < chunkFloats)
+                break;
+        }
+
+        var bytes = new byte[samples.Count * sizeof(float)];
+        var dst = bytes.AsSpan();
+        for (int i = 0; i < samples.Count; i++)
+            BinaryPrimitives.WriteSingleLittleEndian(dst.Slice(i * sizeof(float), sizeof(float)), samples[i]);
+
+        var spec = new AudioSpec(AudioFormat.F32LE, channels, sampleRate);
+        return new Sound(spec, bytes);
     }
 
     // Sample rate used by the procedural synth helpers (Tone, Sweep).

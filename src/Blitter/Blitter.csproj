@@ -11,6 +11,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="NLayer" Version="1.16.0" />
+    <PackageReference Include="NVorbis" Version="0.10.5" />
     <PackageReference Include="SDL3-CS" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native" Version="3.2.20" />
     <PackageReference Include="SDL3-CS.Native.Shadercross" Version="3.0.0" />
