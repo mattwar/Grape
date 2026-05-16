@@ -13,7 +13,7 @@ namespace Blitter;
 /// either kind. Code that needs CPU-side face access uses
 /// <see cref="Cubemap"/> directly.
 /// </remarks>
-public abstract class CubeTexture : Texture
+public abstract class TextureCube : Texture
 {
     /// <summary>
     /// Edge length of every face's base mip level, in pixels. All six

@@ -7,13 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Demonstrates instanced drawing through the Materializer API: a grid
-// of lit + textured cubes drawn in a single call. The mesh + material
-// are supplied once; per-instance data (a world transform plus a tint
-// color) is pulled from a span. Compare with TriangleSwarmInstanced
-// (which calls Renderer3D directly) -- here the materializer picks
-// the shader, so the call site doesn't reference any shader at all.
+
+// Demonstrates drawing multiple copies of a single mesh using a single draw call.
 
 using System.Numerics;
 using Blitter;

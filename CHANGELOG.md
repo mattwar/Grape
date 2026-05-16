@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- `Image` renamed to `Texture2D` and `CubeTexture` renamed to
+  `TextureCube` for symmetry with HLSL/D3D conventions. `Bitmap`,
+  `Mipmap`, and `Cubemap` continue to derive from these.
+- `MipmappedImage` renamed to `Mipmap`.
+- `Blitter.Bits.Font`: tint color is now a `DrawText` parameter (defaults
+  to white) rather than baked into the atlas. Same `Font` instance can
+  be drawn in any color without rebuilding the atlas. Removes the
+  `color` parameter from all `Font` constructors and `Font.Load`
+  overloads, and removes the `Font.Color` property.
+- `Font.DrawText` (3D) now draws with `DepthMode.Transparent` so
+  fully-transparent glyph pixels no longer write depth and occlude
+  other text drawn behind them.
+
+### Added
+- `Bitmap.Save(Stream, format, quality)`: encodes the image to a stream
+  (PNG/JPEG/WebP/BMP). Pass a `MemoryStream` to get raw encoded bytes.
+- `Bitmap.Load(Stream, mipmaps)`: decodes an image from a stream
+  (format auto-detected).
+- `Shaders.PositionTextureWithTransformAndColor`: textured + transformed
+  with a per-draw fragment tint. Pairs with `TransformAndFColorArgs`.
+- `Renderer2D.DrawImage(Image, Rect src, Rect dst, Color tint)`:
+  per-channel tint multiplied through SDL texture color-mod, restored
+  to the texture's previous mod state after the draw.
+
+### Fixed
+- `Bitmap.Save` with format `bmp`: now routes through SDL's native
+  `SDL_SaveBMP_IO` instead of SkiaSharp, whose distributed Skia build
+  ships with the BMP encoder disabled and would throw.
+- Debug-text rendering (`Renderer3D.DrawDebugText`): UVs are inset by
+  half a texel so the linear sampler no longer bleeds adjacent glyph
+  cells along character edges. Atlas is also oversampled 2x so
+  upscaled glyphs look noticeably crisper.
+
 ## [v0.5.0]
 
 ### Added

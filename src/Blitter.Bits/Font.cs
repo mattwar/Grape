@@ -32,9 +32,6 @@ public sealed class Font : IDisposable
     // the key string is GC'd.
     private readonly ConditionalWeakTable<string, Mesh<TextureVertex3D>> _meshCache = new();
 
-    /// <summary>Font color baked into the atlas.</summary>
-    public Color Color { get; }
-
     /// <summary>Cell width in atlas pixels (one monospace advance).</summary>
     public float CellWidth => _cellPixelW;
 
@@ -51,70 +48,53 @@ public sealed class Font : IDisposable
     public bool Contains(Rune rune) => _runeToSlot.ContainsKey(rune.Value);
 
     /// <summary>
-    /// Builds a font from an installed-typeface family name
-    /// (e.g. <c>"Consolas"</c>, <c>"Segoe UI"</c>). When the family is not
-    /// installed on the host OS, SkiaSharp <b>silently falls back</b> to
-    /// the platform default — so the same code can render in a different
-    /// face on another machine. Prefer
-    /// <see cref="Font(IEnumerable{string}, float, Color, bool, string?)"/>
-    /// for a CSS-style fallback list, or
-    /// <see cref="Load(string, float, Color, string?)"/> to ship a
-    /// <c>.ttf</c> with your app for true cross-platform rendering.
+    /// Constructs a <see cref="Font"/> from a typeface family name.
+    /// If the typeface is not found on the host OS, a platform default is used instead.
     /// </summary>
-    public Font(string family, float pixelSize, Color color, bool bold = false, string? charset = null)
+    public Font(string family, float pixelSize, bool bold = false, string? charset = null)
         : this(SKTypeface.FromFamilyName(family,
                 bold ? SKFontStyle.Bold : SKFontStyle.Normal),
-            pixelSize, color, charset, ownsTypeface: true)
+            pixelSize, charset, ownsTypeface: true)
     {
     }
 
     /// <summary>
-    /// Builds a font from a CSS-style list of family names. The first name
-    /// that resolves to an installed typeface (round-tripping equal to the
-    /// requested name) is used; if none match, the constructor falls back
-    /// to Skia's generic <c>"monospace"</c> alias, then finally to the
-    /// platform default. Useful for portable code: e.g.
-    /// <c>new Font(["Consolas", "Menlo", "DejaVu Sans Mono"], ...)</c>.
+    /// Constructs a <see cref="Font"/> from a list of typeface family names, in order of preference.
+    /// The first family found on the host is used.
+    /// If no families are found, a platform default is used instead.
     /// </summary>
-    public Font(IEnumerable<string> familyFallbacks, float pixelSize, Color color, bool bold = false, string? charset = null)
-        : this(ResolveFallback(familyFallbacks, bold), pixelSize, color, charset, ownsTypeface: true)
+    public Font(IEnumerable<string> familyFallbacks, float pixelSize, bool bold = false, string? charset = null)
+        : this(ResolveFallback(familyFallbacks, bold), pixelSize, charset, ownsTypeface: true)
     {
     }
 
     /// <summary>
-    /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> file on disk and
-    /// bakes it into a font atlas. The underlying typeface is disposed
-    /// with the returned <see cref="Font"/>. Prefer this over family-name
-    /// constructors for truly cross-platform rendering.
+    /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> file on disk.
     /// </summary>
-    public static Font Load(string filePath, float pixelSize, Color color, string? charset = null)
+    public static Font Load(string filePath, float pixelSize, string? charset = null)
     {
         ArgumentNullException.ThrowIfNull(filePath);
         var typeface = SKTypeface.FromFile(filePath)
             ?? throw new InvalidOperationException($"Failed to load typeface from '{filePath}'.");
-        return new Font(typeface, pixelSize, color, charset, ownsTypeface: true);
+        return new Font(typeface, pixelSize, charset, ownsTypeface: true);
     }
 
     /// <summary>
-    /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> stream and bakes
-    /// it into a font atlas. The underlying typeface is disposed with the
-    /// returned <see cref="Font"/>; the caller retains ownership of the
-    /// stream and may dispose it after this call returns.
+    /// Loads a typeface from a <c>.ttf</c> / <c>.otf</c> stream.
     /// </summary>
-    public static Font Load(Stream stream, float pixelSize, Color color, string? charset = null)
+    public static Font Load(Stream stream, float pixelSize, string? charset = null)
     {
         ArgumentNullException.ThrowIfNull(stream);
         var typeface = SKTypeface.FromStream(stream)
             ?? throw new InvalidOperationException("Failed to load typeface from stream.");
-        return new Font(typeface, pixelSize, color, charset, ownsTypeface: true);
+        return new Font(typeface, pixelSize, charset, ownsTypeface: true);
     }
 
     /// <summary>
-    /// Builds a font from an explicit <see cref="SKTypeface"/>. The typeface
-    /// is not disposed by this constructor; the caller retains ownership.
+    /// Constructs a <see cref="Font"/> from an existing Skia <see cref="SKTypeface"/>.
     /// </summary>
-    public Font(SKTypeface typeface, float pixelSize, Color color, string? charset = null)
-        : this(typeface, pixelSize, color, charset, ownsTypeface: false)
+    public Font(SKTypeface typeface, float pixelSize, string? charset = null)
+        : this(typeface, pixelSize, charset, ownsTypeface: false)
     {
     }
 
@@ -150,11 +130,10 @@ public sealed class Font : IDisposable
         return SKTypeface.Default;
     }
 
-    private Font(SKTypeface typeface, float pixelSize, Color color, string? charset, bool ownsTypeface)
+    private Font(SKTypeface typeface, float pixelSize, string? charset, bool ownsTypeface)
     {
         ArgumentNullException.ThrowIfNull(typeface);
         if (pixelSize <= 0f) throw new ArgumentOutOfRangeException(nameof(pixelSize));
-        Color = color;
 
         try
         {
@@ -229,7 +208,10 @@ public sealed class Font : IDisposable
             using (var canvas = new SKCanvas(bmp))
             using (var paint = new SKPaint
             {
-                Color = new SKColor(color.R, color.G, color.B, color.A),
+                // Atlas glyphs are baked white; tint is multiplied in at
+                // draw time. The font's Color is preserved as the default
+                // tint when the caller doesn't supply one.
+                Color = SKColors.White,
                 IsAntialias = true,
             })
             {
@@ -273,9 +255,7 @@ public sealed class Font : IDisposable
     }
 
     /// <summary>
-    /// Width × height that <see cref="DrawText(Renderer2D, string, float, float)"/>
-    /// would occupy. Width counts Unicode codepoints (not UTF-16 chars), so
-    /// surrogate pairs each measure as one cell.
+    /// Determines the font pixel size of the rectangle needed to draw the given text.
     /// </summary>
     public Vector2 Measure(string text)
     {
@@ -286,11 +266,15 @@ public sealed class Font : IDisposable
     }
 
     /// <summary>
-    /// Draws text starting at (<paramref name="x"/>, <paramref name="y"/>)
-    /// in renderer pixel coordinates. Codepoints with no baked glyph are
-    /// skipped (the cell advance still happens, so layout is preserved).
+    /// Draws text in 2D space
     /// </summary>
     public void DrawText(Renderer2D renderer, string text, float x, float y)
+        => DrawText(renderer, text, Color.White, x, y);
+
+    /// <summary>
+    /// Draws text in 2D space
+    /// </summary>
+    public void DrawText(Renderer2D renderer, string text, Color color, float x, float y)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(text);
@@ -302,26 +286,21 @@ public sealed class Font : IDisposable
         foreach (var rune in text.EnumerateRunes())
         {
             if (_runeToSlot.TryGetValue(rune.Value, out var slot))
-                renderer.DrawImage(_atlas.Image, _atlas[slot], new Rect(x + i * cw, y, cw, ch));
+                renderer.DrawImage(_atlas.Image, _atlas[slot], new Rect(x + i * cw, y, cw, ch), color);
             i++;
         }
     }
 
     /// <summary>
-    /// Draws text in 3D space using <paramref name="transform"/>. The text
-    /// mesh occupies [0..N] along X (where N is the codepoint count) and
-    /// [0..1] along Y in local model space (Y up, baseline at 0).
+    /// Draws text in 3D space
     /// </summary>
-    /// <remarks>
-    /// The textured-quad mesh built for <paramref name="text"/> is cached
-    /// on the font, keyed by <b>reference identity</b>. Reusing the same
-    /// string instance across frames (string literals, held fields,
-    /// interned values) avoids rebuilding the mesh; freshly-allocated
-    /// strings (e.g. interpolated readouts) miss the cache and rebuild
-    /// each call. Cached entries are collected when the key string is
-    /// GC'd, so the cache cannot grow without bound.
-    /// </remarks>
     public void DrawText(Renderer3D renderer, string text, in Matrix4x4 transform)
+        => DrawText(renderer, text, Color.White, in transform);
+
+    /// <summary>
+    /// Draws text in 3D space
+    /// </summary>
+    public void DrawText(Renderer3D renderer, string text, Color color, in Matrix4x4 transform)
     {
         ArgumentNullException.ThrowIfNull(renderer);
         ArgumentNullException.ThrowIfNull(text);
@@ -333,16 +312,19 @@ public sealed class Font : IDisposable
             _meshCache.Add(text, mesh);
         }
 
-        var args = new TransformArgs(transform);
+        var args = new TransformAndFColorArgs(transform, color);
         // Text glyphs are flat quads; arbitrary transforms (rotation,
         // billboarding, world-space placement) routinely flip them
-        // back-to-front. Disable culling for the duration of this draw
-        // so the text is legible from either side regardless of the
-        // renderer's current CullMode.
+        // back-to-front. Disable culling so the text is legible from
+        // either side regardless of the renderer's current CullMode.
+        // Use DepthMode.Transparent so the quad's fully-transparent
+        // pixels don't write depth and occlude later text drawn behind
+        // them.
         using (renderer.PushState())
         {
             renderer.CullMode = CullMode.None;
-            renderer.DrawMesh(mesh, _atlas.Image, Shaders.PositionTextureWithTransform, in args);
+            renderer.DepthMode = DepthMode.Transparent;
+            renderer.DrawMesh(mesh, _atlas.Image, Shaders.PositionTextureWithTransformAndColor, in args);
         }
     }
 

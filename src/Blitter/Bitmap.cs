@@ -1,9 +1,11 @@
+using SkiaSharp;
+
 namespace Blitter;
 
 /// <summary>
 /// Represents an image bitmap in memory.
 /// </summary>
-public sealed class Bitmap : Image
+public sealed class Bitmap : Texture2D
 {
     private readonly Application _application;
     internal nint _imageId;
@@ -57,11 +59,12 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Creates a new image of the given size. The default format,
-    /// <see cref="PixelFormat.ABGR8888"/>, is the 32-bpp RGBA layout used
-    /// throughout Blitter; pass an explicit format only for specialized
-    /// surfaces (paletted, YUV, 16-bit, float, etc.).
+    /// Creates a new (CPU-side) bitmap.
     /// </summary>
+    /// <param name="width">The width of the image in pixels.</param>
+    /// <param name="height">The height of the image in pixels.</param>
+    /// <param name="format">The pixel format of the image.</param>
+    /// <param name="mipmaps">Hint to GPU to auto-create mipmaps for the image.</param>
     public static Bitmap Create(int width, int height, PixelFormat format = PixelFormat.ABGR8888, bool mipmaps = false)
     {
         var imageId = SDL.CreateSurface(width, height, (SDL.PixelFormat)format);
@@ -74,19 +77,13 @@ public sealed class Bitmap : Image
     public override bool IsDisposed => _imageId == 0;
 
     /// <summary>
-    /// Bumped each time the image's contents change. Renderers use this to
-    /// detect when their cached GPU texture upload is stale. If you mutate
-    /// the image through raw pixel access (e.g. <see cref="GetPixels"/> or
-    /// an external software renderer), call <see cref="Invalidate"/> to mark
-    /// the change.
+    /// The version number, bumped whenever the bitmap is changed.
     /// </summary>
     public override int Version => _version;
 
     /// <summary>
-    /// Marks the image contents as changed so renderers re-upload their
-    /// cached GPU texture on the next draw. Mutations through
-    /// <see cref="SetPixel"/> or <see cref="TransparentColor"/> bump the
-    /// version automatically; this is for callers that touch raw pixels.
+    /// Marks the image contents as changed.
+    /// Use this to force a re-upload to the GPU.
     /// </summary>
     public override void Invalidate()
     {
@@ -102,11 +99,8 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Render into this image using a 2D renderer abstraction. The
-    /// image's existing pixels are preserved as a backdrop and draws
-    /// compose on top of them.
+    /// Render into this <see cref="Bitmap"/> using a 2D renderer.
     /// </summary>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
     public void Render2D(Action<Renderer2D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
@@ -123,16 +117,9 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Render into this image using a 2D renderer abstraction, painting
-    /// <paramref name="backgroundColor"/> behind the draws.
+    /// Render into this image using a 2D renderer.
+    /// The image is filled with the background color before the action is invoked.
     /// </summary>
-    /// <param name="backgroundColor">
-    /// The background painted behind the draws. An opaque alpha (255)
-    /// replaces the prior content (cheapest); a translucent alpha
-    /// blends over the prior content using standard source-over
-    /// compositing.
-    /// </param>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
     public void Render2D(Color backgroundColor, Action<Renderer2D> renderAction)
     {
         ArgumentNullException.ThrowIfNull(renderAction);
@@ -169,38 +156,15 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Render into this image using a 3D renderer. The image's
-    /// existing pixels are preserved as a backdrop and new draws
-    /// compose on top of them; depth is per-call, so the wallpaper
-    /// itself never occludes new draws. The call is synchronous:
-    /// when it returns, the image's pixels reflect the final GPU
-    /// output. Intended for screenshot- and thumbnail-shaped use
-    /// cases, not per-frame readback.
+    /// Render into this image using a 3D renderer
     /// </summary>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
-    /// <remarks>
-    /// Images in <see cref="PixelFormat.ABGR8888"/> take a fast path
-    /// that memcpys pixels between the GPU target and the surface.
-    /// Other formats fall back to a per-pixel conversion loop.
-    /// </remarks>
     public void Render3D(Action<Renderer3D> renderAction)
         => Render3DCore(null, renderAction);
 
     /// <summary>
-    /// Render into this image using a 3D renderer, painting
-    /// <paramref name="backgroundColor"/> behind the draws. The call
-    /// is synchronous: when it returns, the image's pixels reflect
-    /// the final GPU output.
+    /// Render into this image using a 3D renderer.
+    /// The bitmap is filled with the background color before the action is invoked.
     /// </summary>
-    /// <param name="backgroundColor">
-    /// The background painted behind the draws. Opaque colors clear
-    /// the buffer; translucent colors (alpha &lt; 255) are composed
-    /// over the image's existing pixels using SrcOver, so the prior
-    /// contents show through. Translucent backgrounds are supported
-    /// on ABGR8888 (default) and the 8-bit-per-channel RGBA variants;
-    /// not supported on RGBA64Float.
-    /// </param>
-    /// <param name="renderAction">Callback that issues draws on the renderer.</param>
     public void Render3D(Color backgroundColor, Action<Renderer3D> renderAction)
         => Render3DCore(backgroundColor, renderAction);
 
@@ -235,17 +199,10 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Loads an image from disk. Decoding is handled by SkiaSharp,
-    /// covering PNG, JPG, WebP, GIF, BMP, and the rest of SkiaSharp's
-    /// supported formats. The decoded image is normalized to
-    /// <see cref="PixelFormat.ABGR8888"/>.
+    /// Loads an image from disk.
     /// </summary>
     /// <param name="filePath">Path to the image file.</param>
-    /// <param name="mipmaps">
-    /// When true, allocates mipmap storage and regenerates mip levels
-    /// from the base image. Recommended for textures sampled at
-    /// varying distances; unnecessary for full-resolution UI sprites.
-    /// </param>
+    /// <param name="mipmaps">Hint to GPU to auto-create mipmaps for the image.</param>
     public static Bitmap Load(string filePath, bool mipmaps = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
@@ -255,9 +212,26 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Decodes an image from an encoded byte span (PNG, JPG, WebP, ...)
-    /// using SkiaSharp.
+    /// Loads an image from a stream.
     /// </summary>
+    /// <param name="stream">Source stream. Not closed by this call.</param>
+    /// <param name="mipmaps">Hint to GPU to auto-create mipmaps for the image.</param>
+    public static Bitmap Load(Stream stream, bool mipmaps = false)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        using var skBitmap = SkiaSharp.SKBitmap.Decode(stream)
+            ?? throw new InvalidOperationException("SkiaSharp could not decode the supplied image stream.");
+        var image = Bitmap.Create(skBitmap.Width, skBitmap.Height, PixelFormat.ABGR8888, mipmaps);
+        image.CopyFromBitmap(skBitmap);
+        return image;
+    }
+
+    /// <summary>
+    /// Decodes an image from an encoded byte span (PNG, JPG, WebP, ...)
+    /// </summary>
+    /// <param name="bytes">The encoded image bytes.</param>
+    /// <param name="mipmaps">Hint to GPU to auto-create mipmaps for the image.</param>
     public static Bitmap Decode(ReadOnlySpan<byte> bytes, bool mipmaps = false)
     {
         // Always allocate ABGR8888 — the GPU fast-path sampling
@@ -272,42 +246,102 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Saves the image to disk. The encoder is selected by file
-    /// extension and handled by SkiaSharp: <c>.png</c>,
-    /// <c>.jpg</c> / <c>.jpeg</c>, <c>.webp</c>, and <c>.bmp</c>.
+    /// Saves the image to the stream in the given format.
     /// </summary>
-    /// <param name="filename">Destination path. Extension picks the format.</param>
-    /// <param name="quality">
-    /// Encoder quality 0..100 for lossy formats (JPEG, WebP). Ignored
-    /// for lossless formats (BMP, PNG). Defaults to 90.
-    /// </param>
-    public void Save(string filename, int quality = 90)
+    /// <param name="stream">Destination stream. Not closed by this call.</param>
+    /// <param name="format">Target image format (e.g. <c>"png"</c>, <c>"jpg"</c>).</param>
+    /// <param name="quality">Encoder quality (0..100), used by lossy formats.</param>
+    public void Save(Stream stream, string format, int quality = 90)
     {
-        ArgumentException.ThrowIfNullOrEmpty(filename);
-        if (IsDisposed)
-            return;
+        ArgumentNullException.ThrowIfNull(stream);
+        ArgumentException.ThrowIfNullOrEmpty(format);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
 
-        var ext = Path.GetExtension(filename);
-        var format = ext.ToLowerInvariant() switch
+        // SkiaSharp's distributed Skia build disables the BMP encoder,
+        // so SKBitmap.Encode(..., Bmp) returns false. Route BMP through
+        // SDL's native SDL_SaveBMPIO instead, which is built in.
+        if (format.ToLowerInvariant().TrimStart('.') == "bmp")
         {
-            ".png" => SkiaSharp.SKEncodedImageFormat.Png,
-            ".jpg" or ".jpeg" => SkiaSharp.SKEncodedImageFormat.Jpeg,
-            ".webp" => SkiaSharp.SKEncodedImageFormat.Webp,
-            ".bmp" => SkiaSharp.SKEncodedImageFormat.Bmp,
-            _ => throw new NotSupportedException(
-                $"Unsupported image format '{ext}'. Supported: .png, .jpg, .jpeg, .webp, .bmp."),
-        };
+            SaveBmpToStream(stream);
+            return;
+        }
+
+        var skFormat = ParseEncodedImageFormat(format);
 
         // Round-trip through an SKBitmap snapshot. The pixel-by-pixel
         // copy is the cost of converting between Blitter's surface and
         // SkiaSharp's bitmap representations; for one-shot saves this
         // is fine, and it keeps the in-memory Bitmap untouched.
         using var bitmap = this.ToSKBitmap();
-        using var stream = File.Create(filename);
-        if (!bitmap.Encode(stream, format, quality))
+        if (!bitmap.Encode(stream, skFormat, quality))
             throw new InvalidOperationException(
-                $"SkiaSharp failed to encode image as {format}.");
+                $"SkiaSharp failed to encode image as {skFormat}.");
     }
+
+    private void SaveBmpToStream(Stream stream)
+    {
+        // Encode into an SDL dynamic-memory IOStream, then copy the
+        // grown buffer into the caller's stream. SDL owns / frees the
+        // buffer when CloseIO is called.
+        var io = SDL.IOFromDynamicMem();
+        if (io == 0)
+            throw new InvalidOperationException(
+                $"SDL_IOFromDynamicMem failed: {SDL.GetError()}");
+        try
+        {
+            if (!SDL.SaveBMPIO(_imageId, io, false))
+                throw new InvalidOperationException(
+                    $"SDL_SaveBMP_IO failed: {SDL.GetError()}");
+
+            var size = SDL.TellIO(io);
+            if (size < 0)
+                throw new InvalidOperationException(
+                    $"SDL_TellIO failed: {SDL.GetError()}");
+
+            var props = SDL.GetIOProperties(io);
+            var bufferPtr = SDL.GetPointerProperty(
+                props, SDL.Props.IOStreamDynamicMemoryPointer, 0);
+            if (bufferPtr == 0)
+                throw new InvalidOperationException(
+                    "SDL dynamic-memory IOStream did not expose its buffer.");
+
+            unsafe
+            {
+                var span = new ReadOnlySpan<byte>((void*)bufferPtr, (int)size);
+                stream.Write(span);
+            }
+        }
+        finally
+        {
+            SDL.CloseIO(io);
+        }
+    }
+
+    /// <summary>
+    /// Saves the image to a file.
+    /// The format is determiend by the file extension.
+    /// </summary>
+    public void Save(string filename, int quality = 90)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(filename);
+        if (IsDisposed)
+            return;
+
+        using var stream = File.Create(filename);
+        Save(stream, Path.GetExtension(filename), quality);
+    }
+
+    // Accepts "png", ".png", "PNG", etc. Shared by both Save overloads.
+    private static SkiaSharp.SKEncodedImageFormat ParseEncodedImageFormat(string format) =>
+        format.ToLowerInvariant().TrimStart('.') switch
+        {
+            "png" => SkiaSharp.SKEncodedImageFormat.Png,
+            "jpg" or "jpeg" => SkiaSharp.SKEncodedImageFormat.Jpeg,
+            "webp" => SkiaSharp.SKEncodedImageFormat.Webp,
+            "bmp" => SkiaSharp.SKEncodedImageFormat.Bmp,
+            _ => throw new NotSupportedException(
+                $"Unsupported image format '{format}'. Supported: png, jpg, jpeg, webp, bmp."),
+        };
 
     /// <summary>
     /// Surface flags. Used internally to inspect surface state.
@@ -331,7 +365,7 @@ public sealed class Bitmap : Image
     private bool _hasTransparentColor; // defaults to false
 
     /// <summary>
-    /// The color that is treated as transparent on the surface.
+    /// The color that is treated as transparent.
     /// </summary>
     public Color? TransparentColor
     {
@@ -342,6 +376,7 @@ public sealed class Bitmap : Image
             SDL.GetSurfaceColorKey(_imageId, out var key);
             return MapToColor(key);
         }
+
         set
         {
             if (IsDisposed)
@@ -357,6 +392,7 @@ public sealed class Bitmap : Image
             {
                 SDL.SetSurfaceColorKey(_imageId, false, 0);
             }
+
             unchecked { _version++; }
         }
     }
@@ -380,6 +416,9 @@ public sealed class Bitmap : Image
         }
     }
 
+    /// <summary>
+    /// The number of bytes between the start of each pixel row in memory.
+    /// </summary>
     public int Pitch
     {
         get
@@ -394,6 +433,9 @@ public sealed class Bitmap : Image
         }
     }
 
+    /// <summary>
+    /// The pixel format of the bitmap
+    /// </summary>
     public override PixelFormat PixelFormat
     {
         get
@@ -408,6 +450,9 @@ public sealed class Bitmap : Image
         }
     }
 
+    /// <summary>
+    /// Detailed information about the pixel format.
+    /// </summary>
     public PixelFormatDetails PixelFormatDetails
     {
         get
@@ -430,6 +475,9 @@ public sealed class Bitmap : Image
         }
     }
 
+    /// <summary>
+    /// The number of bytes used to represent a single pixel.
+    /// </summary>
     public int BytesPerPixel
     {
         get
@@ -447,9 +495,7 @@ public sealed class Bitmap : Image
     #endregion
 
     /// <summary>
-    /// Returns a view over the raw pixel bytes of the surface (Height * Pitch bytes).
-    /// The returned span aliases the surface's internal buffer; do not retain it
-    /// after the surface is disposed.
+    /// The raw bytes of the bitmap pixels.
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetPixels()
     {
@@ -459,9 +505,7 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Internal writable view over the surface's pixel bytes, used by
-    /// renderers that copy GPU-side results back into the image. Callers
-    /// are responsible for invalidating the image after writing.
+    /// The raw bytes of the bitmap pixels, writable.
     /// </summary>
     internal unsafe Span<byte> WritablePixels
     {
@@ -625,10 +669,7 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Returns a new image with the pixels flipped along the requested
-    /// axis. The source image is unchanged. The new image inherits the
-    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
-    /// flag. <see cref="FlipMode.None"/> still allocates a fresh copy.
+    /// Returns a new bitmap with the pixels flipped along the requested axis.
     /// </summary>
     public Bitmap Flip(FlipMode mode)
     {
@@ -653,12 +694,7 @@ public sealed class Bitmap : Image
     }
 
     /// <summary>
-    /// Returns a new image rotated by the requested right angle. The
-    /// source image is unchanged. For <see cref="Rotation.Clockwise90"/>
-    /// and <see cref="Rotation.Counterclockwise90"/> the result's
-    /// width and height are swapped. The new image inherits the
-    /// source's <see cref="PixelFormat"/> and <see cref="Mipmaps"/>
-    /// flag. <see cref="Rotation.None"/> still allocates a fresh copy.
+    /// Returns a new bitmap rotated by the requested right angle.
     /// </summary>
     public Bitmap Rotate(Rotation rotation)
     {

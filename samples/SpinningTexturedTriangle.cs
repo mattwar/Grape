@@ -7,9 +7,6 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
 using Blitter;
@@ -47,9 +44,11 @@ await window.RunAsync(rd =>
         checker,
         Shaders.PositionTextureWithTransform,
         transform);
-});static Image CreateCheckerboardImage(int width, int height, int cellSize)
+});
+
+static Texture2D CreateCheckerboardImage(int width, int height, int cellSize)
 {
-    var image = Bitmap.Create(width, height, PixelFormat.ABGR8888);
+    var image = Bitmap.Create(width, height);
     var dark = new Color(32, 32, 32);
     var light = new Color(220, 220, 220);
 

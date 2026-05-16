@@ -8,17 +8,10 @@
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
 //
-// Demonstrates Renderer3D.Antialiasing (MSAA). Press SPACE to cycle:
-// None -> X2 -> X4 -> X8 -> None ...
+// Demonstrates Renderer3D.Antialiasing (MSAA). 
 //
 // The scene is a wagon-wheel of 64 razor-thin spokes, slowly rotating.
-// Thin diagonal edges are the worst case for aliasing -- a single-pixel
-// wide line tilted off-axis produces a crawling staircase as it rotates.
-// MSAA replaces the staircase with a smooth gradient.
-//
-// At 4K the per-pixel jaggies are tiny but the *crawling* is what your
-// eye picks up: with None the spokes shimmer and twitch as they spin;
-// with X4 or X8 the rotation looks fluid and the spokes hold steady.
+// With no antialiasing, the spokes have jagged edges.
 
 using System.Collections.Immutable;
 using System.Numerics;
@@ -69,8 +62,7 @@ int levelIndex = 0;
 
 await window.RunAsync(rd =>
 {
-    // Cycle AA mode on Space tap. WasJustPressed fires once per
-    // press, so holding Space won't blur through the modes.
+    // Cycle AA mode on Space tap.
     if (window.Input.WasJustPressed(Key.Space))
         levelIndex = (levelIndex + 1) % levels.Length;
 
@@ -78,8 +70,7 @@ await window.RunAsync(rd =>
 
     var t = rd.ElapsedSecondsSinceStart;
 
-    // Slow rotation -- aliasing is most visible when edges crawl
-    // through pixel boundaries gradually.
+    // Slow rotation -- aliasing is most visible when edges crawl through pixel boundaries gradually.
     var model = Matrix4x4.CreateRotationZ(t * 0.1f);
     var viewProjection = camera.GetViewProjection(rd);
 

@@ -22,7 +22,7 @@ namespace Blitter;
 /// <see cref="Bitmap.Rotate"/> on each face before passing it in.
 /// </para>
 /// <para>
-/// Like <see cref="Image"/>, a <c>Cubemap</c> is a CPU-side handle.
+/// Like <see cref="Texture2D"/>, a <c>Cubemap</c> is a CPU-side handle.
 /// Renderers upload it to the GPU lazily and cache the result, keyed
 /// on <see cref="Version"/>. Bumping <see cref="Version"/> -- by
 /// reassigning a face image's pixels and calling
@@ -30,14 +30,14 @@ namespace Blitter;
 /// six faces.
 /// </para>
 /// </remarks>
-public sealed class Cubemap : CubeTexture
+public sealed class Cubemap : TextureCube
 {
     private int _version;
 
     private Cubemap(
-        MipmappedImage positiveX, MipmappedImage negativeX,
-        MipmappedImage positiveY, MipmappedImage negativeY,
-        MipmappedImage positiveZ, MipmappedImage negativeZ,
+        Mipmap positiveX, Mipmap negativeX,
+        Mipmap positiveY, Mipmap negativeY,
+        Mipmap positiveZ, Mipmap negativeZ,
         bool mipmaps)
     {
         PositiveXLevels = positiveX;
@@ -55,30 +55,30 @@ public sealed class Cubemap : CubeTexture
     }
 
     /// <summary>The +X face: looking toward world +X (right).</summary>
-    public Image PositiveX => PositiveXLevels.Base;
+    public Texture2D PositiveX => PositiveXLevels.Base;
     /// <summary>The -X face: looking toward world -X (left).</summary>
-    public Image NegativeX => NegativeXLevels.Base;
+    public Texture2D NegativeX => NegativeXLevels.Base;
     /// <summary>The +Y face: looking toward world +Y (up).</summary>
-    public Image PositiveY => PositiveYLevels.Base;
+    public Texture2D PositiveY => PositiveYLevels.Base;
     /// <summary>The -Y face: looking toward world -Y (down).</summary>
-    public Image NegativeY => NegativeYLevels.Base;
+    public Texture2D NegativeY => NegativeYLevels.Base;
     /// <summary>The +Z face: looking toward world +Z (forward in a left-handed system, backward in a right-handed system).</summary>
-    public Image PositiveZ => PositiveZLevels.Base;
+    public Texture2D PositiveZ => PositiveZLevels.Base;
     /// <summary>The -Z face: looking toward world -Z.</summary>
-    public Image NegativeZ => NegativeZLevels.Base;
+    public Texture2D NegativeZ => NegativeZLevels.Base;
 
     /// <summary>The +X face's mip chain.</summary>
-    public MipmappedImage PositiveXLevels { get; }
+    public Mipmap PositiveXLevels { get; }
     /// <summary>The -X face's mip chain.</summary>
-    public MipmappedImage NegativeXLevels { get; }
+    public Mipmap NegativeXLevels { get; }
     /// <summary>The +Y face's mip chain.</summary>
-    public MipmappedImage PositiveYLevels { get; }
+    public Mipmap PositiveYLevels { get; }
     /// <summary>The -Y face's mip chain.</summary>
-    public MipmappedImage NegativeYLevels { get; }
+    public Mipmap NegativeYLevels { get; }
     /// <summary>The +Z face's mip chain.</summary>
-    public MipmappedImage PositiveZLevels { get; }
+    public Mipmap PositiveZLevels { get; }
     /// <summary>The -Z face's mip chain.</summary>
-    public MipmappedImage NegativeZLevels { get; }
+    public Mipmap NegativeZLevels { get; }
 
     /// <summary>
     /// Edge length of every face's base mip level, in pixels. All six
@@ -94,7 +94,7 @@ public sealed class Cubemap : CubeTexture
     /// <summary>
     /// Number of mip levels supplied per face. <c>1</c> means only a
     /// base level was provided. When <c>&gt; 1</c>, every face's
-    /// <see cref="MipmappedImage.LevelCount"/> is this same value.
+    /// <see cref="Mipmap.LevelCount"/> is this same value.
     /// </summary>
     public override int LevelCount { get; }
 
@@ -124,7 +124,7 @@ public sealed class Cubemap : CubeTexture
     /// <summary>
     /// Returns the face image identified by <paramref name="face"/>.
     /// </summary>
-    public Image GetFace(CubeFace face) => face switch
+    public Texture2D GetFace(CubeFace face) => face switch
     {
         CubeFace.PositiveX => PositiveX,
         CubeFace.NegativeX => NegativeX,
@@ -196,9 +196,9 @@ public sealed class Cubemap : CubeTexture
     /// cubemap on upload. Defaults to <c>false</c>.
     /// </param>
     public static Cubemap Create(
-        Image positiveX, Image negativeX,
-        Image positiveY, Image negativeY,
-        Image positiveZ, Image negativeZ,
+        Texture2D positiveX, Texture2D negativeX,
+        Texture2D positiveY, Texture2D negativeY,
+        Texture2D positiveZ, Texture2D negativeZ,
         bool mipmaps = false)
     {
         ArgumentNullException.ThrowIfNull(positiveX);
@@ -209,12 +209,12 @@ public sealed class Cubemap : CubeTexture
         ArgumentNullException.ThrowIfNull(negativeZ);
 
         return Create(
-            MipmappedImage.FromBase(positiveX),
-            MipmappedImage.FromBase(negativeX),
-            MipmappedImage.FromBase(positiveY),
-            MipmappedImage.FromBase(negativeY),
-            MipmappedImage.FromBase(positiveZ),
-            MipmappedImage.FromBase(negativeZ),
+            Mipmap.FromBase(positiveX),
+            Mipmap.FromBase(negativeX),
+            Mipmap.FromBase(positiveY),
+            Mipmap.FromBase(negativeY),
+            Mipmap.FromBase(positiveZ),
+            Mipmap.FromBase(negativeZ),
             mipmaps);
     }
 
@@ -236,9 +236,9 @@ public sealed class Cubemap : CubeTexture
     /// one level (the explicit content always wins).
     /// </param>
     public static Cubemap Create(
-        MipmappedImage positiveX, MipmappedImage negativeX,
-        MipmappedImage positiveY, MipmappedImage negativeY,
-        MipmappedImage positiveZ, MipmappedImage negativeZ,
+        Mipmap positiveX, Mipmap negativeX,
+        Mipmap positiveY, Mipmap negativeY,
+        Mipmap positiveZ, Mipmap negativeZ,
         bool mipmaps = false)
     {
         ArgumentNullException.ThrowIfNull(positiveX);

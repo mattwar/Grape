@@ -10,7 +10,7 @@ public class Sprite2D : Prop2D
     /// <summary>
     /// The image to render.
     /// </summary>
-    public Image? Image { get; set; }
+    public Texture2D? Image { get; set; }
 
     /// <summary>
     /// The X position of the center of the sprite.
@@ -69,7 +69,7 @@ public class Sprite2D : Prop2D
     {
     }
 
-    public Sprite2D(Image image, float centerX, float centerY, float scale = 1f)
+    public Sprite2D(Texture2D image, float centerX, float centerY, float scale = 1f)
     {
         this.Image = image;
         this.CenterX = centerX;

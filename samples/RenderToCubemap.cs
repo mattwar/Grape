@@ -7,19 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
+
 // Render a scene *into* a cubemap, then sample it as a skybox.
-//
-// Unlike `Skybox.cs` (which fills each face by writing pixels with
-// `Image.SetPixel`), this sample uses `Cubemap.Render` to
-// run a 3D render pass into every face -- six colored cubes placed
-// along the world axes, photographed from the cube's center with a
-// 90 degree FOV camera per face. After the bake, the camera orbits
-// the origin and the bake result shows up as the skybox.
-//
-// This is the building block for image-based lighting: replace the
-// six colored cubes with a procedural sky / equirect HDR / scene
-// render, and you have an environment map for PBR reflections.
 
 using System.Numerics;
 using Blitter;
@@ -28,9 +17,11 @@ using Blitter.Bits;
 const int FaceSize = 256;
 
 // Empty faces -- contents will be replaced by Render.
-static Image Blank() => Bitmap.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
+static Texture2D Blank() => Bitmap.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
+
 var cubemap = Cubemap.Create(
-    Blank(), Blank(), Blank(), Blank(), Blank(), Blank());
+    Blank(), Blank(), Blank(), Blank(), Blank(), Blank()
+    );
 
 // Six colored cubes placed along the world axes. Each cube is large
 // enough (size 2 at distance 3, ~37 deg angular size) to dominate
@@ -59,17 +50,19 @@ var faceCam = new PerspectiveCamera
     FarPlane = 100f,
 };
 
-cubemap.Render(new Color(20, 20, 30), (rd, face) =>
-{
-    faceCam.Target = face.GetForward();
-    faceCam.Up = face.GetUp();
-    var vp = faceCam.GetViewProjection(rd.AspectRatio);
-    foreach (var (pos, col) in markers)
+cubemap.Render(
+    new Color(20, 20, 30), 
+    (rd, face) =>
     {
-        var model = Matrix4x4.CreateTranslation(pos);
-        rd.DrawMesh(TintMesh(cubeMesh, col), Shaders.PositionColorWithTransform, model * vp);
-    }
-});
+        faceCam.Target = face.GetForward();
+        faceCam.Up = face.GetUp();
+        var vp = faceCam.GetViewProjection(rd.AspectRatio);
+        foreach (var (pos, col) in markers)
+        {
+            var model = Matrix4x4.CreateTranslation(pos);
+            rd.DrawMesh(TintMesh(cubeMesh, col), Shaders.PositionColorWithTransform, model * vp);
+        }
+    });
 
 // Now display the baked cubemap as a skybox.
 var skyboxVertices = new Vertex3D[]
@@ -77,12 +70,14 @@ var skyboxVertices = new Vertex3D[]
     new(-1, -1, -1), new( 1, -1, -1), new( 1,  1, -1), new(-1,  1, -1),
     new(-1, -1,  1), new( 1, -1,  1), new( 1,  1,  1), new(-1,  1,  1),
 };
+
 var skyboxIndices = new uint[]
 {
     4, 5, 6,  4, 6, 7,   1, 0, 3,  1, 3, 2,
     0, 4, 7,  0, 7, 3,   5, 1, 2,  5, 2, 6,
     7, 6, 2,  7, 2, 3,   0, 1, 5,  0, 5, 4,
 };
+
 var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
 var window = new Window3D

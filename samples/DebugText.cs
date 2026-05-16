@@ -7,18 +7,12 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
 
-// Demonstrates 3D debug text. The string is updated every frame to show
-// elapsed time and frame number; the text mesh re-uploads via the renderer's
-// array-keyed mesh cache, sharing one GPU vertex buffer and one GPU font
-// atlas texture across all draws.
+// Demonstrates drawing 3D debug text: render.DrawDebugText(string, Matrix4x4).
 
 var window = new Window3D
 {
@@ -36,8 +30,7 @@ await window.RunAsync(rd =>
     var t = rd.ElapsedSecondsSinceStart;
     var aspect = 1f / rd.AspectRatio; // height / width
 
-    // Top line: a fixed banner that swings left-to-right with a gentle
-    // rotational wobble and slight vertical bob.
+    // Top line: a fixed banner that swings left-to-right with a gentle rotational wobble and slight vertical bob.
     {
         const string banner = "Hello, 3D world!";
         float swing = 0.4f * MathF.Sin(t * 0.8f);

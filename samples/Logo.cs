@@ -7,17 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Renders the Blitter logo: an 8x8 block built out of individually
-// colored "bits" with a small transparent gap between every cell so
-// the stacked-bit construction is visible. The top-right corner is
-// crumbling: a few bits are missing from the block and a handful are
-// tumbling off to the right at varied angles and sizes.
-//
-// Toggle SavePng below to also write a transparent-background PNG
-// next to the binary; flip it back off once the artwork is final
-// and the sample becomes a pure on-screen demo.
 
+// Renders the Blitter logo
 using System.Numerics;
 using Blitter;
 
@@ -217,8 +208,6 @@ void DrawLogo(Renderer2D rd)
             angleDeg * MathF.PI / 180f, bgPalette[colorIdx]);
     }
 }
-
-// --- Optional PNG export -------------------------------------------
 
 if (SavePng)
 {

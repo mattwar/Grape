@@ -7,9 +7,6 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 using System.Numerics;
 using Blitter;
@@ -19,9 +16,6 @@ using Blitter.Bits;
 //   - Shaders.Position                       (white, no transform)
 //   - Shaders.PositionWithTransform          (white, transformed)
 //   - Shaders.PositionWithTransformAndColor  (per-draw fragment color, transformed)
-// All three draw the same triangle mesh in different quadrants of the window
-// so the visual result tells you at a glance whether each shader pipeline
-// survives the runtime HLSL -> shadercross path.
 
 // Position-only triangle, ~1 unit tall, centered at origin.
 var triangle = Mesh.Create([
@@ -79,7 +73,9 @@ await window.RunAsync(rd =>
         Transform = bottomRight,
         FColor = HueToRgb(seconds * 0.25f),
     });
-});static Vector4 HueToRgb(float hue)
+});
+
+static Vector4 HueToRgb(float hue)
 {
     hue -= MathF.Floor(hue);
     var h6 = hue * 6f;

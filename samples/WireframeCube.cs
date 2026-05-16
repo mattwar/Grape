@@ -7,26 +7,15 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Two cubes side-by-side, sharing the same mesh:
-//
-//   * Left:  solid (default)
-//   * Right: wireframe -- the renderer derives the cube's unique edges
-//            from its triangle indices, caches them, and binds a
-//            LineList pipeline. Shared edges between adjacent triangles
-//            are deduped so each visible edge is drawn exactly once.
-//
-// Wireframe is a per-draw renderer state, scoped via PushState() like
-// CullMode and DepthMode. Toggling it on a triangle-based mesh costs
-// one extra index-buffer build per change; non-triangle meshes ignore
-// the flag.
+
+// Two cubes side-by-side, sharing the same mesh, one solide, one wireframe.
 
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
 
-// 8 unique cube corners + 36 triangle indices (12 triangles, CCW from
-// outside). Identical to the IndexedCube sample.
+// 8 unique cube corners + 36 triangle indices (12 triangles, CCW from outside). 
+// Identical to the IndexedCube sample.
 var vertices = new ColorVertex3D[]
 {
     new(new Vertex3D(-1f, -1f, -1f), new Color(40,  40, 200)),
@@ -75,20 +64,14 @@ await window.RunAsync(rd =>
     var modelLeft  = spin * Matrix4x4.CreateTranslation(-1.8f, 0f, 0f);
     var modelRight = spin * Matrix4x4.CreateTranslation( 1.8f, 0f, 0f);
 
-    // Left cube: solid. CullMode.Back is safe because the cube is a
-    // closed solid -- back faces are always hidden inside.
+    // solid cube
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
         rd.DrawMesh(cube, Shaders.PositionColorWithTransform, modelLeft * viewProjection);
     }
 
-    // Right cube: wireframe. The renderer builds a deduped edge index
-    // buffer (12 unique edges -> 24 line indices) the first time this
-    // draws and reuses it on every subsequent frame.
-    //
-    // CullMode is left at None for wireframe -- there are no faces to
-    // cull, just lines, and lines have no facing.
+    // wireframe cube
     using (rd.PushState())
     {
         rd.Wireframe = true;

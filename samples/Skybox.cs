@@ -7,23 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
+
 // A spinning camera inside a procedurally-generated skybox.
-//
-// A skybox is a cubemap (six square images arranged as the inside of
-// a cube) sampled by a 3D direction vector instead of a 2D UV. The
-// renderer ships a built-in `Shaders.Skybox` and `Camera3D` exposes
-// `GetSkyboxViewProjection` -- which strips the camera's translation
-// so the sky always stays centred on the player no matter where the
-// camera moves.
-//
-// Each face is a solid colour with a 1-pixel black border so face
-// edges and orientation are obvious in the rendered image. The
-// camera-facing inner cube (drawn after the skybox, with depth
-// writes on) verifies that the skybox renders behind opaque
-// geometry without any per-draw depth-state gymnastics: the skybox
-// shader forces clip-space Z = W, so the perspective divide pins
-// every skybox pixel to depth 1 (the far plane).
 
 using System.Numerics;
 using Blitter;
@@ -39,9 +24,7 @@ var cubemap = Cubemap.Create(
     positiveZ: MakeFace(new Color(220,  80, 200)),  // +Z back   : magenta
     negativeZ: MakeFace(new Color( 80, 210, 210))); // -Z front  : cyan
 
-// Unit cube geometry for the skybox. Only positions matter -- the
-// skybox shader uses the position itself as the cubemap sample
-// direction.
+// Unit cube geometry for the skybox. 
 var skyboxVertices = new Vertex3D[]
 {
     new(-1f, -1f, -1f),
@@ -54,9 +37,6 @@ var skyboxVertices = new Vertex3D[]
     new(-1f,  1f,  1f),
 };
 
-// Index winding doesn't matter here: the skybox is rendered with
-// CullMode.None so we don't have to worry about whether the camera
-// is "inside" or "outside" the cube.
 var skyboxIndices = new uint[]
 {
     4, 5, 6,   4, 6, 7,   // +Z
@@ -66,6 +46,7 @@ var skyboxIndices = new uint[]
     7, 6, 2,   7, 2, 3,   // +Y
     0, 1, 5,   0, 5, 4,   // -Y
 };
+
 var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
 // A small inner cube (one solid colour per vertex) so the depth
@@ -81,6 +62,7 @@ var innerCubeVertices = new ColorVertex3D[]
     new(new Vertex3D( 0.5f,  0.5f,  0.5f), new Color( 30,  30,  30)),
     new(new Vertex3D(-0.5f,  0.5f,  0.5f), new Color(  8,   8,   8)),
 };
+
 var innerCube = Mesh.Create(innerCubeVertices, skyboxIndices);
 
 var window = new Window3D
@@ -105,12 +87,12 @@ await window.RunAsync(rd =>
         MathF.Sin(t * 0.3f) * OrbitRadius,
         MathF.Sin(t * 0.5f) * 1.2f,
         MathF.Cos(t * 0.3f) * OrbitRadius);
+
     // Always look at the origin so the inner cube stays in frame
     // while the orbit sweeps the camera through every cubemap face.
     camera.Target = Vector3.Zero;
 
-    // Skybox: translation-stripped view-projection. CullMode.None
-    // because the cube is drawn from the inside.
+    // Draw the Skybox
     using (rd.PushState())
     {
         rd.CullMode = CullMode.None;
@@ -118,13 +100,12 @@ await window.RunAsync(rd =>
             camera.GetSkyboxViewProjection(rd.AspectRatio));
     }
 
-    // Inner cube: regular view-projection (translation kept), with
-    // backface culling. Depth writes are on by default so the
-    // skybox correctly hides behind the cube where the cube covers
-    // it.
+    // Draw the Inner cube
     var viewProjection = camera.GetViewProjection(rd);
-    var model = Matrix4x4.CreateRotationY(t * 0.7f)
+    var model = Matrix4x4
+        .CreateRotationY(t * 0.7f)
         .RotateX(t * 0.4f);
+
     using (rd.PushState())
     {
         rd.CullMode = CullMode.Back;
@@ -133,7 +114,7 @@ await window.RunAsync(rd =>
     }
 });
 
-static Image MakeFace(Color fill)
+static Texture2D MakeFace(Color fill)
 {
     var image = Bitmap.Create(FaceSize, FaceSize, PixelFormat.ABGR8888);
     var border = Color.Black;

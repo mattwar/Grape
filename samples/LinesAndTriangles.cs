@@ -7,29 +7,20 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Three meshes drawn with three different topologies through the same
+
+
+// Shows three meshes drawn with three different topologies through the same
 // renderer:
 //
 //   * RGB world axes  -> Topology.LineList   (3 line segments)
 //   * Animated sine   -> Topology.LineStrip  (one continuous polyline)
 //   * Filled triangle -> Topology.TriangleList (default)
-//
-// The same `RenderMesh` call handles all three -- the topology is a
-// property of the mesh, so the renderer compiles a separate pipeline
-// for each (cached after first use) and routes the vertex data through
-// it correctly.
 
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
 
-// World axes: three independent line segments. Each pair of vertices
-// in the buffer is one line, so the topology is LineList.
-//
-//   X axis: red,    from (0,0,0) to (+1,0,0)
-//   Y axis: green,  from (0,0,0) to (0,+1,0)
-//   Z axis: blue,   from (0,0,0) to (0,0,+1)
+// World axes: three independent line segments.
 var axes = Meshes.Axes(length: 1f);
 
 // A filled reference triangle off to the right, rendered with the

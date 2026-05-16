@@ -7,20 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Demonstrates how tightly SkiaSharp integrates with Blitter:
-// `Image.DrawCanvas(canvas => ...)` hands you an SKCanvas pointing
-// at the image's pixels, so you can use any Skia drawing code to
-// build textures the renderer can blit. Here we bake an atlas once
-// at startup, then blit cells of it hundreds of times per frame as
-// falling confetti.
-//
-// If you already have an SKBitmap from another source (PNG decode,
-// procedural pipeline, etc.), `bitmap.ToImage()` adopts it instead.
-//
-// For per-frame procedural drawing (where the pixels actually change
-// every frame) use `Renderer2D.DrawCanvas(rect, action)` instead;
-// see the SkiaCanvas sample.
+
+// Demonstrates drawing into a `Blitter.Bitmap` using a `SkiaSharp.SKCanvas`
 
 using System.Numerics;
 using Blitter;
@@ -34,8 +22,8 @@ const int AtlasW    = CellSize * AtlasCols;
 const int AtlasH    = CellSize * AtlasRows;
 const int ConfettiCount = 320;
 
-// All draws inside the rendering callback work in this fixed design
-// space. The renderer's ViewPort + Scale letterbox it into whatever
+// All draws inside the rendering callback work in this fixed design space. 
+// The renderer's ViewPort + Scale letterbox it into whatever
 // the actual window size is, so the layout stays aspect-correct on
 // resize / fullscreen.
 const int DesignW = 960;
@@ -58,7 +46,7 @@ SKColor[] hues =
 ];
 
 // Build the atlas once. Per cell: a diagonal gradient backdrop and
-// an anti-aliased character centered on top. `Image.DrawCanvas`
+// an anti-aliased character centered on top. `Texture2D.DrawCanvas`
 // gives us an SKCanvas pointing at the image's pixels -- everything
 // inside the lambda is plain SkiaSharp code.
 var atlasImage = Bitmap.Create(AtlasW, AtlasH);
@@ -108,9 +96,9 @@ atlasImage.DrawCanvas(canvas =>
 });
 
 // Wrap the image in an Atlas so glyph cells can be looked up by
-// index instead of recomputing src rects on every blit. The Atlas
-// takes ownership of the Image (default), so disposing the atlas
-// releases everything.
+// index instead of recomputing src rects on every blit. 
+// The Atlas takes ownership of the Texture2D (default), 
+// so disposing the atlas releases everything.
 var atlasGrid = Atlas.Grid(atlasImage, AtlasCols, AtlasRows);
 
 // Confetti state. Each piece picks an atlas cell, a screen position,
@@ -128,10 +116,6 @@ var window = new Window2D(960, 540)
 };
 
 // Tell the renderer to treat the surface as a fixed DesignW x DesignH
-// drawing area and letterbox it into whatever the window grows to.
-// All draws inside the rendering callback now use design coordinates;
-// SDL handles scaling, centering, and letterbox bars (filled with the
-// window's BackgroundColor).
 window.Renderer.SetLogicalSize(DesignW, DesignH, LogicalPresentation.Letterbox);
 
 await window.RunAsync(rd =>
@@ -162,7 +146,9 @@ await window.RunAsync(rd =>
         var dst = new Rect(c.Pos.X - c.Size * 0.5f, c.Pos.Y - c.Size * 0.5f, c.Size, c.Size);
         atlasGrid.Draw(rd, c.AtlasIndex, dst);
     }
-});static Confetti SpawnConfetti(Random rng, bool initial)
+});
+
+static Confetti SpawnConfetti(Random rng, bool initial)
 {
     float size = 18f + (float)rng.NextDouble() * 30f;
     return new Confetti

@@ -26,7 +26,7 @@ internal static class GLTF
 
         // Cache: glTF Image -> Blitter Image, so two materials sharing a
         // texture share the GPU upload too.
-        var imageCache = new Dictionary<SharpGLTF.Schema2.Image, Image>();
+        var imageCache = new Dictionary<SharpGLTF.Schema2.Image, Texture2D>();
         // Same for materials.
         var materialCache = new Dictionary<SharpGLTF.Schema2.Material, PbrMaterial>();
 
@@ -51,7 +51,7 @@ internal static class GLTF
     private static void VisitNode(
         Node node,
         List<ModelPart> parts,
-        Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
+        Dictionary<SharpGLTF.Schema2.Image, Texture2D> imageCache,
         Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache)
     {
         if (node.Mesh is { } mesh)
@@ -82,7 +82,7 @@ internal static class GLTF
         MeshPrimitive prim,
         Matrix4x4 world,
         Matrix4x4 normalMatrix,
-        Dictionary<SharpGLTF.Schema2.Image, Image> imageCache,
+        Dictionary<SharpGLTF.Schema2.Image, Texture2D> imageCache,
         Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache,
         string? nodeName)
     {
@@ -146,7 +146,7 @@ internal static class GLTF
     private static PbrMaterial ConvertMaterial(
         SharpGLTF.Schema2.Material? src,
         Dictionary<SharpGLTF.Schema2.Material, PbrMaterial> materialCache,
-        Dictionary<SharpGLTF.Schema2.Image, Image> imageCache)
+        Dictionary<SharpGLTF.Schema2.Image, Texture2D> imageCache)
     {
         if (src is null)
             return PbrMaterial.Default;
@@ -156,7 +156,7 @@ internal static class GLTF
 
         // pbrMetallicRoughness: baseColorFactor + baseColorTexture.
         var baseColor = Color.White;
-        Image? baseColorTex = null;
+        Texture2D? baseColorTex = null;
         if (src.FindChannel("BaseColor") is { } bc)
         {
             baseColor = FloatToColor(bc.Color);
@@ -168,7 +168,7 @@ internal static class GLTF
         // roughnessFactor (default 1) packed into a single channel
         // alongside the (B=metallic, G=roughness) MR texture.
         float metallic = 1f, roughness = 1f;
-        Image? mrTex = null;
+        Texture2D? mrTex = null;
         if (src.FindChannel("MetallicRoughness") is { } mr)
         {
             metallic = GetFloatParameter(mr, "MetallicFactor", 1f);
@@ -180,7 +180,7 @@ internal static class GLTF
         // emissiveFactor is a Vector3 (no alpha); SharpGLTF surfaces it
         // as Vector4 with W=1, so we drop W when converting to Color.
         var emissive = Color.Black;
-        Image? emissiveTex = null;
+        Texture2D? emissiveTex = null;
         if (src.FindChannel("Emissive") is { } em)
         {
             var v = em.Color;
@@ -191,7 +191,7 @@ internal static class GLTF
         }
 
         float occlusionStrength = 1f;
-        Image? occlusionTex = null;
+        Texture2D? occlusionTex = null;
         if (src.FindChannel("Occlusion") is { } occ)
         {
             occlusionStrength = GetFloatParameter(occ, "OcclusionStrength", 1f);
@@ -229,9 +229,9 @@ internal static class GLTF
         return defaultValue;
     }
 
-    private static Image GetOrDecodeImage(
+    private static Texture2D GetOrDecodeImage(
         SharpGLTF.Schema2.Image gltfImage,
-        Dictionary<SharpGLTF.Schema2.Image, Image> imageCache)
+        Dictionary<SharpGLTF.Schema2.Image, Texture2D> imageCache)
     {
         if (imageCache.TryGetValue(gltfImage, out var cached))
             return cached;

@@ -3,7 +3,7 @@ namespace Blitter;
 /// <summary>
 /// A GPU-resident image.
 /// </summary>
-public sealed class GpuBitmap : Image
+public sealed class GpuBitmap : Texture2D
 {
     private readonly GpuDevice _device;
     private GpuTexture? _texture;

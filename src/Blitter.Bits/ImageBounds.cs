@@ -3,7 +3,7 @@ using System.Numerics;
 namespace Blitter.Bits;
 
 /// <summary>
-/// Helpers to compute bounds for an <see cref="Image"/>.
+/// Helpers to compute bounds for an <see cref="Texture2D"/>.
 /// </summary>
 public static class ImageBounds
 {

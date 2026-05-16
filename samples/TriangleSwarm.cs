@@ -7,14 +7,9 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
-//
-// Draws 24 copies of one triangle by issuing 24 separate DrawMesh
-// calls -- one per triangle -- each with its own transform. Compare
-// with TriangleSwarmInstanced.cs, which renders the same scene as a
-// single instanced DrawMesh call.
+
+// Draws 24 copies of one triangle by issuing 24 separate DrawMesh calls, one per triangle, 
+// each with its own transform. 
 
 using System.Collections.Immutable;
 using System.Numerics;
@@ -60,11 +55,6 @@ await window.RunAsync(rd =>
             .Translate(cx, cy, 0f) *
             aspectScale;
 
-        // One DrawMesh call per triangle. Renderer3D + GpuRenderer have
-        // to allocate a draw command, look up the pipeline state, and
-        // walk the per-draw bookkeeping for every iteration of this
-        // loop -- contrast with the single submission used by the
-        // instanced version.
         rd.DrawMesh(mesh, Shaders.PositionColorWithTransform, transform);
     }
 });

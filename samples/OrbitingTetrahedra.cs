@@ -7,9 +7,6 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// The samples/NuGet.config in this folder pulls Blitter from
-// ./artifacts/nuget when present, falling back to nuget.org otherwise.
 
 // Two regular tetrahedra orbit a common axis in the XZ plane while
 // independently spinning. As one tetra moves behind the other (greater
@@ -20,28 +17,6 @@
 using System.Numerics;
 using Blitter;
 using Blitter.Bits;
-
-// Regular tetrahedron with vertices on the unit cube's diagonals.
-// Each vertex carries a color so the faces show as colored gradients
-// once they are interpolated across the triangle.
-static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
-{
-    var v0 = new Vertex3D( 1f,  1f,  1f);
-    var v1 = new Vertex3D( 1f, -1f, -1f);
-    var v2 = new Vertex3D(-1f,  1f, -1f);
-    var v3 = new Vertex3D(-1f, -1f,  1f);
-
-    return Mesh.Create([
-        // face opposite v0
-        new ColorVertex3D(v1, c1), new ColorVertex3D(v2, c2), new ColorVertex3D(v3, c3),
-        // face opposite v1
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v3, c3), new ColorVertex3D(v2, c2),
-        // face opposite v2
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v1, c1), new ColorVertex3D(v3, c3),
-        // face opposite v3
-        new ColorVertex3D(v0, c0), new ColorVertex3D(v2, c2), new ColorVertex3D(v1, c1),
-    ]);
-}
 
 // Warm-toned tetra and cool-toned tetra so it's obvious which is which
 // when they overlap.
@@ -99,3 +74,23 @@ await window.RunAsync(rd =>
     rd.DrawMesh(tetraA, Shaders.PositionColorWithTransform, modelA * viewProjection);
     rd.DrawMesh(tetraB, Shaders.PositionColorWithTransform, modelB * viewProjection);
 });
+
+static Mesh<ColorVertex3D> MakeTetrahedron(Color c0, Color c1, Color c2, Color c3)
+{
+    var v0 = new Vertex3D( 1f,  1f,  1f);
+    var v1 = new Vertex3D( 1f, -1f, -1f);
+    var v2 = new Vertex3D(-1f,  1f, -1f);
+    var v3 = new Vertex3D(-1f, -1f,  1f);
+
+    return Mesh.Create([
+        // face opposite v0
+        new ColorVertex3D(v1, c1), new ColorVertex3D(v2, c2), new ColorVertex3D(v3, c3),
+        // face opposite v1
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v3, c3), new ColorVertex3D(v2, c2),
+        // face opposite v2
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v1, c1), new ColorVertex3D(v3, c3),
+        // face opposite v3
+        new ColorVertex3D(v0, c0), new ColorVertex3D(v2, c2), new ColorVertex3D(v1, c1),
+    ]);
+}
+

@@ -1,7 +1,7 @@
 namespace Blitter;
 
 /// <summary>
-/// Pixel format identifiers for <see cref="Image"/> and related GPU/CPU
+/// Pixel format identifiers for <see cref="Texture2D"/> and related GPU/CPU
 /// surfaces.
 /// </summary>
 /// <remarks>

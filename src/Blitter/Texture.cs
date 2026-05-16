@@ -2,7 +2,7 @@ namespace Blitter;
 
 /// <summary>
 /// Base type for any GPU-samplable texture asset. Sealed to its two
-/// engine-provided subtypes -- <see cref="Image"/> (1D or 2D, any
+/// engine-provided subtypes -- <see cref="Texture2D"/> (1D or 2D, any
 /// dimension that samples by 2D UV) and <see cref="Cubemap"/>
 /// (six faces sampled by 3D direction) -- because the renderer's
 /// upload and bind paths pattern-match on exactly these kinds.

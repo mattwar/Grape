@@ -26,7 +26,7 @@ internal static class MTL
 
         string? currentName = null;
         Color currentDiffuse = Color.White;
-        Image? currentTexture = null;
+        Texture2D? currentTexture = null;
 
         using var reader = new StreamReader(path);
         string? line;
@@ -94,7 +94,7 @@ internal static class MTL
     private static void Flush(
         string? name,
         Color diffuse,
-        Image? texture,
+        Texture2D? texture,
         Dictionary<string, LitTextureMaterial> materials)
     {
         if (string.IsNullOrEmpty(name))
@@ -112,7 +112,7 @@ internal static class MTL
     // texture-less; the renderer will fall back to the model's 1x1
     // white placeholder, so the geometry still renders -- just
     // without its painted detail.
-    private static Image? TryLoadImage(string path)
+    private static Texture2D? TryLoadImage(string path)
     {
         if (!File.Exists(path))
             return null;

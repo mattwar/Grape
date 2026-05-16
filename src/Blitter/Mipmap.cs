@@ -1,12 +1,11 @@
 namespace Blitter;
 
 /// <summary>
-/// An image with an explicit mip chain: a base image plus one or more
-/// successively-halved lower-resolution levels supplied by the caller.
+/// An explicit (CPU-side) mipmap chain of images.
 /// </summary>
-public sealed class MipmappedImage : Image
+public sealed class Mipmap : Texture2D
 {
-    private MipmappedImage(IReadOnlyList<Image> levels)
+    private Mipmap(IReadOnlyList<Texture2D> levels)
     {
         Levels = levels;
     }
@@ -15,10 +14,10 @@ public sealed class MipmappedImage : Image
     /// The mip levels in order from highest to lowest resolution.
     /// <c>Levels[0]</c> is the base level.
     /// </summary>
-    public IReadOnlyList<Image> Levels { get; }
+    public IReadOnlyList<Texture2D> Levels { get; }
 
     /// <summary>The highest-resolution level (mip 0).</summary>
-    public Image Base => Levels[0];
+    public Texture2D Base => Levels[0];
 
     /// <inheritdoc/>
     public override int LevelCount => Levels.Count;
@@ -73,7 +72,7 @@ public sealed class MipmappedImage : Image
     /// dimensions <c>max(1, prev / 2)</c> and share the base's
     /// <see cref="Blitter.PixelFormat"/>.
     /// </summary>
-    public static MipmappedImage Create(params Image[] levels)
+    public static Mipmap Create(params Texture2D[] levels)
     {
         ArgumentNullException.ThrowIfNull(levels);
         if (levels.Length < 1)
@@ -108,20 +107,20 @@ public sealed class MipmappedImage : Image
         }
 
         // Defensive copy so callers can't mutate the chain after construction.
-        var copy = new Image[levels.Length];
+        var copy = new Texture2D[levels.Length];
         Array.Copy(levels, copy, levels.Length);
-        return new MipmappedImage(copy);
+        return new Mipmap(copy);
     }
 
     /// <summary>
     /// Convenience: builds a single-level chain wrapping a plain
-    /// <see cref="Image"/>. Useful when an API takes
+    /// <see cref="Texture2D"/>. Useful when an API takes
     /// <c>MipmappedImage</c> uniformly but most callers only have one
     /// level.
     /// </summary>
-    public static MipmappedImage FromBase(Image baseLevel)
+    public static Mipmap FromBase(Texture2D baseLevel)
     {
         ArgumentNullException.ThrowIfNull(baseLevel);
-        return new MipmappedImage(new[] { baseLevel });
+        return new Mipmap(new[] { baseLevel });
     }
 }

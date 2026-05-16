@@ -1,14 +1,14 @@
 namespace Blitter;
 
 /// <summary>
-/// A <see cref="CubeTexture"/> whose six faces live on the GPU as
+/// A <see cref="TextureCube"/> whose six faces live on the GPU as
 /// a single layered <c>SDL_GPUTexture</c> (<c>TexturetypeCube</c>).
 /// Use when the cubemap's contents are produced by the GPU (e.g.
 /// baked diffuse / specular environment maps) and
 /// never need to be read back to the CPU. Renderers bind it directly
 /// with no upload cost.
 /// </summary>
-public sealed class GpuCubemap : CubeTexture, IDisposable
+public sealed class GpuCubemap : TextureCube, IDisposable
 {
     private readonly GpuDevice _device;
     private GpuTexture? _texture;

@@ -7,10 +7,8 @@
 // While Blitter is unpublished, build a local copy first:
 //
 //     dotnet build src/Blitter.Package/Blitter.Package.csproj
-//
-// Displays Blitter.Bits's default procedural sky cubemap as a
-// skybox. The sky is baked once (CPU per-pixel) and cached for the
-// rest of the process, so accessing `Cubemaps.Sky` again is free.
+
+// Displays Blitter.Bits's default procedural sky cubemap as a skybox. 
 
 using System.Numerics;
 using Blitter;
@@ -21,12 +19,14 @@ var skyboxVertices = new Vertex3D[]
     new(-1, -1, -1), new( 1, -1, -1), new( 1,  1, -1), new(-1,  1, -1),
     new(-1, -1,  1), new( 1, -1,  1), new( 1,  1,  1), new(-1,  1,  1),
 };
+
 var skyboxIndices = new uint[]
 {
     4, 5, 6,  4, 6, 7,   1, 0, 3,  1, 3, 2,
     0, 4, 7,  0, 7, 3,   5, 1, 2,  5, 2, 6,
     7, 6, 2,  7, 2, 3,   0, 1, 5,  0, 5, 4,
 };
+
 var skyboxMesh = Mesh.Create(skyboxVertices, skyboxIndices);
 
 var window = new Window3D

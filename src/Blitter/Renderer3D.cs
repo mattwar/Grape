@@ -178,7 +178,7 @@ public abstract class Renderer3D
     /// linearly with the sample count; fragment shading cost stays the
     /// same (one shader invocation per pixel, regardless of MSAA level).
     /// MSAA does not help with texture aliasing inside surfaces � use
-    /// mipmaps (<see cref="Image.Mipmaps"/>) for that.
+    /// mipmaps (<see cref="Texture2D.Mipmaps"/>) for that.
     /// </remarks>
     public Antialiasing Antialiasing { get; set; } = Antialiasing.None;
 
@@ -314,7 +314,7 @@ public abstract class Renderer3D
     /// <summary>Queues a mesh for drawing, sampling from the given image.</summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex> shader)
         where TVertex : unmanaged;
 
@@ -337,7 +337,7 @@ public abstract class Renderer3D
     /// <see cref="DrawMeshRaw{TVertex,TArgs}(Mesh{TVertex}, Shader{TVertex,TArgs}, in TArgs)"/>.</summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -364,7 +364,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMesh<TVertex>(
         Mesh<TVertex> mesh,
-        CubeTexture cubemap,
+        TextureCube cubemap,
         Shader<TVertex> shader)
         where TVertex : unmanaged;
 
@@ -376,7 +376,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        CubeTexture cubemap,
+        TextureCube cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -427,7 +427,7 @@ public abstract class Renderer3D
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -463,7 +463,7 @@ public abstract class Renderer3D
     /// </summary>
     public void DrawMesh<TVertex, TArgs>(
         Mesh<TVertex> mesh,
-        CubeTexture cubemap,
+        TextureCube cubemap,
         Shader<TVertex, TArgs> shader,
         in TArgs args)
         where TVertex : unmanaged
@@ -568,7 +568,7 @@ public abstract class Renderer3D
     /// </summary>
     public abstract void DrawMeshRaw<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
@@ -603,7 +603,7 @@ public abstract class Renderer3D
     /// </summary>
     public void DrawMesh<TVertex, TArgs, TInstance>(
         Mesh<TVertex> mesh,
-        Image texture,
+        Texture2D texture,
         Shader<TVertex, TArgs, TInstance> shader,
         in TArgs args,
         ReadOnlySpan<TInstance> instances)
