@@ -36,22 +36,29 @@ var rocket = new Sprite2D(rocketImage, DesignW / 2, DesignH / 2, 0.1f)
     Heading = 45f
 };
 
-var sound = Sound.LoadWAV(Asset.GetPathRelativeToCaller("szwoopy.wav"));
-
 await window.RunAsync(rd =>
 {
     // Per-frame input:
     //     turn left/right as long as key is down keep turning
     //     speed up/down only on key down transitions
     var input = window.Input;
+    
     if (input.IsDown(Key.Left))
         rocket.Heading = (rocket.Heading + 350f) % 360f;
+    
     if (input.IsDown(Key.Right))
         rocket.Heading = (rocket.Heading + 10f) % 360f;
+
     if (input.WasJustPressed(Key.Up))
+    {
         rocket.Speed = Math.Clamp(rocket.Speed + 50f, 0f, 1000f);
+        Audio.Play(Sounds.RoarUp, volume: .25f);
+    }
     if (input.WasJustPressed(Key.Down))
+    {
         rocket.Speed = Math.Clamp(rocket.Speed - 50f, 0f, 1000f);
+        Audio.Play(Sounds.RoarDown, volume: .25f);
+    }
 
     if (rocket.Update(rd.GetUpdateContext()))
     {
@@ -87,7 +94,7 @@ await window.RunAsync(rd =>
         if (bounce)
         {
             rocket.Heading = (rocket.Heading + Random.Shared.Next(-10, 10) + 360f) % 360f;
-            Audio.Play(sound, volume: .2f);
+            Audio.Play(Sounds.Boing, volume: .2f);
         }
     }
 

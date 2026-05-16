@@ -14,26 +14,27 @@
 
 SDL3 is fantastic, but using it directly from C# means a lot of P/Invoke, unsafe code, and boilerplate. Blitter exists to give .NET developers a small, approachable surface for:
 
-- Opening a window
-- Drawing 2D images and primitives
-- Drawing 3D meshes with custom shaders
+- Managing windows and events
+- Drawing/animating 2D images and primitives
+- Drawing/animating 3D meshes, models and text with lighting
 - Reading keyboard, mouse, gamepad, and touch input
-- Playing audio
-- Loading images
+- Loading/Playing sounds
+- Customizing Shaders
+- **Zero** allocation overhead per frame
 
 …all without ever having to think about pointers or marshalling or interacting directly with the GPU.
 
 ## Features
 
-- **`Window2D`** - bitmap/sprite-style 2D rendering
-- **`Window3D`** - GPU-accelerated 3D rendering
+- **Window2D** - bitmap/sprite-style 2D rendering
+- **Window3D** - GPU-accelerated 3D rendering
 - **SkiaSharp** Integration - Fonts, Filters, Canvas and more
 - **Input** - keyboard, mouse, gamepad, and touch via simple events
-- **Audio** - load and play WAV data
+- **Audio** - load, play & mix wav, mp3 and ogg sound files
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
-- **`Blitter.Bits`** - beyond the basics: useful tidbits for graphical apps
-- **`Blitter.Blocks`** - building blocks: sprites, scenes, panels and more
+- **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
+- **Blitter.Blocks** - building blocks: sprites, scenes, panels and more
 
 ## Installation
 
@@ -57,7 +58,7 @@ using Blitter;
 var window = new Window2D(800, 600)
 {
     Title = "Bouncing Square",
-    BackgroundColor = new Color(20, 20, 40),
+    BackgroundColor = Color.Black,
     CloseKey = Key.Escape
 };
 
@@ -66,9 +67,11 @@ float x = 0, vx = 200; // pixels per second
 await window.RunAsync(rd =>
 {
     x += vx * rd.ElapsedSecondsSinceLastRender;
-    if (x < 0 || x > window.Size.Width - 100) vx = -vx;
 
-    rd.DrawColor = new Color(220, 60, 60);
+    if (x < 0 || x > window.Size.Width - 100) 
+        vx = -vx;
+
+    rd.DrawColor = Color.Red;
     rd.DrawFillRect(new Rect(x, 250, 100, 100));
 });
 ```
@@ -91,16 +94,16 @@ var triangle = Mesh.Create<ColorVertex3D>(
 var window = new Window3D
 {
     Title = "Spinning Triangle",
-    BackgroundColor = new Color(0, 0, 32),
+    BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape
 };
 
 await window.RunAsync(r =>
 {
-    var transform =
-        Matrix4x4.CreateRotationZ(r.ElapsedSecondsSinceStart) *
-        Matrix4x4.CreateScale(0.8f);
+    var transform = Matrix4x4
+        .CreateRotationZ(r.ElapsedSecondsSinceStart)
+        .Scale(0.8f);
 
     r.DrawMesh(triangle, transform);
 });

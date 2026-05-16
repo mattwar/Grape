@@ -6,15 +6,15 @@
 
 ## What's in the box
 
-- **`Window2D`** - bitmap/sprite-style 2D rendering
-- **`Window3D`** - GPU-accelerated 3D rendering
+- **Window2D** - bitmap/sprite-style 2D rendering
+- **Window3D** - GPU-accelerated 3D rendering
 - **SkiaSharp** Integration - Fonts, Filters, Canvas and more
 - **Input** - keyboard, mouse, gamepad, and touch via simple events
-- **Audio** - load and play WAV data
+- **Audio** - load, play & mix wav, mp3 and ogg sound files
 - **Images** - load, save, manipulate pixels, apply filters
 - **Shaders** - load, save, dynamic compilation
-- **`Blitter.Bits`** - beyond the basics: useful tidbits for graphical apps
-- **`Blitter.Blocks`** - building blocks: sprites, scenes, panels and more
+- **Blitter.Bits** - beyond the basics: useful tidbits for graphical apps
+- **Blitter.Blocks** - building blocks: sprites, scenes, panels and more
 
 ## A 2D example
 
@@ -26,7 +26,7 @@ using Blitter;
 var window = new Window2D(800, 600)
 {
     Title = "Bouncing Square",
-    BackgroundColor = new Color(20, 20, 40),
+    BackgroundColor = Color.Black,
     CloseKey = Key.Escape
 };
 
@@ -35,9 +35,11 @@ float x = 0, vx = 200; // pixels per second
 await window.RunAsync(rd =>
 {
     x += vx * rd.ElapsedSecondsSinceLastRender;
-    if (x < 0 || x > window.Size.Width - 100) vx = -vx;
 
-    rd.DrawColor = new Color(220, 60, 60);
+    if (x < 0 || x > window.Size.Width - 100) 
+        vx = -vx;
+
+    rd.DrawColor = Color.Red;
     rd.DrawFillRect(new Rect(x, 250, 100, 100));
 });
 ```
@@ -60,16 +62,16 @@ var triangle = Mesh.Create<ColorVertex3D>(
 var window = new Window3D
 {
     Title = "Spinning Triangle",
-    BackgroundColor = new Color(0, 0, 32),
+    BackgroundColor = Color.Black,
     FullScreen = true,
     CloseKey = Key.Escape
 };
 
 await window.RunAsync(r =>
 {
-    var transform =
-        Matrix4x4.CreateRotationZ(r.ElapsedSecondsSinceStart) *
-        Matrix4x4.CreateScale(0.8f);
+    var transform = Matrix4x4
+        .CreateRotationZ(r.ElapsedSecondsSinceStart)
+        .Scale(0.8f);
 
     r.DrawMesh(triangle, transform);
 });
